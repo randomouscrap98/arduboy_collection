@@ -45,11 +45,35 @@ uint8_t worldMap[MAPWIDTH][MAPHEIGHT]=
   {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
 };
 
+constexpr uint8_t GRADIENTS = 4;
 constexpr uint8_t sp_shading[] PROGMEM = { 
     1, 64,
-    255,255,255,255,255,255,255,255,    // Full fill
-    85,85,85,85,85,85,85,85,            // Half fill
-    170,170,170,170,170,170,170,170,    // Half fill alt
+    255,255,255,255,255,255,255,255,
+    255,255,255,255,255,255,255,255,
+
+    238,238,238,238,238,238,238,238,
+    187,187,187,187,187,187,187,187,
+
+    170,170,170,170,170,170,170,170,
+    85,85,85,85,85,85,85,85,
+
+    136,136,136,136,136,136,136,136,
+    34,34,34,34,34,34,34,34,
+
+    //255,255,255,255,255,255,255,255,
+    ////254,254,254,254,254,254,254,254,
+    //238,238,238,238,238,238,238,238,
+    ////234,234,234,234,234,234,234,234,
+    //170,170,170,170,170,170,170,170,
+    ////168,168,168,168,168,168,168,168,
+    //136,136,136,136,136,136,136,136,
+    ////128,128,128,128,128,128,128,128,
+    //0,0,0,0,0,0,0,0
+    //255,255,255,255,255,255,255,255,    // Full fill
+    //254,254,254,254,254,254,254,254,
+
+    //85,85,85,85,85,85,85,85,            // Half fill
+    //170,170,170,170,170,170,170,170,    // Half fill alt
 };
 //constexpr uint8_t sp_fill[8] = { 255,255,255,255,255,255,255,255 };
 //constexpr uint8_t sp_half[8] = { 85,85,85,85,85,85,85,85 };
@@ -137,10 +161,10 @@ inline void render()
                 break;
         }
 
-        if(perpWallDist >= VIEWDISTANCE) continue;
+        if(perpWallDist >= VIEWDISTANCE || side & x) continue;
 
         //Choose wall color based sort of on distance + wall side
-        uint8_t color_offset = 0;
+        uint8_t color_offset = (int)(perpWallDist / 2);
 
         // Calculate distance projected on camera direction. This is the shortest distance from the point where the wall is
         // hit to the camera plane. Euclidean to center camera point would give fisheye effect!
@@ -148,9 +172,11 @@ inline void render()
         // for size == 1, but can be simplified to the code below thanks to how sideDist and deltaDist are computed:
         // because they were left scaled to |rayDir|. sideDist is the entire length of the ray above after the multiple
         // steps, but we subtract deltaDist once because one step more into the wall was taken above.
-        if (side == 1) {
-            color_offset = 1;
-        }
+        //if (side == 1) 
+        //    color_offset += 1;
+
+        if(color_offset >= GRADIENTS)
+            color_offset = GRADIENTS - 1;
 
         // Calculate half height of line to draw on screen
         uint8_t lineHeight = (perpWallDist < 1 ? HEIGHT : (int)(HEIGHT / perpWallDist)) >> 1;
@@ -159,7 +185,7 @@ inline void render()
         uint8_t drawStart = MIDSCREEN - lineHeight;
         uint8_t drawEnd = MIDSCREEN + lineHeight;
 
-        Sprites::drawOverwrite(x, drawStart, sp_shading, color_offset);
+        Sprites::drawOverwrite(x, drawStart, sp_shading, (color_offset << 1) + (x & 1));
         if (drawEnd < HEIGHT - 1)
             arduboy.drawFastVLine(x, drawEnd + 1, HEIGHT - 1, BLACK);
     }
