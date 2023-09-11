@@ -8,12 +8,20 @@ Arduboy2 arduboy;
 
 //int thing = 0b101010;
 
+typedef SFixed<7,8> flot;
+typedef UFixed<8,8> uflot;
+constexpr uflot MAXFIXED = 255;
+constexpr uflot NEARZEROFIXED = 0.01;
+
+
 constexpr uint8_t MIDSCREEN = HEIGHT / 2;
 
 constexpr uint8_t FRAMERATE = 30;
 constexpr float MOVESPEED = 5.0f / FRAMERATE;
 constexpr float ROTSPEED = 4.0f / FRAMERATE;
-constexpr uint8_t VIEWDISTANCE = 8;
+
+constexpr uint8_t VIEWDISTANCE = 16;
+constexpr uflot LIGHTINTENSITY = 2;
 
 constexpr uint8_t MAPWIDTH = 24;
 constexpr uint8_t MAPHEIGHT = 24;
@@ -69,11 +77,6 @@ float dirX = -1, dirY = 0; //initial direction vector
 //float dirX = 0, dirY = 1; //initial direction vector
 float planeX = 0, planeY = 0.66; //the 2d raycaster version of camera plane
 
-typedef SFixed<7,8> flot;
-typedef UFixed<8,8> uflot;
-constexpr uint8_t MAXFIXED = 255;
-constexpr uflot NEARZEROFIXED = 1 / MAXFIXED;
-
 inline void render()
 {
     uint8_t pmapX = int(posX);
@@ -103,8 +106,8 @@ inline void render()
         // stepping further below works. So the values can be computed as below.
         //  Division through zero is prevented, even though technically that's not
         //  needed in C++ with IEEE 754 floating point values.
-        uflot deltaDistX = (uflot)abs(rayDirX); //(rayDirX == 0) ? 1e10 : abs(1 / rayDirX);
-        uflot deltaDistY = (uflot)abs(rayDirY); //(rayDirY == 0) ? 1e10 : abs(1 / rayDirY);
+        uflot deltaDistX = (uflot)abs(rayDirX); //Temp value; may not be used
+        uflot deltaDistY = (uflot)abs(rayDirY); //same
 
         // length of ray from current position to next x or y-side
         uflot sideDistX = MAXFIXED;
@@ -164,7 +167,7 @@ inline void render()
         if(perpWallDist >= VIEWDISTANCE || side & x) continue;
 
         //Choose wall color based sort of on distance + wall side
-        uint8_t color_offset = (int)(perpWallDist / 2);
+        uint8_t color_offset = (perpWallDist / LIGHTINTENSITY).getInteger();
 
         // Calculate distance projected on camera direction. This is the shortest distance from the point where the wall is
         // hit to the camera plane. Euclidean to center camera point would give fisheye effect!
@@ -253,17 +256,4 @@ void loop()
     render();
     movement();
     arduboy.display();
-
-    //arduboy.setCursor(0, 0);
-
-    //char thing[20];
-    //sprintf(thing, "Byte: %d", sizeof(uint8_t));
-    //arduboy.println(thing);
-    //sprintf(thing, "Int: %d", sizeof(int));
-    //arduboy.println(thing);
-    //sprintf(thing, "Float: %d", sizeof(float));
-    //arduboy.println(thing);
-    //// print("Int: %d")
-
-    //arduboy.display();
 }
