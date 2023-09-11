@@ -1,3 +1,5 @@
+#include <FixedPoints.h>
+
 #include <Arduboy2.h>
 #include <math.h>
 #include <float.h>
@@ -9,10 +11,9 @@ Arduboy2 arduboy;
 constexpr uint8_t MIDSCREEN = HEIGHT / 2;
 
 constexpr uint8_t FRAMERATE = 30;
-constexpr float MOVESPEED = 6.0f / FRAMERATE;
+constexpr float MOVESPEED = 5.0f / FRAMERATE;
 constexpr float ROTSPEED = 4.0f / FRAMERATE;
 constexpr uint8_t VIEWDISTANCE = 8;
-// constexpr uint8_t MAXDDA = 10;
 
 constexpr uint8_t MAPWIDTH = 24;
 constexpr uint8_t MAPHEIGHT = 24;
@@ -59,42 +60,37 @@ constexpr uint8_t sp_shading[] PROGMEM = {
 
     136,136,136,136,136,136,136,136,
     34,34,34,34,34,34,34,34,
-
-    //255,255,255,255,255,255,255,255,
-    ////254,254,254,254,254,254,254,254,
-    //238,238,238,238,238,238,238,238,
-    ////234,234,234,234,234,234,234,234,
-    //170,170,170,170,170,170,170,170,
-    ////168,168,168,168,168,168,168,168,
-    //136,136,136,136,136,136,136,136,
-    ////128,128,128,128,128,128,128,128,
-    //0,0,0,0,0,0,0,0
-    //255,255,255,255,255,255,255,255,    // Full fill
-    //254,254,254,254,254,254,254,254,
-
-    //85,85,85,85,85,85,85,85,            // Half fill
-    //170,170,170,170,170,170,170,170,    // Half fill alt
 };
-//constexpr uint8_t sp_fill[8] = { 255,255,255,255,255,255,255,255 };
-//constexpr uint8_t sp_half[8] = { 85,85,85,85,85,85,85,85 };
-//constexpr uint8_t sp_half2[8] = { 170,170,170,170,170,170,170,170 };
 
 float posX = 22, posY = 12;  //x and y start position
 float dirX = -1, dirY = 0; //initial direction vector
+//TODO: figure out what part of the algorithm is broken such that any values 
+//other than dirX = -1 and dirY = 0 break everything.
 //float dirX = 0, dirY = 1; //initial direction vector
 float planeX = 0, planeY = 0.66; //the 2d raycaster version of camera plane
 
+typedef SFixed<7,8> flot;
+typedef UFixed<8,8> uflot;
+constexpr uint8_t MAXFIXED = 255;
+constexpr uflot NEARZEROFIXED = 1 / MAXFIXED;
+
 inline void render()
 {
+    uint8_t pmapX = int(posX);
+    uint8_t pmapY = int(posY);
+    uflot pmapofsX = posX - pmapX;
+    uflot pmapofsY = posY - pmapY;
+
     for (uint8_t x = 0; x < WIDTH; x++)
     {
         // calculate ray position and direction
-        float cameraX = (x << 1) / (float)WIDTH - 1; // x-coordinate in camera space
-        float rayDirX = dirX + planeX * cameraX;
-        float rayDirY = dirY + planeY * cameraX;
-        // which box of the map we're in
-        uint8_t mapX = int(posX);
-        uint8_t mapY = int(posY);
+        flot cameraX = x * 2.0f / WIDTH - 1; // x-coordinate in camera space
+        flot rayDirX = dirX + planeX * cameraX;
+        flot rayDirY = dirY + planeY * cameraX;
+
+        // which box of the map the ray collision is in
+        uint8_t mapX = pmapX;
+        uint8_t mapY = pmapY;
 
         // length of ray from one x or y-side to next x or y-side
         // these are derived as:
@@ -107,37 +103,41 @@ inline void render()
         // stepping further below works. So the values can be computed as below.
         //  Division through zero is prevented, even though technically that's not
         //  needed in C++ with IEEE 754 floating point values.
-        float deltaDistX = (rayDirX == 0) ? FLT_MAX : abs(1 / rayDirX);
-        float deltaDistY = (rayDirY == 0) ? FLT_MAX : abs(1 / rayDirY);
-
+        uflot deltaDistX = (uflot)abs(rayDirX); //(rayDirX == 0) ? 1e10 : abs(1 / rayDirX);
+        uflot deltaDistY = (uflot)abs(rayDirY); //(rayDirY == 0) ? 1e10 : abs(1 / rayDirY);
 
         // length of ray from current position to next x or y-side
-        float sideDistX;
-        float sideDistY;
+        uflot sideDistX = MAXFIXED;
+        uflot sideDistY = MAXFIXED;
 
         // what direction to step in x or y-direction (either +1 or -1)
-        int8_t stepX;
-        int8_t stepY;
+        int8_t stepX = 0;
+        int8_t stepY = 0;
 
-        // calculate step and initial sideDist
-        if (rayDirX < 0) {
-            stepX = -1;
-            sideDistX = (posX - mapX) * deltaDistX;
+        if(deltaDistX > NEARZEROFIXED) {
+            deltaDistX = 1 / deltaDistX;
+            if (rayDirX < 0) {
+                stepX = -1;
+                sideDistX = pmapofsX * deltaDistX;
+            }
+            else {
+                stepX = 1;
+                sideDistX = (1 - pmapofsX) * deltaDistX;
+            }
         }
-        else {
-            stepX = 1;
-            sideDistX = (mapX + 1.0 - posX) * deltaDistX;
-        }
-        if (rayDirY < 0) {
-            stepY = -1;
-            sideDistY = (posY - mapY) * deltaDistY;
-        }
-        else {
-            stepY = 1;
-            sideDistY = (mapY + 1.0 - posY) * deltaDistY;
+        if(deltaDistY > NEARZEROFIXED) {
+            deltaDistY = 1 / deltaDistY;
+            if (rayDirY < 0) {
+                stepY = -1;
+                sideDistY = pmapofsY * deltaDistY;
+            }
+            else {
+                stepY = 1;
+                sideDistY = (1 - pmapofsY) * deltaDistY;
+            }
         }
 
-        float perpWallDist = 0;
+        uflot perpWallDist = 0;
         uint8_t side;    // was a NS or a EW wall hit?
 
         // perform DDA
@@ -157,7 +157,7 @@ inline void render()
                 side = 1;
             }
             // Check if ray has hit a wall
-            if (worldMap[mapX][mapY] > 0)
+            if (worldMap[mapX][mapY])
                 break;
         }
 
