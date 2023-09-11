@@ -6,20 +6,28 @@
 
 Arduboy2 arduboy;
 
+// Define a fake FOV. Slightly more computation but not much honestly. 
+// It just doesn't do much. 1 = "90", more than 1 = more than 90
+// #define FAKEFOV 1.0
 
+// I modify these for testing, just nice to have it abstracted
 typedef SFixed<7,8> flot;
 typedef UFixed<8,8> uflot;
+
+// Funny hack constants. We're working with very small ranges, so 
+// the values have to be picked carefully. The following must remain true:
+// 1 / NEARZEROFIXED < MAXFIXED. It may even need to be < MAXFIXED / 2
 constexpr uflot MAXFIXED = 255;
 constexpr uflot NEARZEROFIXED = 0.01;
 
-
+// Screen calc constants (no need to do it at runtime)
 constexpr uint8_t MIDSCREEN = HEIGHT / 2;
 constexpr uflot NORMWIDTH = 2.0f / WIDTH;
 
+// Gameplay constants
 constexpr uint8_t FRAMERATE = 30;
 constexpr float MOVESPEED = 5.0f / FRAMERATE;
 constexpr float ROTSPEED = 4.0f / FRAMERATE;
-
 constexpr uint8_t VIEWDISTANCE = 16;
 constexpr uflot LIGHTINTENSITY = 2;
 
@@ -59,6 +67,8 @@ uint8_t worldMap[MAPHEIGHT][MAPWIDTH]=
   {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
 };
 
+// Sprite-based gradients. May change to direct buffer writing for 
+// true gradients
 constexpr uint8_t GRADIENTS = 4;
 constexpr uint8_t sp_shading[] PROGMEM = { 
     1, 64,
@@ -75,16 +85,12 @@ constexpr uint8_t sp_shading[] PROGMEM = {
     34,34,34,34,34,34,34,34,
 };
 
-float posX = 22, posY = 12;  //x and y start position
-float dirX = -1, dirY = 0; //initial direction vector
-//TODO: figure out what part of the algorithm is broken such that any values 
-//other than dirX = -1 and dirY = 0 break everything.
-//float dirX = 0, dirY = 1; //initial direction vector
-float planeX = 0, planeY = 0.66; //the 2d raycaster version of camera plane
+float posX = 22, posY = 12;     //x and y start position
+float dirX = 0, dirY = -1;      //initial direction vector
 
 inline void render()
 {
-    //Waste 6 bytes of memory to save numerous cycles on render (leaving posX + posY floats so...)
+    //Waste 6 bytes of memory to save numerous cycles on render (and on programmer. leaving posX + posY floats so...)
     uint8_t pmapX = int(posX);
     uint8_t pmapY = int(posY);
     uflot pmapofsX = posX - pmapX;
@@ -95,8 +101,16 @@ inline void render()
         // calculate ray position and direction. This is the only place we use floats,
         // so maybe 7 * 64 float operations per frame. Maybe that's OK? 
         flot cameraX = x * 2.0f / WIDTH - 1; // x-coordinate in camera space
-        flot rayDirX = dirX + planeX * cameraX;
-        flot rayDirY = dirY + planeY * cameraX;
+
+        // The camera plane is a simple -90 degree rotation on the player direction (as required for this algorithm).
+        // As such, it's simply (dirY, -dirX) * FAKEFOV. The camera plane does NOT need to be tracked separately
+        #ifdef FAKEFOV
+        flot rayDirX = dirX + dirY * FAKEFOV * cameraX;
+        flot rayDirY = dirY - dirX * FAKEFOV * cameraX;
+        #else
+        flot rayDirX = dirX + dirY * cameraX;
+        flot rayDirY = dirY - dirX * cameraX;
+        #endif
 
         // which box of the map the ray collision is in
         uint8_t mapX = pmapX;
@@ -111,8 +125,6 @@ inline void render()
         // unlike (dirX, dirY) is not 1, however this does not matter, only the
         // ratio between deltaDistX and deltaDistY matters, due to the way the DDA
         // stepping further below works. So the values can be computed as below.
-        //  Division through zero is prevented, even though technically that's not
-        //  needed in C++ with IEEE 754 floating point values.
         uflot deltaDistX = (uflot)abs(rayDirX); //Temp value; may not be used
         uflot deltaDistY = (uflot)abs(rayDirY); //same
 
@@ -223,9 +235,6 @@ inline void movement()
         float oldDirX = dirX;
         dirX = dirX * cos(-ROTSPEED) - dirY * sin(-ROTSPEED);
         dirY = oldDirX * sin(-ROTSPEED) + dirY * cos(-ROTSPEED);
-        float oldPlaneX = planeX;
-        planeX = planeX * cos(-ROTSPEED) - planeY * sin(-ROTSPEED);
-        planeY = oldPlaneX * sin(-ROTSPEED) + planeY * cos(-ROTSPEED);
     }
     // rotate to the left
     if (arduboy.pressed(LEFT_BUTTON))
@@ -234,16 +243,12 @@ inline void movement()
         float oldDirX = dirX;
         dirX = dirX * cos(ROTSPEED) - dirY * sin(ROTSPEED);
         dirY = oldDirX * sin(ROTSPEED) + dirY * cos(ROTSPEED);
-        float oldPlaneX = planeX;
-        planeX = planeX * cos(ROTSPEED) - planeY * sin(ROTSPEED);
-        planeY = oldPlaneX * sin(ROTSPEED) + planeY * cos(ROTSPEED);
     }
 }
 
 //Using floats for now, will use others later
 void setup()
 {
-    // arduboy.begin();
     // Initialize the Arduboy
     arduboy.boot();
     arduboy.initRandomSeed();
