@@ -6,7 +6,6 @@
 
 Arduboy2 arduboy;
 
-//int thing = 0b101010;
 
 typedef SFixed<7,8> flot;
 typedef UFixed<8,8> uflot;
@@ -15,6 +14,7 @@ constexpr uflot NEARZEROFIXED = 0.01;
 
 
 constexpr uint8_t MIDSCREEN = HEIGHT / 2;
+constexpr uflot NORMWIDTH = 2.0f / WIDTH;
 
 constexpr uint8_t FRAMERATE = 30;
 constexpr float MOVESPEED = 5.0f / FRAMERATE;
@@ -26,8 +26,13 @@ constexpr uflot LIGHTINTENSITY = 2;
 constexpr uint8_t MAPWIDTH = 24;
 constexpr uint8_t MAPHEIGHT = 24;
 
-uint8_t worldMap[MAPWIDTH][MAPHEIGHT]=
+uint8_t worldMap[MAPHEIGHT][MAPWIDTH]=
 {
+  //{0b11111111, 0b11111111, 0b11111111},
+  //{0b00000001, 0b00000000, 0b10000000},
+  //{0b00000001, 0b00000000, 0b10000000},
+  //{0b00000001, 0b00000000, 0b10000000},
+  //{0b11000001, 0b10000111, 0b10001010},
   {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
   {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
   {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
@@ -79,6 +84,7 @@ float planeX = 0, planeY = 0.66; //the 2d raycaster version of camera plane
 
 inline void render()
 {
+    //Waste 6 bytes of memory to save numerous cycles on render (leaving posX + posY floats so...)
     uint8_t pmapX = int(posX);
     uint8_t pmapY = int(posY);
     uflot pmapofsX = posX - pmapX;
@@ -86,7 +92,8 @@ inline void render()
 
     for (uint8_t x = 0; x < WIDTH; x++)
     {
-        // calculate ray position and direction
+        // calculate ray position and direction. This is the only place we use floats,
+        // so maybe 7 * 64 float operations per frame. Maybe that's OK? 
         flot cameraX = x * 2.0f / WIDTH - 1; // x-coordinate in camera space
         flot rayDirX = dirX + planeX * cameraX;
         flot rayDirY = dirY + planeY * cameraX;
@@ -117,6 +124,11 @@ inline void render()
         int8_t stepX = 0;
         int8_t stepY = 0;
 
+        // With this DDA stepping algorithm, have to be careful about making too-large values
+        // with our tiny fixed point numbers. Make some arbitrarily small cutoff point for
+        // even trying to deal with steps in that direction. As long as the map size is 
+        // never larger than 1 / NEARZEROFIXED on any side, it will be fine (that meeans
+        // map has to be < 100 on a side with this)
         if(deltaDistX > NEARZEROFIXED) {
             deltaDistX = 1 / deltaDistX;
             if (rayDirX < 0) {
@@ -148,7 +160,7 @@ inline void render()
         {
             // jump to next map square, either in x-direction, or in y-direction
             if (sideDistX < sideDistY) {
-                perpWallDist = sideDistX;
+                perpWallDist = sideDistX; // Remember that sideDist is actual distance and not distance only in 1 direction
                 sideDistX += deltaDistX;
                 mapX += stepX;
                 side = 0;
@@ -169,19 +181,10 @@ inline void render()
         //Choose wall color based sort of on distance + wall side
         uint8_t color_offset = (perpWallDist / LIGHTINTENSITY).getInteger();
 
-        // Calculate distance projected on camera direction. This is the shortest distance from the point where the wall is
-        // hit to the camera plane. Euclidean to center camera point would give fisheye effect!
-        // This can be computed as (mapX - posX + (1 - stepX) / 2) / rayDirX for side == 0, or same formula with Y
-        // for size == 1, but can be simplified to the code below thanks to how sideDist and deltaDist are computed:
-        // because they were left scaled to |rayDir|. sideDist is the entire length of the ray above after the multiple
-        // steps, but we subtract deltaDist once because one step more into the wall was taken above.
-        //if (side == 1) 
-        //    color_offset += 1;
-
         if(color_offset >= GRADIENTS)
             color_offset = GRADIENTS - 1;
 
-        // Calculate half height of line to draw on screen
+        // Calculate half height of line to draw on screen. We already know the distance to the wall
         uint8_t lineHeight = (perpWallDist < 1 ? HEIGHT : (int)(HEIGHT / perpWallDist)) >> 1;
 
         // calculate lowest and highest pixel to fill in current stripe
