@@ -10,6 +10,10 @@ Arduboy2 arduboy;
 // It just doesn't do much. 1 = "90", more than 1 = more than 90
 // #define FAKEFOV 1.0
 
+// Define a new wallheight. This usually doesn't look great, and it
+// wastes cycles, so I made it a define
+// #define WALLHEIGHT 1.0
+
 // I modify these for testing, just nice to have it abstracted
 typedef SFixed<7,8> flot;
 typedef UFixed<8,8> uflot;
@@ -196,8 +200,14 @@ inline void render()
         if(color_offset >= GRADIENTS)
             color_offset = GRADIENTS - 1;
 
-        // Calculate half height of line to draw on screen. We already know the distance to the wall
+        // Calculate half height of line to draw on screen. We already know the distance to the wall.
+        // We can truncate the total height if too close to the wall right here and now and avoid future checks.
+        #ifdef WALLHEIGHT
+        uint8_t lineHeight = (perpWallDist < WALLHEIGHT ? HEIGHT : (int)(HEIGHT / perpWallDist * WALLHEIGHT)) >> 1;
+        #else
         uint8_t lineHeight = (perpWallDist < 1 ? HEIGHT : (int)(HEIGHT / perpWallDist)) >> 1;
+        #endif
+        
 
         // calculate lowest and highest pixel to fill in current stripe
         uint8_t drawStart = MIDSCREEN - lineHeight;
