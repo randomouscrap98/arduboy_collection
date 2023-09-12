@@ -11,7 +11,7 @@ ArduboyTones sound(arduboy.audio.enabled);
 
 // Define a fake FOV. Slightly more computation but not much honestly. 
 // It just doesn't do much. 1 = "90", more than 1 = more than 90
-// #define FAKEFOV 1.0
+// #define FAKEFOV 0.8
 
 // Define a new wallheight. This usually doesn't look great, and it
 // wastes cycles, so I made it a define
@@ -38,7 +38,7 @@ constexpr uint8_t BAYERGRADIENTS = 16;
 constexpr uint8_t FRAMERATE = 30;
 constexpr float MOVESPEED = 4.0f / FRAMERATE;
 constexpr float ROTSPEED = 4.0f / FRAMERATE;
-constexpr uint8_t VIEWDISTANCE = 16;        // Hard cutoff
+constexpr uflot VIEWDISTANCE = 16;        // Hard cutoff
 constexpr uflot LIGHTINTENSITY = 1.25;
 
 constexpr uint8_t MAPWIDTH = 24;
@@ -100,7 +100,7 @@ constexpr uint8_t b_shading[] = {
 // Top and bottom masking for bytes to fill screen for dithering
 constexpr uint8_t b_masks[] = {
     0xFF, 0xFE, 0xFC, 0xF8, 0xF0, 0xE0, 0xC0, 0x80,
-    0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01
+    0x01, 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x7F, 0xFF
 };
 
 float posX = 22, posY = 11.6;     //x and y start position
@@ -224,15 +224,18 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
         return;
 
     uint8_t shade = b_shading[(dither << 2) + (x & 3)];
-    for(uint8_t b = (yStart >> 3); b <= (yEnd >> 3); ++b)
-    {
-        arduboy.sBuffer[b * WIDTH + x] = shade;
-    }
+    uint8_t start = yStart >> 3;
+    uint8_t end = yEnd >> 3;
 
-    if(yStart > 0)
-        arduboy.drawFastVLine(x, 0, yStart, BLACK);
-    if(yEnd < HEIGHT - 1)
-        arduboy.drawFastVLine(x, yEnd + 1, HEIGHT - 1 - yEnd, BLACK);
+    for(uint8_t b = start; b <= end; ++b)
+    {
+        uint8_t s = shade;
+        if(b == start)
+            s &= b_masks[yStart & 7];
+        if(b == end)
+            s &= b_masks[8 + (yEnd & 7)];
+        arduboy.sBuffer[b * WIDTH + x] = s;
+    }
 }
 
 inline void movement()
