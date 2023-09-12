@@ -1,10 +1,13 @@
 #include <FixedPoints.h>
 
 #include <Arduboy2.h>
+#include <ArduboyTones.h>
+
 #include <math.h>
 #include <float.h>
 
 Arduboy2 arduboy;
+ArduboyTones sound(arduboy.audio.enabled);
 
 // Define a fake FOV. Slightly more computation but not much honestly. 
 // It just doesn't do much. 1 = "90", more than 1 = more than 90
@@ -26,7 +29,7 @@ constexpr uflot NEARZEROFIXED = 0.01;
 
 // Screen calc constants (no need to do it at runtime)
 constexpr uint8_t MIDSCREEN = HEIGHT / 2;
-constexpr uint8_t VIEWWIDTH = 128;
+constexpr uint8_t VIEWWIDTH = 100;
 constexpr float NORMWIDTH = 2.0f / VIEWWIDTH;
 
 constexpr uint8_t BAYERGRADIENTS = 16;
@@ -223,16 +226,11 @@ inline void render_walls()
         #ifdef WALLHEIGHT
         uint8_t lineHeight = (perpWallDist < WALLHEIGHT ? HEIGHT : (int)(HEIGHT / perpWallDist * WALLHEIGHT)) >> 1;
         #else
-        uint8_t lineHeight = (perpWallDist < 1 ? HEIGHT : (int)(HEIGHT / perpWallDist)) >> 1;
+        uint8_t lineHeight = (perpWallDist <= 1 ? HEIGHT : (int)(HEIGHT / perpWallDist)) >> 1;
         #endif
 
         //NOTE: unless view distance is set to > 32, lineHeight will never be 0, so no need to check
-        
-        // calculate lowest and highest pixel to fill in current stripe
-        uint8_t drawStart = MIDSCREEN - lineHeight;
-        uint8_t drawEnd = MIDSCREEN + lineHeight;
-
-        draw_wall_line(x, MIDSCREEN - lineHeight, MIDSCREEN + lineHeight, perpWallDist);
+        draw_wall_line(x, MIDSCREEN - lineHeight, MIDSCREEN + lineHeight - 1, perpWallDist);
     }
 }
 
@@ -245,7 +243,14 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
 
     uint8_t shade = b_shading[(dither << 2) + (x & 3)];
     for(uint8_t b = (yStart >> 3); b <= (yEnd >> 3); ++b)
-        arduboy.sBuffer[b * WIDTH + x] = shade;
+    {
+        uint16_t index = b * WIDTH + x;
+        arduboy.sBuffer[index] = shade;
+
+        if(index >= 1024) {
+            sound.tone(440, 32);
+        }
+    }
 
     if(yStart > 0)
         arduboy.drawFastVLine(x, 0, yStart, BLACK);
@@ -324,7 +329,7 @@ void loop()
 
     arduboy.pollButtons();
     arduboy.clear();
-    //arduboy.drawRect(VIEWWIDTH + 1, 0, WIDTH - VIEWWIDTH - 2, HEIGHT, WHITE);
+    arduboy.drawRect(VIEWWIDTH + 1, 0, WIDTH - VIEWWIDTH - 2, HEIGHT, WHITE);
     //arduboy.setCursor(108, 1);
     //sprintf(buff, "%d", light);
     //arduboy.print("DE");
