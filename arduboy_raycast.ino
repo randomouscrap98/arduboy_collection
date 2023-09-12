@@ -25,7 +25,7 @@ typedef UFixed<8,8> uflot;
 // the values have to be picked carefully. The following must remain true:
 // 1 / NEARZEROFIXED < MAXFIXED. It may even need to be < MAXFIXED / 2
 constexpr uflot MAXFIXED = 255;
-constexpr uflot NEARZEROFIXED = 0.01;
+constexpr uflot NEARZEROFIXED = 1.0f / 128; // Prefer accuracy (fixed decimal exact)
 
 // Screen calc constants (no need to do it at runtime)
 constexpr uint8_t MIDSCREEN = HEIGHT / 2;
@@ -36,10 +36,10 @@ constexpr uint8_t BAYERGRADIENTS = 16;
 
 // Gameplay constants
 constexpr uint8_t FRAMERATE = 30;
-constexpr float MOVESPEED = 5.0f / FRAMERATE;
+constexpr float MOVESPEED = 4.0f / FRAMERATE;
 constexpr float ROTSPEED = 4.0f / FRAMERATE;
-constexpr uint8_t VIEWDISTANCE = 16;
-constexpr uflot LIGHTINTENSITY = 0.08;
+constexpr uint8_t VIEWDISTANCE = 16;        // Hard cutoff
+constexpr uflot LIGHTINTENSITY = 1.25;
 
 constexpr uint8_t MAPWIDTH = 24;
 constexpr uint8_t MAPHEIGHT = 24;
@@ -218,7 +218,7 @@ inline void render_walls()
 
 inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distance)
 {
-    uint8_t dither = (distance / VIEWDISTANCE * distance / LIGHTINTENSITY).getInteger();
+    uint8_t dither = (distance / LIGHTINTENSITY * distance).getInteger();
 
     if(dither >= BAYERGRADIENTS)
         return;
