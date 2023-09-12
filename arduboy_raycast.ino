@@ -238,18 +238,13 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
 {
     uint8_t dither = (distance / VIEWDISTANCE * distance / LIGHTINTENSITY).getInteger();
 
-    if(dither >= 16)
+    if(dither >= BAYERGRADIENTS)
         return;
 
     uint8_t shade = b_shading[(dither << 2) + (x & 3)];
     for(uint8_t b = (yStart >> 3); b <= (yEnd >> 3); ++b)
     {
-        uint16_t index = b * WIDTH + x;
-        arduboy.sBuffer[index] = shade;
-
-        if(index >= 1024) {
-            sound.tone(440, 32);
-        }
+        arduboy.sBuffer[b * WIDTH + x] = shade;
     }
 
     if(yStart > 0)
@@ -330,9 +325,9 @@ void loop()
     arduboy.pollButtons();
     arduboy.clear();
     arduboy.drawRect(VIEWWIDTH + 1, 0, WIDTH - VIEWWIDTH - 2, HEIGHT, WHITE);
-    //arduboy.setCursor(108, 1);
+    arduboy.setCursor(108, 1);
     //sprintf(buff, "%d", light);
-    //arduboy.print("DE");
+    arduboy.print("DE");
     render_walls();
     movement();
     arduboy.display();
