@@ -1,5 +1,15 @@
 #pragma once
 
+// I modify these for testing, just nice to have it abstracted
+typedef SFixed<7,8> flot;
+typedef UFixed<8,8> uflot;
+
+// Funny hack constants. We're working with very small ranges, so 
+// the values have to be picked carefully. The following must remain true:
+// 1 / NEARZEROFIXED < MAXFIXED. It may even need to be < MAXFIXED / 2
+constexpr uflot MAXFIXED = 255;
+constexpr uflot NEARZEROFIXED = 1.0f / 128; // Prefer accuracy (fixed decimal exact)
+
 // Generates code for pulling a single struct of type t from a progmem
 // data array of structs d at index idx
 #define getProgmemStruct(t, d, idx) \

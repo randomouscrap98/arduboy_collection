@@ -1,20 +1,20 @@
 #include <Tinyfont.h>
 #include <FixedPoints.h>
 #include <Arduboy2.h>
-//#include <ArduboyTones.h>
 
 #include <math.h>
 
 // Graphics
-#include "menu.h"
-#include "light2.h"
+#include "resources/menu.h"
+#include "resources/light2.h"
 
 // Libs (sort of; mostly just code organization)
+#include "utils.h"
 #include "mazedef.h"
 #include "mazegen.h"
+#include "shading.h"
 
 Arduboy2Base arduboy;
-//ArduboyTones sound(arduboy.audio.enabled);
 Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
 
 // Define a fake FOV. Slightly more computation but not much honestly. 
@@ -25,10 +25,6 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // wastes cycles, so I made it a define
 // #define WALLHEIGHT 1.0
 
-// I modify these for testing, just nice to have it abstracted
-typedef SFixed<7,8> flot;
-typedef UFixed<8,8> uflot;
-
 // Gameplay constants
 constexpr uint8_t FRAMERATE = 45; //Untextured can run at near 60; lots of headroom at 45
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
@@ -37,7 +33,6 @@ constexpr uflot LIGHTINTENSITY = 1.5;
 
 //Visual constants (Probably shouldn't change these)
 constexpr uint8_t LIGHTSTART = 34;
-constexpr uint8_t BAYERGRADIENTS = 16;
 
 //These are calculated constants based off your light intensity. The view 
 //distance is an optimization; increase light intensity to increase view distance.
@@ -45,52 +40,32 @@ constexpr uint8_t BAYERGRADIENTS = 16;
 const uflot VIEWDISTANCE = sqrt(BAYERGRADIENTS * (float)LIGHTINTENSITY);
 const uflot DARKNESS = 1 / LIGHTINTENSITY;
 
-// Funny hack constants. We're working with very small ranges, so 
-// the values have to be picked carefully. The following must remain true:
-// 1 / NEARZEROFIXED < MAXFIXED. It may even need to be < MAXFIXED / 2
-constexpr uflot MAXFIXED = 255;
-constexpr uflot NEARZEROFIXED = 1.0f / 128; // Prefer accuracy (fixed decimal exact)
-
 //Screen calc constants (no need to do it at runtime)
 constexpr uint8_t MIDSCREEN = HEIGHT / 2;
 constexpr uint8_t VIEWWIDTH = 100;
 constexpr flot NORMWIDTH = 2.0f / VIEWWIDTH;
 
-uint8_t worldMap[MAXMAPHEIGHT * REALMAPWIDTH];
-
-// Bayer gradients, not including the 0 fill (useless?).
-// Takes up 64 precious bytes of RAM
-constexpr uint8_t b_shading[] = {
-    0xFF, 0xFF, 0xFF, 0xFF, // Beyer 16
-    0xEE, 0xFF, 0xFF, 0xFF, // 0
-    0xEE, 0xFF, 0xBB, 0xFF,
-    0xEE, 0xFF, 0xAA, 0xFF, // 2 
-    0xAA, 0xFF, 0xAA, 0xFF, 
-    0xAA, 0xDD, 0xAA, 0xFF, // 4
-    0xAA, 0xDD, 0xAA, 0x77,
-    0xAA, 0xDD, 0xAA, 0x55, // 6
-    0xAA, 0x55, 0xAA, 0x55,
-    0xAA, 0x44, 0xAA, 0x55, // 8
-    0xAA, 0x44, 0xAA, 0x11, 
-    0xAA, 0x44, 0xAA, 0x00, // 10
-    0xAA, 0x00, 0xAA, 0x00, 
-    0x44, 0x00, 0xAA, 0x00, // 12
-    0x44, 0x00, 0x22, 0x00,
-    0x44, 0x00, 0x00, 0x00, // 14
-};
-
-//Menu / gamestate related stuff
+//Menu related stuff
 uint8_t menuIndex = 0;
 uint8_t mazeSize = 0;
 uint8_t mazeType = 0;
 
-//uint8_t gameState = 0;
-//constexpr uint8_t STATEMAZE = 0;
-//constexpr uint8_t STATEWIN = 1;
-
 // Position and facing direction
 float posX, posY; 
 float dirX, dirY;
+
+//The map itself!
+uint8_t worldMap[MAXMAPHEIGHT * REALMAPWIDTH];
+
+
+//Draw the floor underneath the raycast walls (ultra simple for now to save cycles)
+void raycastFoundation()
+{
+    //Arduboy2 fillrect is absurdly slow; I have the luxury of doing this instead
+    for(uint8_t i = 0; i <= LIGHTSTART >> 3; ++i)
+        memset(arduboy.sBuffer + i * WIDTH, 0, VIEWWIDTH);
+    Sprites::drawOverwrite(0, LIGHTSTART, light, 0);
+}
 
 // The full function for raycasting. 
 void raycast()
@@ -161,11 +136,11 @@ void raycast()
         uint8_t side;           // was a NS or a EW wall hit?
         uint8_t mapX = pmapX;   // which box of the map the ray collision is in
         uint8_t mapY = pmapY;
-        uflot perpWallDist = 0;
-        uint8_t tile = 0;
+        uflot perpWallDist = 0;     // perpendicular distance (not real distance)
+        uint8_t tile = TILEEMPTY;   // tile that was hit by ray
 
         // perform DDA
-        while (perpWallDist < VIEWDISTANCE && tile == 0)
+        while (perpWallDist < VIEWDISTANCE && tile == TILEEMPTY)
         {
             // jump to next map square, either in x-direction, or in y-direction
             if (sideDistX < sideDistY) {
@@ -185,7 +160,8 @@ void raycast()
                 //break;
         }
 
-        if(perpWallDist >= VIEWDISTANCE) continue;
+        // If the above loop was exited without finding a tile, there's nothing to draw
+        if(tile == TILEEMPTY) continue;
 
         // Calculate half height of line to draw on screen. We already know the distance to the wall.
         // We can truncate the total height if too close to the wall right here and now and avoid future checks.
@@ -208,6 +184,7 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
     //NOTE: multiplication is WAY FASTER than division
     uint8_t dither = (uint8_t)(roundFixed(distance * DARKNESS * distance));
 
+    //Oops, we're beyond dark (this shouldn't happen often but it CAN)
     if(dither >= BAYERGRADIENTS)
         return;
 
@@ -217,6 +194,7 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
 
     for(uint8_t b = start; b <= end; ++b)
     {
+        //Mask to cut wall and insert floor / ceiling
         uint8_t m = 0xFF;
         if(b == start)
             m &= (0xFF << (yStart & 7));
@@ -226,20 +204,9 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
     }
 }
 
-//Draw the floor underneath the raycast walls (ultra simple for now to save cycles)
-void raycastFoundation()
-{
-    //Arduboy2 fillrect is absurdly slow; I have the luxury of doing this instead
-    for(uint8_t i = 0; i <= LIGHTSTART >> 3; ++i)
-        memset(arduboy.sBuffer + i * WIDTH, 0, VIEWWIDTH);
-    Sprites::drawOverwrite(0, LIGHTSTART, light, 0);
-}
-
+// Perform ONLY player movement updates! No drawing!
 void movement()
 {
-    //Disable movement in the exit
-    if(inExit()) return;
-
     // move forward if no wall in front of you
     if (arduboy.pressed(A_BUTTON))
     {
@@ -266,7 +233,7 @@ void movement()
     }
 }
 
-bool inExit() { return getMazeCell(worldMap, (int)posX, (int)posY) == TILEEXIT; }
+inline bool inExit() { return getMazeCell(worldMap, (int)posX, (int)posY) == TILEEXIT; }
 
 //Menu functionality, move the cursor, select things (redraws automatically)
 void doMenu()
@@ -341,7 +308,6 @@ void generateMaze()
     posY = 1.6;
     dirX = 1;
     dirY = 0;
-    //gameState = STATEMAZE;
 }
 
 
@@ -363,32 +329,31 @@ void loop()
 
     arduboy.pollButtons();
 
-    raycastFoundation();
-    raycast();
-    movement();
     doMenu();
 
-    if(inExit()) //gameState == STATEWIN)
+    // Funny game no state variable haha
+    if(inExit()) 
     {
+        for(uint8_t i = 0; i < HEIGHT >> 3; ++i)
+            memset(arduboy.sBuffer + i * WIDTH, 0, VIEWWIDTH);
+
         tinyfont.setCursor(30, 24);
-        tinyfont.print(F("The maze"));
-        tinyfont.setCursor(15, 29);
-        tinyfont.print(F("goes deeper..."));
+        tinyfont.print(F("THE MAZE"));
+        tinyfont.setCursor(19, 29);
+        tinyfont.print(F("GOES DEEPER..."));
+        //uint8_t rgb = (arduboy.frameCount >> 4) & 0b111;
+        //arduboy.digitalWriteRGB(
+        //    rgb & 0b001 ? RGB_ON : RGB_OFF, 
+        //    rgb & 0b010 ? RGB_ON : RGB_OFF, 
+        //    rgb & 0b100 ? RGB_ON : RGB_OFF);
     }
     else
     {
-
+        raycastFoundation();
+        raycast();
+        movement();
+        //arduboy.digitalWriteRGB(RGB_OFF, RGB_OFF, RGB_OFF);
     }
-
-    //switch(gameState)
-    //{
-    //    //Normal gameplay
-    //    case STATEMAZE:
-    //        break;
-    //    //Winning or whatever.
-    //    case STATEWIN:
-    //        break;
-    //}
 
     arduboy.display();
 }
