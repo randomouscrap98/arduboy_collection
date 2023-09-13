@@ -225,7 +225,7 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
     if(dither >= BAYERGRADIENTS)
         return;
 
-    uint8_t shade = b_shading[(dither << 2) + (x & 3)];
+    uint8_t shade = (side & x) ? 0 : b_shading[(dither << 2) + (x & 3)];
     //if(side)
     //{
     //    if(distance > 0.8 && ((x & 1) == 0) || distance > 0.4 && ((x & 0b11) == 0) || distance > 0.2 && ((x & 0b111) == 0))
