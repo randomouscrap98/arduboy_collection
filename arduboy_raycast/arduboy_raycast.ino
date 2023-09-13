@@ -5,8 +5,13 @@
 
 #include <math.h>
 
+// Graphics
 #include "menu.h"
 #include "light2.h"
+
+// Libs (sort of; mostly just code organization)
+#include "mazedef.h"
+#include "mazegen.h"
 
 Arduboy2Base arduboy;
 //ArduboyTones sound(arduboy.audio.enabled);
@@ -51,9 +56,6 @@ constexpr uint8_t MIDSCREEN = HEIGHT / 2;
 constexpr uint8_t VIEWWIDTH = 100;
 constexpr flot NORMWIDTH = 2.0f / VIEWWIDTH;
 
-constexpr uint8_t MAXMAPWIDTH = 24;
-constexpr uint8_t MAXMAPHEIGHT = 24;
-
 uint8_t worldMap[MAXMAPHEIGHT][MAXMAPWIDTH]=
 {
   {4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,7,7,7,7,7,7,7,7},
@@ -82,7 +84,8 @@ uint8_t worldMap[MAXMAPHEIGHT][MAXMAPWIDTH]=
   {4,4,4,4,4,4,4,4,4,4,1,1,1,2,2,2,2,2,2,3,3,3,3,3}
 };
 
-// Bayer gradients, not including the 0 fill (useless?)
+// Bayer gradients, not including the 0 fill (useless?).
+// Takes up 64 precious bytes of RAM
 constexpr uint8_t b_shading[] = {
     0xFF, 0xFF, 0xFF, 0xFF, // Beyer 16
     0xEE, 0xFF, 0xFF, 0xFF, // 0
@@ -103,9 +106,9 @@ constexpr uint8_t b_shading[] = {
 };
 
 //Menu related stuff
-constexpr uint8_t MENUITEMS = 3;
 uint8_t menuIndex = 0;
 uint8_t mazeSize = 0;
+uint8_t mazeType = 0;
 
 float posX = 22, posY = 11.6;   //x and y start position
 float dirX = -1, dirY = 0;      //initial direction vector
@@ -243,6 +246,14 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
     }
 }
 
+void raycastFoundation()
+{
+    //Arduboy2 fillrect is absurdly slow; I have the luxury of doing this instead
+    for(uint8_t i = 0; i <= LIGHTSTART >> 3; ++i)
+        memset(arduboy.sBuffer + i * WIDTH, 0, VIEWWIDTH);
+    Sprites::drawOverwrite(0, LIGHTSTART, light, 0);
+}
+
 void movement()
 {
     // move forward if no wall in front of you
@@ -281,35 +292,62 @@ void movement()
 
 void doMenu()
 {
+    constexpr uint8_t MENUITEMS = 3;
     int8_t menuMod = 0;
+    int8_t selectMod = 0;
 
     if(arduboy.justPressed(UP_BUTTON))
         menuMod = -1;
     if(arduboy.justPressed(DOWN_BUTTON))
         menuMod = 1;
 
-    if(menuMod)
+    menumod(menuIndex, menuMod, MENUITEMS);
+
+    if(arduboy.justPressed(B_BUTTON))
     {
-        menuIndex = (menuIndex + menuMod + MENUITEMS) % MENUITEMS;
-        drawMenu();
+        selectMod = 1;
+        switch (menuIndex)
+        {
+            case 0:
+                menumod(mazeSize, selectMod, MAZESIZECOUNT);
+                break;
+            case 1:
+                menumod(mazeType, selectMod, MAZETYPECOUNT);
+                break;
+            case 2:
+                break;
+        }
     }
+
+    if(menuMod || selectMod)
+        drawMenu();
 }
 
 void drawMenu()
 {
+    constexpr uint8_t MENUX = 105;
+    constexpr uint8_t MENUY = 24;
+    constexpr uint8_t MENUSPACING = 6;
+
     Sprites::drawOverwrite(VIEWWIDTH, 0, menu, 0);
     tinyfont.setCursor(109, 4);
-    tinyfont.print("3D");
+    tinyfont.print(F("3D"));
     tinyfont.setCursor(105, 9);
-    tinyfont.print("Maze");
-}
+    tinyfont.print(F("Maze"));
 
-void raycastFoundation()
-{
-    //Arduboy2 fillrect is absurdly slow; I have the luxury of doing this instead
-    for(uint8_t i = 0; i <= LIGHTSTART >> 3; ++i)
-        memset(arduboy.sBuffer + i * WIDTH, 0, VIEWWIDTH);
-    Sprites::drawOverwrite(0, LIGHTSTART, light, 0);
+    MazeSize mzs = getMazeSize(mazeSize);
+    tinyfont.setCursor(MENUX + 4, MENUY);
+    tinyfont.print(mzs.name);
+
+    MazeType mzt = MAZETYPES[mazeType];
+    tinyfont.setCursor(MENUX + 4, MENUY + MENUSPACING);
+    tinyfont.print(mzt.name);
+
+    tinyfont.setCursor(MENUX + 4, MENUY + MENUSPACING * 2);
+    tinyfont.print(F("NEW"));
+
+    tinyfont.setCursor(MENUX, MENUY + menuIndex * MENUSPACING);
+    tinyfont.print("o");
 }
 
 //Using floats for now, will use others later
@@ -317,13 +355,13 @@ void setup()
 {
     // Initialize the Arduboy
     arduboy.boot();
+    arduboy.flashlight();
     arduboy.initRandomSeed();
     arduboy.clear();
     arduboy.setFrameRate(FRAMERATE);
     drawMenu();
 }
 
-//char buff[20];
 void loop()
 {
     if (!arduboy.nextFrame()) return;
