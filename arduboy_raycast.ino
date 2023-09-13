@@ -4,7 +4,6 @@
 #include <ArduboyTones.h>
 
 #include <math.h>
-#include <float.h>
 
 Arduboy2 arduboy;
 ArduboyTones sound(arduboy.audio.enabled);
