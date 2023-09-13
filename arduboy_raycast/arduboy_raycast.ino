@@ -31,8 +31,8 @@ typedef UFixed<8,8> uflot;
 
 // Gameplay constants
 constexpr uint8_t FRAMERATE = 45; //Untextured can run at near 60; lots of headroom at 45
-constexpr float MOVESPEED = 4.0f / FRAMERATE;
-constexpr float ROTSPEED = 4.0f / FRAMERATE;
+constexpr float MOVESPEED = 3.5f / FRAMERATE;
+constexpr float ROTSPEED = 3.5f / FRAMERATE;
 constexpr uflot LIGHTINTENSITY = 1.5;
 
 //Visual constants (Probably shouldn't change these)
@@ -56,34 +56,7 @@ constexpr uint8_t MIDSCREEN = HEIGHT / 2;
 constexpr uint8_t VIEWWIDTH = 100;
 constexpr flot NORMWIDTH = 2.0f / VIEWWIDTH;
 
-uint8_t worldMap[MAXMAPHEIGHT * MAXMAPWIDTH / TILESPERBYTE];
-//[MAXMAPWIDTH]=
-//{
-//  {4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,7,7,7,7,7,7,7,7},
-//  {4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,7},
-//  {4,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7},
-//  {4,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7},
-//  {4,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,7},
-//  {4,0,4,0,0,0,0,5,5,5,5,5,5,5,5,5,7,7,0,7,7,7,7,7},
-//  {4,0,5,0,0,0,0,5,0,5,0,5,0,5,0,5,7,0,0,0,7,7,7,1},
-//  {4,0,6,0,0,0,0,5,0,0,0,0,0,0,0,5,7,0,0,0,0,0,0,8},
-//  {4,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,7,7,1},
-//  {4,0,8,0,0,0,0,5,0,0,0,0,0,0,0,5,7,0,0,0,0,0,0,8},
-//  {4,0,0,0,0,0,0,5,0,0,0,0,0,0,0,5,7,0,0,0,7,7,7,1},
-//  {4,0,0,0,0,0,0,5,5,5,5,0,5,5,5,5,7,7,7,7,7,7,7,1},
-//  {6,6,6,6,6,6,6,6,6,6,6,0,6,6,6,6,6,6,6,6,6,6,6,6},
-//  {8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4},
-//  {6,6,6,6,6,6,0,6,6,6,6,0,6,6,6,6,6,6,6,6,6,6,6,6},
-//  {4,4,4,4,4,4,0,4,4,4,6,0,6,2,2,2,2,2,2,2,3,3,3,3},
-//  {4,0,0,0,0,0,0,0,0,4,6,0,6,2,0,0,0,0,0,2,0,0,0,2},
-//  {4,0,0,0,0,0,0,0,0,0,0,0,6,2,0,0,5,0,0,2,0,0,0,2},
-//  {4,0,0,0,0,0,0,0,0,4,6,0,6,2,0,0,0,0,0,2,2,0,2,2},
-//  {4,0,6,0,6,0,0,0,0,4,6,0,0,0,0,0,5,0,0,0,0,0,0,2},
-//  {4,0,0,5,0,0,0,0,0,4,6,0,6,2,0,0,0,0,0,2,2,0,2,2},
-//  {4,0,6,0,6,0,0,0,0,4,6,0,6,2,0,0,5,0,0,2,0,0,0,2},
-//  {4,0,0,0,0,0,0,0,0,4,6,0,6,2,0,0,0,0,0,2,0,0,0,2},
-//  {4,4,4,4,4,4,4,4,4,4,1,1,1,2,2,2,2,2,2,3,3,3,3,3}
-//};
+uint8_t worldMap[MAXMAPHEIGHT * REALMAPWIDTH];
 
 // Bayer gradients, not including the 0 fill (useless?).
 // Takes up 64 precious bytes of RAM
@@ -106,14 +79,18 @@ constexpr uint8_t b_shading[] = {
     0x44, 0x00, 0x00, 0x00, // 14
 };
 
-//Menu related stuff
+//Menu / gamestate related stuff
 uint8_t menuIndex = 0;
 uint8_t mazeSize = 0;
 uint8_t mazeType = 0;
 
-float posX, posY; // = 1.6, posY = 1.6;   //x and y start position
-//float posX = 22, posY = 11.6;   //x and y start position
-float dirX, dirY; //dirX = -1, dirY = 0;      //initial direction vector
+//uint8_t gameState = 0;
+//constexpr uint8_t STATEMAZE = 0;
+//constexpr uint8_t STATEWIN = 1;
+
+// Position and facing direction
+float posX, posY; 
+float dirX, dirY;
 
 // The full function for raycasting. 
 void raycast()
@@ -185,9 +162,10 @@ void raycast()
         uint8_t mapX = pmapX;   // which box of the map the ray collision is in
         uint8_t mapY = pmapY;
         uflot perpWallDist = 0;
+        uint8_t tile = 0;
 
         // perform DDA
-        while (perpWallDist < VIEWDISTANCE)
+        while (perpWallDist < VIEWDISTANCE && tile == 0)
         {
             // jump to next map square, either in x-direction, or in y-direction
             if (sideDistX < sideDistY) {
@@ -203,8 +181,8 @@ void raycast()
                 side = 1; //1 = yside hit
             }
             // Check if ray has hit a wall
-            if (getMazeCell(worldMap, mapX, mapY)) //[mapX][mapY])
-                break;
+            tile = getMazeCell(worldMap, mapX, mapY); //[mapX][mapY])
+                //break;
         }
 
         if(perpWallDist >= VIEWDISTANCE) continue;
@@ -219,13 +197,13 @@ void raycast()
 
         //NOTE: unless view distance is set to > 32, lineHeight will never be 0, so no need to check.
         //ending should be exclusive
-        draw_wall_line(x, MIDSCREEN - lineHeight, MIDSCREEN + lineHeight, perpWallDist, side);
+        draw_wall_line(x, MIDSCREEN - lineHeight, MIDSCREEN + lineHeight, perpWallDist, side, tile);
     }
 }
 
 //Draw a single raycast wall line. Will only draw specifically the wall line and will clip out all the rest
 //(so you can predraw a ceiling and floor before calling raycast)
-inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distance, uint8_t side) 
+inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distance, uint8_t side, uint8_t tile) 
 {
     //NOTE: multiplication is WAY FASTER than division
     uint8_t dither = (uint8_t)(roundFixed(distance * DARKNESS * distance));
@@ -233,7 +211,7 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
     if(dither >= BAYERGRADIENTS)
         return;
 
-    uint8_t shade = (side & x) ? 0 : b_shading[(dither << 2) + (x & 3)];
+    uint8_t shade = ((side & x) || tile == TILEEXIT) ? 0 : b_shading[(dither << 2) + (x & 3)];
     uint8_t start = yStart >> 3;
     uint8_t end = (yEnd - 1) >> 3; //This end needs to be inclusive
 
@@ -248,6 +226,7 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
     }
 }
 
+//Draw the floor underneath the raycast walls (ultra simple for now to save cycles)
 void raycastFoundation()
 {
     //Arduboy2 fillrect is absurdly slow; I have the luxury of doing this instead
@@ -258,12 +237,15 @@ void raycastFoundation()
 
 void movement()
 {
+    //Disable movement in the exit
+    if(inExit()) return;
+
     // move forward if no wall in front of you
     if (arduboy.pressed(A_BUTTON))
     {
-        if (!getMazeCell(worldMap, (int)(posX + dirX * MOVESPEED), (int)posY)) //worldMap[int(posX + dirX * MOVESPEED)][int(posY)] == false)
+        if (!isCellSolid(worldMap, (int)(posX + dirX * MOVESPEED), (int)posY)) 
             posX += dirX * MOVESPEED;
-        if (!getMazeCell(worldMap, (int)posX, (int)(posY + dirY * MOVESPEED))) //(worldMap[int(posX)][int(posY + dirY * MOVESPEED)] == false)
+        if (!isCellSolid(worldMap, (int)posX, (int)(posY + dirY * MOVESPEED)))
             posY += dirY * MOVESPEED;
     }
     // rotate to the right
@@ -284,6 +266,9 @@ void movement()
     }
 }
 
+bool inExit() { return getMazeCell(worldMap, (int)posX, (int)posY) == TILEEXIT; }
+
+//Menu functionality, move the cursor, select things (redraws automatically)
 void doMenu()
 {
     constexpr uint8_t MENUITEMS = 3;
@@ -302,15 +287,9 @@ void doMenu()
         selectMod = 1;
         switch (menuIndex)
         {
-            case 0:
-                menumod(mazeSize, selectMod, MAZESIZECOUNT);
-                break;
-            case 1:
-                menumod(mazeType, selectMod, MAZETYPECOUNT);
-                break;
-            case 2:
-                generateMaze();
-                break;
+            case 0: menumod(mazeSize, selectMod, MAZESIZECOUNT); break;
+            case 1: menumod(mazeType, selectMod, MAZETYPECOUNT); break;
+            case 2: generateMaze(); break;
         }
     }
 
@@ -318,6 +297,7 @@ void doMenu()
         drawMenu();
 }
 
+// Draw just the menu section, does not overwrite the raycast area
 void drawMenu()
 {
     constexpr uint8_t MENUX = 105;
@@ -345,6 +325,7 @@ void drawMenu()
     tinyfont.print("o");
 }
 
+// Generate a new maze and reset the game to an initial playable state
 void generateMaze()
 {
     arduboy.clear();
@@ -360,9 +341,10 @@ void generateMaze()
     posY = 1.6;
     dirX = 1;
     dirY = 0;
+    //gameState = STATEMAZE;
 }
 
-//Using floats for now, will use others later
+
 void setup()
 {
     // Initialize the Arduboy
@@ -380,9 +362,33 @@ void loop()
     if (!arduboy.nextFrame()) return;
 
     arduboy.pollButtons();
+
     raycastFoundation();
     raycast();
     movement();
     doMenu();
+
+    if(inExit()) //gameState == STATEWIN)
+    {
+        tinyfont.setCursor(30, 24);
+        tinyfont.print(F("The maze"));
+        tinyfont.setCursor(15, 29);
+        tinyfont.print(F("goes deeper..."));
+    }
+    else
+    {
+
+    }
+
+    //switch(gameState)
+    //{
+    //    //Normal gameplay
+    //    case STATEMAZE:
+    //        break;
+    //    //Winning or whatever.
+    //    case STATEWIN:
+    //        break;
+    //}
+
     arduboy.display();
 }

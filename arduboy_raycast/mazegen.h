@@ -22,6 +22,8 @@ void genMazeType(uint8_t * map, uint8_t width, uint8_t height)
     for(uint8_t x = 1; x < width - 1; x += 2)
         for(uint8_t y = 1; y < height - 1; y += 1)
             setMazeCell(map, x, y, 0);
+    
+    setMazeCell(map, width - 1, 1, TILEEXIT);
 }
 
 void genRoomsType(uint8_t * map, uint8_t width, uint8_t height)
