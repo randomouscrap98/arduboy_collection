@@ -1,9 +1,10 @@
 #include <FixedPoints.h>
-
 #include <Arduboy2.h>
 #include <ArduboyTones.h>
 
 #include <math.h>
+
+#include "menu.h"
 
 Arduboy2 arduboy;
 ArduboyTones sound(arduboy.audio.enabled);
@@ -20,6 +21,12 @@ ArduboyTones sound(arduboy.audio.enabled);
 typedef SFixed<7,8> flot;
 typedef UFixed<8,8> uflot;
 
+// Gameplay constants
+constexpr uint8_t FRAMERATE = 30; //Untextured can run at near 60; definitely 45
+constexpr float MOVESPEED = 4.0f / FRAMERATE;
+constexpr float ROTSPEED = 4.0f / FRAMERATE;
+constexpr uflot LIGHTINTENSITY = 1.5;
+
 // Funny hack constants. We're working with very small ranges, so 
 // the values have to be picked carefully. The following must remain true:
 // 1 / NEARZEROFIXED < MAXFIXED. It may even need to be < MAXFIXED / 2
@@ -29,16 +36,14 @@ constexpr uflot NEARZEROFIXED = 1.0f / 128; // Prefer accuracy (fixed decimal ex
 // Screen calc constants (no need to do it at runtime)
 constexpr uint8_t MIDSCREEN = HEIGHT / 2;
 constexpr uint8_t VIEWWIDTH = 100;
-constexpr float NORMWIDTH = 2.0f / VIEWWIDTH;
+constexpr flot NORMWIDTH = 2.0f / VIEWWIDTH;
 
 constexpr uint8_t BAYERGRADIENTS = 16;
 
-// Gameplay constants
-constexpr uint8_t FRAMERATE = 30;
-constexpr float MOVESPEED = 4.0f / FRAMERATE;
-constexpr float ROTSPEED = 4.0f / FRAMERATE;
-constexpr uflot VIEWDISTANCE = 16;        // Hard cutoff
-constexpr uflot LIGHTINTENSITY = 1.25;
+//This is a calculated constant based off your light intensity. The view 
+//distance is an optimization; increase light intensity to increase view distance.
+const uflot VIEWDISTANCE = sqrt(BAYERGRADIENTS * (float)LIGHTINTENSITY);
+const uflot DARKNESS = 1 / LIGHTINTENSITY;
 
 constexpr uint8_t MAPWIDTH = 24;
 constexpr uint8_t MAPHEIGHT = 24;
@@ -96,44 +101,37 @@ constexpr uint8_t b_shading[] = {
     0x44, 0x00, 0x00, 0x00, // 14
 };
 
-// Top and bottom masking for bytes to fill screen for dithering
-constexpr uint8_t b_masks[] = {
-    0xFF, 0xFE, 0xFC, 0xF8, 0xF0, 0xE0, 0xC0, 0x80,
-    0x01, 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x7F, 0xFF
-};
-
-float posX = 22, posY = 11.6;     //x and y start position
+float posX = 22, posY = 11.6;   //x and y start position
 float dirX = -1, dirY = 0;      //initial direction vector
 
-// The full function for rendering walls. It's inlined because I only ever expect to call it from
+// The full function for raycasting. It's inlined because I only ever expect to call it from
 // one location. If that changes, I'll just remove inline, it'll be VERY OBVIOUS in the output size
-inline void render_walls()
+inline void raycast()
 {
-    //Waste 6 bytes of memory to save numerous cycles on render (and on programmer. leaving posX + posY floats so...)
+    //Waste 10 bytes of stack to save numerous cycles on render (and on programmer. leaving posX + posY floats so...)
     uint8_t pmapX = int(posX);
     uint8_t pmapY = int(posY);
     uflot pmapofsX = posX - pmapX;
     uflot pmapofsY = posY - pmapY;
+    flot dx = dirX; //NO floating points inside critical loop!!
+    flot dy = dirY;
+
+    uflot dx2dy = 2 * (abs(dx) + 1) / (abs(dy) + 1);
+    uflot dy2dx = 1 / xtoy;
 
     for (uint8_t x = 0; x < VIEWWIDTH; x++)
     {
-        // calculate ray position and direction. This is the only place we use floats,
-        // so maybe 7 * 64 float operations per frame. Maybe that's OK? 
-        flot cameraX = x * NORMWIDTH - 1; // x-coordinate in camera space
+        flot cameraX = (flot)x * NORMWIDTH - 1; // x-coordinate in camera space
 
         // The camera plane is a simple -90 degree rotation on the player direction (as required for this algorithm).
         // As such, it's simply (dirY, -dirX) * FAKEFOV. The camera plane does NOT need to be tracked separately
         #ifdef FAKEFOV
-        flot rayDirX = dirX + dirY * FAKEFOV * cameraX;
-        flot rayDirY = dirY - dirX * FAKEFOV * cameraX;
+        flot rayDirX = dx + dy * FAKEFOV * cameraX;
+        flot rayDirY = dy - dx * FAKEFOV * cameraX;
         #else
-        flot rayDirX = dirX + dirY * cameraX;
-        flot rayDirY = dirY - dirX * cameraX;
+        flot rayDirX = dx + dy * cameraX;
+        flot rayDirY = dy - dx * cameraX;
         #endif
-
-        // which box of the map the ray collision is in
-        uint8_t mapX = pmapX;
-        uint8_t mapY = pmapY;
 
         // length of ray from one x or y-side to next x or y-side. But we prefill it with
         // some initial data which has to be massaged later.
@@ -176,8 +174,10 @@ inline void render_walls()
             }
         }
 
+        uint8_t side;           // was a NS or a EW wall hit?
+        uint8_t mapX = pmapX;   // which box of the map the ray collision is in
+        uint8_t mapY = pmapY;
         uflot perpWallDist = 0;
-        uint8_t side;    // was a NS or a EW wall hit?
 
         // perform DDA
         while (perpWallDist < VIEWDISTANCE)
@@ -187,20 +187,21 @@ inline void render_walls()
                 perpWallDist = sideDistX; // Remember that sideDist is actual distance and not distance only in 1 direction
                 sideDistX += deltaDistX;
                 mapX += stepX;
-                side = 0;
+                side = 0; //0 = xside hit
             }
             else {
                 perpWallDist = sideDistY;
                 sideDistY += deltaDistY;
                 mapY += stepY;
-                side = 1;
+                side = 1; //1 = yside hit
             }
             // Check if ray has hit a wall
             if (worldMap[mapX][mapY])
                 break;
         }
 
-        if(perpWallDist >= VIEWDISTANCE || side & x) continue;
+        //if(perpWallDist >= VIEWDISTANCE || side & x) continue;
+        if(perpWallDist >= VIEWDISTANCE) continue;
 
         // Calculate half height of line to draw on screen. We already know the distance to the wall.
         // We can truncate the total height if too close to the wall right here and now and avoid future checks.
@@ -210,30 +211,33 @@ inline void render_walls()
         uint8_t lineHeight = (perpWallDist <= 1 ? HEIGHT : (int)(HEIGHT / perpWallDist)) >> 1;
         #endif
 
-        //NOTE: unless view distance is set to > 32, lineHeight will never be 0, so no need to check
-        draw_wall_line(x, MIDSCREEN - lineHeight, MIDSCREEN + lineHeight - 1, perpWallDist);
+        //NOTE: unless view distance is set to > 32, lineHeight will never be 0, so no need to check.
+        //ending should be exclusive
+        draw_wall_line(x, MIDSCREEN - lineHeight, MIDSCREEN + lineHeight, perpWallDist, side ? dy2dx : dx2dy);
     }
 }
 
-inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distance)
+inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distance, uflot dim)
 {
-    uint8_t dither = (distance / LIGHTINTENSITY * distance).getInteger();
+    //NOTE: multiplication is WAY FASTER than division
+    uint8_t dither = (uint8_t)roundFixed(distance * DARKNESS * distance) + dim;
 
     if(dither >= BAYERGRADIENTS)
         return;
 
     uint8_t shade = b_shading[(dither << 2) + (x & 3)];
+    //uint8_t shade = (side & x) ? 0 : b_shading[(dither << 2) + (x & 3)];
     uint8_t start = yStart >> 3;
-    uint8_t end = yEnd >> 3;
+    uint8_t end = (yEnd - 1) >> 3; //This end needs to be inclusive
 
     for(uint8_t b = start; b <= end; ++b)
     {
-        uint8_t s = shade;
+        uint8_t m = 0xFF;
         if(b == start)
-            s &= b_masks[yStart & 7];
-        if(b == end)
-            s &= b_masks[8 + (yEnd & 7)];
-        arduboy.sBuffer[b * WIDTH + x] = s;
+            m &= (0xFF << (yStart & 7));
+        if(b == end && yEnd & 7) //Short circuit I sincerely hope!!
+            m &= (0xFF << (yEnd & 7)) >> 8;
+        arduboy.sBuffer[b * WIDTH + x] = (arduboy.sBuffer[b * WIDTH + x] & ~m) | (shade & m);
     }
 }
 
@@ -294,12 +298,14 @@ void loop()
     if (!arduboy.nextFrame()) return;
 
     arduboy.pollButtons();
-    arduboy.clear();
-    arduboy.drawRect(VIEWWIDTH + 1, 0, WIDTH - VIEWWIDTH - 2, HEIGHT, WHITE);
-    arduboy.setCursor(108, 1);
-    //sprintf(buff, "%d", light);
-    arduboy.print("DE");
-    render_walls();
+    //arduboy.clear();
+    constexpr uint16_t cutoff = 1024; //640;
+    memset(arduboy.sBuffer, 0x00, cutoff);
+    memset(arduboy.sBuffer + cutoff, 0xAA, 1024 - cutoff);
+    Sprites::drawOverwrite(VIEWWIDTH, 0, menu, 0);
+    arduboy.setCursor(106, 4);
+    arduboy.print("END");
+    raycast();
     movement();
     arduboy.display();
 }
