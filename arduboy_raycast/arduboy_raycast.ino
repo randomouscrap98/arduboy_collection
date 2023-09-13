@@ -56,33 +56,34 @@ constexpr uint8_t MIDSCREEN = HEIGHT / 2;
 constexpr uint8_t VIEWWIDTH = 100;
 constexpr flot NORMWIDTH = 2.0f / VIEWWIDTH;
 
-uint8_t worldMap[MAXMAPHEIGHT][MAXMAPWIDTH]=
-{
-  {4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,7,7,7,7,7,7,7,7},
-  {4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,7},
-  {4,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7},
-  {4,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7},
-  {4,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,7},
-  {4,0,4,0,0,0,0,5,5,5,5,5,5,5,5,5,7,7,0,7,7,7,7,7},
-  {4,0,5,0,0,0,0,5,0,5,0,5,0,5,0,5,7,0,0,0,7,7,7,1},
-  {4,0,6,0,0,0,0,5,0,0,0,0,0,0,0,5,7,0,0,0,0,0,0,8},
-  {4,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,7,7,1},
-  {4,0,8,0,0,0,0,5,0,0,0,0,0,0,0,5,7,0,0,0,0,0,0,8},
-  {4,0,0,0,0,0,0,5,0,0,0,0,0,0,0,5,7,0,0,0,7,7,7,1},
-  {4,0,0,0,0,0,0,5,5,5,5,0,5,5,5,5,7,7,7,7,7,7,7,1},
-  {6,6,6,6,6,6,6,6,6,6,6,0,6,6,6,6,6,6,6,6,6,6,6,6},
-  {8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4},
-  {6,6,6,6,6,6,0,6,6,6,6,0,6,6,6,6,6,6,6,6,6,6,6,6},
-  {4,4,4,4,4,4,0,4,4,4,6,0,6,2,2,2,2,2,2,2,3,3,3,3},
-  {4,0,0,0,0,0,0,0,0,4,6,0,6,2,0,0,0,0,0,2,0,0,0,2},
-  {4,0,0,0,0,0,0,0,0,0,0,0,6,2,0,0,5,0,0,2,0,0,0,2},
-  {4,0,0,0,0,0,0,0,0,4,6,0,6,2,0,0,0,0,0,2,2,0,2,2},
-  {4,0,6,0,6,0,0,0,0,4,6,0,0,0,0,0,5,0,0,0,0,0,0,2},
-  {4,0,0,5,0,0,0,0,0,4,6,0,6,2,0,0,0,0,0,2,2,0,2,2},
-  {4,0,6,0,6,0,0,0,0,4,6,0,6,2,0,0,5,0,0,2,0,0,0,2},
-  {4,0,0,0,0,0,0,0,0,4,6,0,6,2,0,0,0,0,0,2,0,0,0,2},
-  {4,4,4,4,4,4,4,4,4,4,1,1,1,2,2,2,2,2,2,3,3,3,3,3}
-};
+uint8_t worldMap[MAXMAPHEIGHT * MAXMAPWIDTH / TILESPERBYTE];
+//[MAXMAPWIDTH]=
+//{
+//  {4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,7,7,7,7,7,7,7,7},
+//  {4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,7},
+//  {4,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7},
+//  {4,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7},
+//  {4,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,7},
+//  {4,0,4,0,0,0,0,5,5,5,5,5,5,5,5,5,7,7,0,7,7,7,7,7},
+//  {4,0,5,0,0,0,0,5,0,5,0,5,0,5,0,5,7,0,0,0,7,7,7,1},
+//  {4,0,6,0,0,0,0,5,0,0,0,0,0,0,0,5,7,0,0,0,0,0,0,8},
+//  {4,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,7,7,1},
+//  {4,0,8,0,0,0,0,5,0,0,0,0,0,0,0,5,7,0,0,0,0,0,0,8},
+//  {4,0,0,0,0,0,0,5,0,0,0,0,0,0,0,5,7,0,0,0,7,7,7,1},
+//  {4,0,0,0,0,0,0,5,5,5,5,0,5,5,5,5,7,7,7,7,7,7,7,1},
+//  {6,6,6,6,6,6,6,6,6,6,6,0,6,6,6,6,6,6,6,6,6,6,6,6},
+//  {8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4},
+//  {6,6,6,6,6,6,0,6,6,6,6,0,6,6,6,6,6,6,6,6,6,6,6,6},
+//  {4,4,4,4,4,4,0,4,4,4,6,0,6,2,2,2,2,2,2,2,3,3,3,3},
+//  {4,0,0,0,0,0,0,0,0,4,6,0,6,2,0,0,0,0,0,2,0,0,0,2},
+//  {4,0,0,0,0,0,0,0,0,0,0,0,6,2,0,0,5,0,0,2,0,0,0,2},
+//  {4,0,0,0,0,0,0,0,0,4,6,0,6,2,0,0,0,0,0,2,2,0,2,2},
+//  {4,0,6,0,6,0,0,0,0,4,6,0,0,0,0,0,5,0,0,0,0,0,0,2},
+//  {4,0,0,5,0,0,0,0,0,4,6,0,6,2,0,0,0,0,0,2,2,0,2,2},
+//  {4,0,6,0,6,0,0,0,0,4,6,0,6,2,0,0,5,0,0,2,0,0,0,2},
+//  {4,0,0,0,0,0,0,0,0,4,6,0,6,2,0,0,0,0,0,2,0,0,0,2},
+//  {4,4,4,4,4,4,4,4,4,4,1,1,1,2,2,2,2,2,2,3,3,3,3,3}
+//};
 
 // Bayer gradients, not including the 0 fill (useless?).
 // Takes up 64 precious bytes of RAM
@@ -110,8 +111,9 @@ uint8_t menuIndex = 0;
 uint8_t mazeSize = 0;
 uint8_t mazeType = 0;
 
-float posX = 22, posY = 11.6;   //x and y start position
-float dirX = -1, dirY = 0;      //initial direction vector
+float posX, posY; // = 1.6, posY = 1.6;   //x and y start position
+//float posX = 22, posY = 11.6;   //x and y start position
+float dirX, dirY; //dirX = -1, dirY = 0;      //initial direction vector
 
 // The full function for raycasting. 
 void raycast()
@@ -201,7 +203,7 @@ void raycast()
                 side = 1; //1 = yside hit
             }
             // Check if ray has hit a wall
-            if (worldMap[mapX][mapY])
+            if (getMazeCell(worldMap, mapX, mapY)) //[mapX][mapY])
                 break;
         }
 
@@ -259,19 +261,11 @@ void movement()
     // move forward if no wall in front of you
     if (arduboy.pressed(A_BUTTON))
     {
-        if (worldMap[int(posX + dirX * MOVESPEED)][int(posY)] == false)
+        if (!getMazeCell(worldMap, (int)(posX + dirX * MOVESPEED), (int)posY)) //worldMap[int(posX + dirX * MOVESPEED)][int(posY)] == false)
             posX += dirX * MOVESPEED;
-        if (worldMap[int(posX)][int(posY + dirY * MOVESPEED)] == false)
+        if (!getMazeCell(worldMap, (int)posX, (int)(posY + dirY * MOVESPEED))) //(worldMap[int(posX)][int(posY + dirY * MOVESPEED)] == false)
             posY += dirY * MOVESPEED;
     }
-    //// move backwards if no wall behind you
-    //if (arduboy.pressed(DOWN_BUTTON))
-    //{
-    //    if (worldMap[int(posX - dirX * MOVESPEED)][int(posY)] == false)
-    //        posX -= dirX * MOVESPEED;
-    //    if (worldMap[int(posX)][int(posY - dirY * MOVESPEED)] == false)
-    //        posY -= dirY * MOVESPEED;
-    //}
     // rotate to the right
     if (arduboy.pressed(RIGHT_BUTTON))
     {
@@ -315,6 +309,7 @@ void doMenu()
                 menumod(mazeType, selectMod, MAZETYPECOUNT);
                 break;
             case 2:
+                generateMaze();
                 break;
         }
     }
@@ -350,6 +345,23 @@ void drawMenu()
     tinyfont.print("o");
 }
 
+void generateMaze()
+{
+    arduboy.clear();
+    tinyfont.setCursor(40, 28);
+    tinyfont.print(F("Generating maze"));
+    arduboy.display();
+
+    MazeSize mzs = getMazeSize(mazeSize);
+    MazeType mzt = MAZETYPES[mazeType];
+
+    mzt.func(worldMap, mzs.width, mzs.height);
+    posX = 1.6;
+    posY = 1.6;
+    dirX = 1;
+    dirY = 0;
+}
+
 //Using floats for now, will use others later
 void setup()
 {
@@ -359,6 +371,7 @@ void setup()
     arduboy.initRandomSeed();
     arduboy.clear();
     arduboy.setFrameRate(FRAMERATE);
+    generateMaze();
     drawMenu();
 }
 
