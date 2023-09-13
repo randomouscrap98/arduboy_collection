@@ -1,14 +1,16 @@
+#include <Tinyfont.h>
 #include <FixedPoints.h>
 #include <Arduboy2.h>
-#include <ArduboyTones.h>
+//#include <ArduboyTones.h>
 
 #include <math.h>
 
 #include "menu.h"
 #include "light2.h"
 
-Arduboy2 arduboy;
-ArduboyTones sound(arduboy.audio.enabled);
+Arduboy2Base arduboy;
+//ArduboyTones sound(arduboy.audio.enabled);
+Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
 
 // Define a fake FOV. Slightly more computation but not much honestly. 
 // It just doesn't do much. 1 = "90", more than 1 = more than 90
@@ -23,10 +25,20 @@ typedef SFixed<7,8> flot;
 typedef UFixed<8,8> uflot;
 
 // Gameplay constants
-constexpr uint8_t FRAMERATE = 30; //Untextured can run at near 60; definitely 45
+constexpr uint8_t FRAMERATE = 45; //Untextured can run at near 60; lots of headroom at 45
 constexpr float MOVESPEED = 4.0f / FRAMERATE;
 constexpr float ROTSPEED = 4.0f / FRAMERATE;
 constexpr uflot LIGHTINTENSITY = 1.5;
+
+//Visual constants (Probably shouldn't change these)
+constexpr uint8_t LIGHTSTART = 34;
+constexpr uint8_t BAYERGRADIENTS = 16;
+
+//These are calculated constants based off your light intensity. The view 
+//distance is an optimization; increase light intensity to increase view distance.
+//We calculate "darkness" to avoid 100 divisions per frame (huuuge savings)
+const uflot VIEWDISTANCE = sqrt(BAYERGRADIENTS * (float)LIGHTINTENSITY);
+const uflot DARKNESS = 1 / LIGHTINTENSITY;
 
 // Funny hack constants. We're working with very small ranges, so 
 // the values have to be picked carefully. The following must remain true:
@@ -34,28 +46,16 @@ constexpr uflot LIGHTINTENSITY = 1.5;
 constexpr uflot MAXFIXED = 255;
 constexpr uflot NEARZEROFIXED = 1.0f / 128; // Prefer accuracy (fixed decimal exact)
 
-// Screen calc constants (no need to do it at runtime)
+//Screen calc constants (no need to do it at runtime)
 constexpr uint8_t MIDSCREEN = HEIGHT / 2;
 constexpr uint8_t VIEWWIDTH = 100;
 constexpr flot NORMWIDTH = 2.0f / VIEWWIDTH;
 
-constexpr uint8_t BAYERGRADIENTS = 16;
+constexpr uint8_t MAXMAPWIDTH = 24;
+constexpr uint8_t MAXMAPHEIGHT = 24;
 
-//This is a calculated constant based off your light intensity. The view 
-//distance is an optimization; increase light intensity to increase view distance.
-const uflot VIEWDISTANCE = sqrt(BAYERGRADIENTS * (float)LIGHTINTENSITY);
-const uflot DARKNESS = 1 / LIGHTINTENSITY;
-
-constexpr uint8_t MAPWIDTH = 24;
-constexpr uint8_t MAPHEIGHT = 24;
-
-uint8_t worldMap[MAPHEIGHT][MAPWIDTH]=
+uint8_t worldMap[MAXMAPHEIGHT][MAXMAPWIDTH]=
 {
-  //{0b11111111, 0b11111111, 0b11111111},
-  //{0b00000001, 0b00000000, 0b10000000},
-  //{0b00000001, 0b00000000, 0b10000000},
-  //{0b00000001, 0b00000000, 0b10000000},
-  //{0b11000001, 0b10000111, 0b10001010},
   {4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,7,7,7,7,7,7,7,7},
   {4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,7},
   {4,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7},
@@ -102,12 +102,16 @@ constexpr uint8_t b_shading[] = {
     0x44, 0x00, 0x00, 0x00, // 14
 };
 
+//Menu related stuff
+constexpr uint8_t MENUITEMS = 3;
+uint8_t menuIndex = 0;
+uint8_t mazeSize = 0;
+
 float posX = 22, posY = 11.6;   //x and y start position
 float dirX = -1, dirY = 0;      //initial direction vector
 
-// The full function for raycasting. It's inlined because I only ever expect to call it from
-// one location. If that changes, I'll just remove inline, it'll be VERY OBVIOUS in the output size
-inline void raycast()
+// The full function for raycasting. 
+void raycast()
 {
     //Waste 10 bytes of stack to save numerous cycles on render (and on programmer. leaving posX + posY floats so...)
     uint8_t pmapX = int(posX);
@@ -198,7 +202,6 @@ inline void raycast()
                 break;
         }
 
-        //if(perpWallDist >= VIEWDISTANCE || side & x) continue;
         if(perpWallDist >= VIEWDISTANCE) continue;
 
         // Calculate half height of line to draw on screen. We already know the distance to the wall.
@@ -215,8 +218,8 @@ inline void raycast()
     }
 }
 
-//constexpr uint8_t curling [] = { 0xF, 0x};
-
+//Draw a single raycast wall line. Will only draw specifically the wall line and will clip out all the rest
+//(so you can predraw a ceiling and floor before calling raycast)
 inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distance, uint8_t side) 
 {
     //NOTE: multiplication is WAY FASTER than division
@@ -226,15 +229,6 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
         return;
 
     uint8_t shade = (side & x) ? 0 : b_shading[(dither << 2) + (x & 3)];
-    //if(side)
-    //{
-    //    if(distance > 0.8 && ((x & 1) == 0) || distance > 0.4 && ((x & 0b11) == 0) || distance > 0.2 && ((x & 0b111) == 0))
-    //        shade = 0;
-    //}
-    //if(distance < 0.75 && side)
-        //side = 0b111 >> ((int)distance * 4);
-    //uint8_t shade = (side && ((side & x) == side)) ? 0 : b_shading[(dither << 2) + (x & 3)];
-    //uint8_t shade //(side && (distance > 1 && (side & x) || (x & (0x7 >> (int)(distance * 3))) == 1)) ? 0 : b_shading[(dither << 2) + (x & 3)];
     uint8_t start = yStart >> 3;
     uint8_t end = (yEnd - 1) >> 3; //This end needs to be inclusive
 
@@ -249,24 +243,24 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
     }
 }
 
-inline void movement()
+void movement()
 {
     // move forward if no wall in front of you
-    if (arduboy.pressed(UP_BUTTON))
+    if (arduboy.pressed(A_BUTTON))
     {
         if (worldMap[int(posX + dirX * MOVESPEED)][int(posY)] == false)
             posX += dirX * MOVESPEED;
         if (worldMap[int(posX)][int(posY + dirY * MOVESPEED)] == false)
             posY += dirY * MOVESPEED;
     }
-    // move backwards if no wall behind you
-    if (arduboy.pressed(DOWN_BUTTON))
-    {
-        if (worldMap[int(posX - dirX * MOVESPEED)][int(posY)] == false)
-            posX -= dirX * MOVESPEED;
-        if (worldMap[int(posX)][int(posY - dirY * MOVESPEED)] == false)
-            posY -= dirY * MOVESPEED;
-    }
+    //// move backwards if no wall behind you
+    //if (arduboy.pressed(DOWN_BUTTON))
+    //{
+    //    if (worldMap[int(posX - dirX * MOVESPEED)][int(posY)] == false)
+    //        posX -= dirX * MOVESPEED;
+    //    if (worldMap[int(posX)][int(posY - dirY * MOVESPEED)] == false)
+    //        posY -= dirY * MOVESPEED;
+    //}
     // rotate to the right
     if (arduboy.pressed(RIGHT_BUTTON))
     {
@@ -283,10 +277,39 @@ inline void movement()
         dirX = dirX * cos(ROTSPEED) - dirY * sin(ROTSPEED);
         dirY = oldDirX * sin(ROTSPEED) + dirY * cos(ROTSPEED);
     }
-    //if (arduboy.justPressed(B_BUTTON))
-    //{
-    //    light = (light + 1) & 7;
-    //}
+}
+
+void doMenu()
+{
+    int8_t menuMod = 0;
+
+    if(arduboy.justPressed(UP_BUTTON))
+        menuMod = -1;
+    if(arduboy.justPressed(DOWN_BUTTON))
+        menuMod = 1;
+
+    if(menuMod)
+    {
+        menuIndex = (menuIndex + menuMod + MENUITEMS) % MENUITEMS;
+        drawMenu();
+    }
+}
+
+void drawMenu()
+{
+    Sprites::drawOverwrite(VIEWWIDTH, 0, menu, 0);
+    tinyfont.setCursor(109, 4);
+    tinyfont.print("3D");
+    tinyfont.setCursor(105, 9);
+    tinyfont.print("Maze");
+}
+
+void raycastFoundation()
+{
+    //Arduboy2 fillrect is absurdly slow; I have the luxury of doing this instead
+    for(uint8_t i = 0; i <= LIGHTSTART >> 3; ++i)
+        memset(arduboy.sBuffer + i * WIDTH, 0, VIEWWIDTH);
+    Sprites::drawOverwrite(0, LIGHTSTART, light, 0);
 }
 
 //Using floats for now, will use others later
@@ -297,8 +320,8 @@ void setup()
     arduboy.initRandomSeed();
     arduboy.clear();
     arduboy.setFrameRate(FRAMERATE);
+    drawMenu();
 }
-
 
 //char buff[20];
 void loop()
@@ -306,15 +329,9 @@ void loop()
     if (!arduboy.nextFrame()) return;
 
     arduboy.pollButtons();
-    //arduboy.clear();
-    constexpr uint16_t cutoff = 1024; //640;
-    memset(arduboy.sBuffer, 0x00, cutoff);
-    memset(arduboy.sBuffer + cutoff, 0xAA, 1024 - cutoff);
-    Sprites::drawOverwrite(0, 34, light, 0);
-    Sprites::drawOverwrite(VIEWWIDTH, 0, menu, 0);
-    arduboy.setCursor(106, 4);
-    arduboy.print("END");
+    raycastFoundation();
     raycast();
     movement();
+    doMenu();
     arduboy.display();
 }
