@@ -5,6 +5,7 @@
 #include <math.h>
 
 #include "menu.h"
+#include "light2.h"
 
 Arduboy2 arduboy;
 ArduboyTones sound(arduboy.audio.enabled);
@@ -116,9 +117,6 @@ inline void raycast()
     flot dx = dirX; //NO floating points inside critical loop!!
     flot dy = dirY;
 
-    //uflot dx2dy = 4 * ((uflot)abs(dx) + 1) / ((uflot)abs(dy) + 1);
-    //uflot dy2dx = 4 * ((uflot)abs(dy) + 1) / ((uflot)abs(dx) + 1);
-
     for (uint8_t x = 0; x < VIEWWIDTH; x++)
     {
         flot cameraX = (flot)x * NORMWIDTH - 1; // x-coordinate in camera space
@@ -213,20 +211,30 @@ inline void raycast()
 
         //NOTE: unless view distance is set to > 32, lineHeight will never be 0, so no need to check.
         //ending should be exclusive
-        draw_wall_line(x, MIDSCREEN - lineHeight, MIDSCREEN + lineHeight, perpWallDist, side); // ? 4 : 0); //dx2dy : dy2dx);
+        draw_wall_line(x, MIDSCREEN - lineHeight, MIDSCREEN + lineHeight, perpWallDist, side);
     }
 }
 
-inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distance, uint8_t side) //uflot dim)
+//constexpr uint8_t curling [] = { 0xF, 0x};
+
+inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distance, uint8_t side) 
 {
     //NOTE: multiplication is WAY FASTER than division
-    uint8_t dither = (uint8_t)(roundFixed(distance * DARKNESS * distance)); // + dim);
+    uint8_t dither = (uint8_t)(roundFixed(distance * DARKNESS * distance));
 
     if(dither >= BAYERGRADIENTS)
         return;
 
-    //uint8_t shade = b_shading[(dither << 2) + (x & 3)];
-    uint8_t shade = (side & x) ? 0 : b_shading[(dither << 2) + (x & 3)];
+    uint8_t shade = b_shading[(dither << 2) + (x & 3)];
+    //if(side)
+    //{
+    //    if(distance > 0.8 && ((x & 1) == 0) || distance > 0.4 && ((x & 0b11) == 0) || distance > 0.2 && ((x & 0b111) == 0))
+    //        shade = 0;
+    //}
+    //if(distance < 0.75 && side)
+        //side = 0b111 >> ((int)distance * 4);
+    //uint8_t shade = (side && ((side & x) == side)) ? 0 : b_shading[(dither << 2) + (x & 3)];
+    //uint8_t shade //(side && (distance > 1 && (side & x) || (x & (0x7 >> (int)(distance * 3))) == 1)) ? 0 : b_shading[(dither << 2) + (x & 3)];
     uint8_t start = yStart >> 3;
     uint8_t end = (yEnd - 1) >> 3; //This end needs to be inclusive
 
@@ -302,6 +310,7 @@ void loop()
     constexpr uint16_t cutoff = 1024; //640;
     memset(arduboy.sBuffer, 0x00, cutoff);
     memset(arduboy.sBuffer + cutoff, 0xAA, 1024 - cutoff);
+    Sprites::drawOverwrite(0, 34, light, 0);
     Sprites::drawOverwrite(VIEWWIDTH, 0, menu, 0);
     arduboy.setCursor(106, 4);
     arduboy.print("END");
