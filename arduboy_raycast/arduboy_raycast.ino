@@ -116,8 +116,8 @@ inline void raycast()
     flot dx = dirX; //NO floating points inside critical loop!!
     flot dy = dirY;
 
-    uflot dx2dy = 2 * (abs(dx) + 1) / (abs(dy) + 1);
-    uflot dy2dx = 1 / xtoy;
+    //uflot dx2dy = 4 * ((uflot)abs(dx) + 1) / ((uflot)abs(dy) + 1);
+    //uflot dy2dx = 4 * ((uflot)abs(dy) + 1) / ((uflot)abs(dx) + 1);
 
     for (uint8_t x = 0; x < VIEWWIDTH; x++)
     {
@@ -213,20 +213,20 @@ inline void raycast()
 
         //NOTE: unless view distance is set to > 32, lineHeight will never be 0, so no need to check.
         //ending should be exclusive
-        draw_wall_line(x, MIDSCREEN - lineHeight, MIDSCREEN + lineHeight, perpWallDist, side ? dy2dx : dx2dy);
+        draw_wall_line(x, MIDSCREEN - lineHeight, MIDSCREEN + lineHeight, perpWallDist, side); // ? 4 : 0); //dx2dy : dy2dx);
     }
 }
 
-inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distance, uflot dim)
+inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distance, uint8_t side) //uflot dim)
 {
     //NOTE: multiplication is WAY FASTER than division
-    uint8_t dither = (uint8_t)roundFixed(distance * DARKNESS * distance) + dim;
+    uint8_t dither = (uint8_t)(roundFixed(distance * DARKNESS * distance)); // + dim);
 
     if(dither >= BAYERGRADIENTS)
         return;
 
-    uint8_t shade = b_shading[(dither << 2) + (x & 3)];
-    //uint8_t shade = (side & x) ? 0 : b_shading[(dither << 2) + (x & 3)];
+    //uint8_t shade = b_shading[(dither << 2) + (x & 3)];
+    uint8_t shade = (side & x) ? 0 : b_shading[(dither << 2) + (x & 3)];
     uint8_t start = yStart >> 3;
     uint8_t end = (yEnd - 1) >> 3; //This end needs to be inclusive
 
