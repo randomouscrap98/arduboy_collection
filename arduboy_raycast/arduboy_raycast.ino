@@ -50,6 +50,10 @@ uint8_t menuIndex = 0;
 uint8_t mazeSize = 0;
 uint8_t mazeType = 0;
 
+uint8_t totalWins = 1; //lol
+float thisDistance = 0;
+float totalDistance = 0;
+
 // Position and facing direction
 float posX, posY; 
 float dirX, dirY;
@@ -210,10 +214,11 @@ void movement()
     // move forward if no wall in front of you
     if (arduboy.pressed(A_BUTTON))
     {
-        if (!isCellSolid(worldMap, (int)(posX + dirX * MOVESPEED), (int)posY)) 
-            posX += dirX * MOVESPEED;
-        if (!isCellSolid(worldMap, (int)posX, (int)(posY + dirY * MOVESPEED)))
-            posY += dirY * MOVESPEED;
+        float movX = isCellSolid(worldMap, (int)(posX + dirX * MOVESPEED), (int)posY) ? 0 : dirX * MOVESPEED;
+        float movY = isCellSolid(worldMap, (int)posX, (int)(posY + dirY * MOVESPEED)) ? 0 : dirY * MOVESPEED;
+        thisDistance += sqrt(movX * movX + movY * movY);
+        posX += movX;
+        posY += movY;
     }
     // rotate to the right
     if (arduboy.pressed(RIGHT_BUTTON))
@@ -275,7 +280,7 @@ void drawMenu()
     tinyfont.setCursor(109, 4);
     tinyfont.print(F("3D"));
     tinyfont.setCursor(105, 9);
-    tinyfont.print(F("Maze"));
+    tinyfont.print(F("MAZE"));
 
     MazeSize mzs = getMazeSize(mazeSize);
     tinyfont.setCursor(MENUX + 4, MENUY);
@@ -296,18 +301,28 @@ void drawMenu()
 void generateMaze()
 {
     arduboy.clear();
-    tinyfont.setCursor(40, 28);
+    tinyfont.setCursor(12, 28);
     tinyfont.print(F("Generating maze"));
     arduboy.display();
+
+    //Why am I doing this? It's mostly a meme I guess; don't write code like this!
+    if(inExit())
+        totalWins += 1;
+
+    //Regardless if you win or not, put distance away
+    totalDistance += thisDistance;
 
     MazeSize mzs = getMazeSize(mazeSize);
     MazeType mzt = MAZETYPES[mazeType];
 
+    //Call the generator function chosen by the menu
     mzt.func(worldMap, mzs.width, mzs.height);
+
     posX = 1.6;
     posY = 1.6;
     dirX = 1;
     dirY = 0;
+    thisDistance = 0;
 }
 
 
@@ -323,6 +338,9 @@ void setup()
     drawMenu();
 }
 
+// Waste 20 bytes for a string buffer (might remove later)
+char buff[20];
+
 void loop()
 {
     if (!arduboy.nextFrame()) return;
@@ -337,22 +355,27 @@ void loop()
         for(uint8_t i = 0; i < HEIGHT >> 3; ++i)
             memset(arduboy.sBuffer + i * WIDTH, 0, VIEWWIDTH);
 
-        tinyfont.setCursor(30, 24);
-        tinyfont.print(F("THE MAZE"));
-        tinyfont.setCursor(19, 29);
-        tinyfont.print(F("GOES DEEPER..."));
-        //uint8_t rgb = (arduboy.frameCount >> 4) & 0b111;
-        //arduboy.digitalWriteRGB(
-        //    rgb & 0b001 ? RGB_ON : RGB_OFF, 
-        //    rgb & 0b010 ? RGB_ON : RGB_OFF, 
-        //    rgb & 0b100 ? RGB_ON : RGB_OFF);
+        constexpr uint8_t WINX = 22;
+
+        tinyfont.setCursor(WINX, 24);
+        tinyfont.print(F("COMPLETE!"));
+        sprintf(buff, "WINS: %d", totalWins);
+        tinyfont.setCursor(WINX + 8, 32);
+        tinyfont.print(buff);
+        sprintf(buff, "DIST: %d", (int)thisDistance);
+        tinyfont.setCursor(WINX + 8, 37);
+        tinyfont.print(buff);
+        sprintf(buff, "TDIST: %d", (int)(totalDistance + thisDistance));
+        tinyfont.setCursor(WINX + 3, 42);
+        tinyfont.print(buff);
+
+        //tinyfont.print(F("GOES DEEPER..."));
     }
     else
     {
         raycastFoundation();
         raycast();
         movement();
-        //arduboy.digitalWriteRGB(RGB_OFF, RGB_OFF, RGB_OFF);
     }
 
     arduboy.display();
