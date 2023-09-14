@@ -57,6 +57,9 @@ uint8_t menuIndex = 0;
 uint8_t mazeSize = 0;
 uint8_t mazeType = 0;
 
+uint8_t curWidth = 0;
+uint8_t curHeight = 0;
+
 uint8_t totalWins = 1; //lol
 float thisDistance = 0;
 float totalDistance = 0;
@@ -318,6 +321,7 @@ void drawMenu(bool showHint)
     {
         arduboy.drawRect(MENUX + 5, HEIGHT - 15, 10, 10, WHITE);
         arduboy.drawPixel(MENUX + 14, HEIGHT - 7, BLACK);
+        arduboy.drawPixel(MENUX + 6 + (int)(posX / curWidth * 8), HEIGHT - 14 + (int)(posY / curHeight * 8), arduboy.frameCount & 0b10000 ? WHITE : BLACK);
     }
 }
 
@@ -341,6 +345,8 @@ void generateMaze()
 
     //Call the generator function chosen by the menu
     mzt.func(worldMap, mzs.width, mzs.height);
+    curWidth = mzs.width;
+    curHeight = mzs.height;
 
     posX = 1.6;
     posY = 1.6;
