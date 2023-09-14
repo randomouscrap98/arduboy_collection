@@ -8,7 +8,8 @@ constexpr uint8_t ELLERVTCHANCE = 2;
 constexpr uint8_t ELLERROWSIZE = MAXMAPWIDTH >> 1;
 
 // Using some algorithm called "Eller's algorithm", which is constant memory.
-void genMazeType(uint8_t * map, uint8_t width, uint8_t height)
+void genMazeType(uint8_t * map, uint8_t width, uint8_t height, 
+float * posX, float * posY, float * dirX, float * dirY)
 {
     resetMaze(map);
 
@@ -104,9 +105,23 @@ void genMazeType(uint8_t * map, uint8_t width, uint8_t height)
     } 
 
     setMazeCell(map, width - 1, yEnd, TILEEXIT);
+
+    * posX = 1.6;
+     *posY = 1.6;
+
+    if(getMazeCell(map, 2, 1) == TILEEMPTY)
+    {
+        * dirX = 1;
+        * dirY = 0;
+    }
+    else
+    {
+        * dirY = 1;
+        * dirX = 0;
+    }
 }
 
-void genRoomsType(uint8_t * map, uint8_t width, uint8_t height)
+void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, float * posX, float * posY, float * dirX, float * dirY)
 {
     resetMaze(map);
 
@@ -115,7 +130,7 @@ void genRoomsType(uint8_t * map, uint8_t width, uint8_t height)
     oddify(height);
 }
 
-void genCellType(uint8_t * map, uint8_t width, uint8_t height)
+void genCellType(uint8_t * map, uint8_t width, uint8_t height, float * posX, float * posY, float * dirX, float * dirY)
 {
     resetMaze(map);
 
@@ -128,7 +143,7 @@ void genCellType(uint8_t * map, uint8_t width, uint8_t height)
 struct MazeType
 {
     char name[4];
-    void (*func)(uint8_t*, uint8_t, uint8_t);
+    void (*func)(uint8_t*, uint8_t, uint8_t, float *, float *, float *, float *);
     //void * func;
 };
 

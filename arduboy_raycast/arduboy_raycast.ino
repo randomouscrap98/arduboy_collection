@@ -278,13 +278,6 @@ void doMenu()
     // We check released in case the user was showing a hint
     if(menuMod || selectMod || arduboy.pressed(B_BUTTON) || arduboy.justReleased(B_BUTTON))
         drawMenu(arduboy.pressed(B_BUTTON) && menuIndex == 3);
-    
-    //// Only show hint while user is holding down on that
-    //if(arduboy.pressed(B_BUTTON) && menuIndex == 2)
-    //{
-    //    // draw a little hint box. Don't use optimized draw commands, I don't care
-    //    arduboy.drawRect()
-    //}
 }
 
 // Draw just the menu section, does not overwrite the raycast area
@@ -339,28 +332,15 @@ void generateMaze()
 
     //Regardless if you win or not, put distance away
     totalDistance += thisDistance;
+    thisDistance = 0;
 
     MazeSize mzs = getMazeSize(mazeSize);
     MazeType mzt = MAZETYPES[mazeType];
 
     //Call the generator function chosen by the menu
-    mzt.func(worldMap, mzs.width, mzs.height);
+    mzt.func(worldMap, mzs.width, mzs.height, &posX, &posY, &dirX, &dirY);
     curWidth = mzs.width;
     curHeight = mzs.height;
-
-    posX = 1.6;
-    posY = 1.6;
-    if(getMazeCell(worldMap, 2, 1) == TILEEMPTY)
-    {
-        dirX = 1;
-        dirY = 0;
-    }
-    else
-    {
-        dirY = 1;
-        dirX = 0;
-    }
-    thisDistance = 0;
 }
 
 
