@@ -313,8 +313,10 @@ void drawMenu(bool showHint)
     if(showHint)
     {
         arduboy.drawRect(MENUX + 5, HEIGHT - 15, 10, 10, WHITE);
-        arduboy.drawPixel(MENUX + 14, HEIGHT - 7, BLACK);
-        arduboy.drawPixel(MENUX + 6 + (int)(posX / curWidth * 8), HEIGHT - 14 + (int)(posY / curHeight * 8), arduboy.frameCount & 0b10000 ? WHITE : BLACK);
+        //arduboy.drawPixel(MENUX + 14, HEIGHT - 7, BLACK);
+        arduboy.drawPixel(MENUX + 14, HEIGHT - 14, BLACK);
+        //arduboy.drawPixel(MENUX + 6 + (int)(posX / curWidth * 8), HEIGHT - 14 + (int)(posY / curHeight * 8), arduboy.frameCount & 0b10000 ? WHITE : BLACK);
+        arduboy.drawPixel(MENUX + 6 + (int)(posX / curWidth * 8), HEIGHT - 7 - (int)(posY / curHeight * 8), arduboy.frameCount & 0b10000 ? WHITE : BLACK);
     }
 }
 
