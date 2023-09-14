@@ -25,6 +25,10 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // wastes cycles, so I made it a define
 // #define WALLHEIGHT 1.0
 
+// Corner shadows are slightly more expensive, but help visually 
+// separate the darker walls (North/South) from the floor and gives a nice effect
+#define CORNERSHADOWS
+
 // Display map (will take up large portion of screen)
 // #define DRAWMAP 1
 
@@ -170,8 +174,7 @@ void raycast()
                 side = 1; //1 = yside hit
             }
             // Check if ray has hit a wall
-            tile = getMazeCell(worldMap, mapX, mapY); //[mapX][mapY])
-                //break;
+            tile = getMazeCell(worldMap, mapX, mapY);
         }
 
         // If the above loop was exited without finding a tile, there's nothing to draw
@@ -212,8 +215,15 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
         uint8_t m = 0xFF;
         if(b == start)
             m &= (0xFF << (yStart & 7));
-        if(b == end && yEnd & 7) //Short circuit I sincerely hope!!
-            m &= (0xFF << (yEnd & 7)) >> 8;
+        if(b == end)
+        {
+            #ifdef CORNERSHADOWS
+            if(side && shade)
+                shade &= ~((1 + ((x & 1) << 1)) << ((yEnd - 1) & 7));
+            #endif
+            if(yEnd & 7)
+                m &= (0xFF << (yEnd & 7)) >> 8;
+        }
         arduboy.sBuffer[b * WIDTH + x] = (arduboy.sBuffer[b * WIDTH + x] & ~m) | (shade & m);
     }
 }
