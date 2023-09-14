@@ -25,12 +25,12 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // wastes cycles, so I made it a define
 // #define WALLHEIGHT 1.0
 
+// Display map (will take up large portion of screen)
+#define DRAWMAP 1
+
 // Corner shadows are slightly more expensive, but help visually 
 // separate the darker walls (North/South) from the floor and gives a nice effect
 #define CORNERSHADOWS
-
-// Display map (will take up large portion of screen)
-// #define DRAWMAP 1
 
 // Gameplay constants
 #ifdef DRAWMAP

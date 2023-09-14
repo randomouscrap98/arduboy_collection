@@ -131,11 +131,15 @@ struct RoomStack {
     uint8_t count = 0;  // 1 past the "top" of the stack
 };
 
-bool pushRoom(RoomStack * stack, const MRect room) //uint8_t x, uint8_t y, uint8_t w, uint8_t h)
+bool pushRoom(RoomStack * stack, uint8_t x, uint8_t y, uint8_t w, uint8_t h)
 {
     if(stack->count == ROOMSMAXDEPTH)
         return false;
-    memcpy(&stack->rooms[stack->count], &room, sizeof(MRect));
+    MRect * r = &stack->rooms[stack->count];
+    r->x = x;
+    r->y = y;
+    r->w = w;
+    r->h = h;
     stack->count += 1;
     return true;
 }
@@ -174,7 +178,7 @@ void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, float * posX, fl
     RoomStack stack;
 
     //Push the main room onto the stack
-    pushRoom(&stack, crect);
+    pushRoom(&stack, crect.x, crect.y, crect.w, crect.h);
 
     //Now the main loop
     while(stack.count)
@@ -209,7 +213,8 @@ void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, float * posX, fl
                             if(i != door)
                                 setMazeCell(map, exact, crect.y + i, TILEWALL);
                         //Two sides are the original x,y,h + smaller width, then wall+1x,y,h + smaller width
-                        pushRoom(&stack, {(uint8_t)crect.x, (uint8_t)crect.y, (uint8_t)(exact - crect.x), (uint8_t)crect.h});
+                        pushRoom(&stack, crect.x, crect.y, exact - crect.x, crect.h);
+                        pushRoom(&stack, exact + 1, crect.y, crect.w - (exact - crect.x) - 1, crect.h);
                         break;
                     }
                 }
@@ -224,6 +229,9 @@ void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, float * posX, fl
                         for(uint8_t i = 0; i < longest; i++)
                             if(i != door)
                                 setMazeCell(map, crect.x + i, exact, TILEWALL);
+                        //Two sides are original x,y,w,smaller h, then x,wall+1,w, smaller h
+                        pushRoom(&stack, crect.x, crect.y, crect.w, exact - crect.y);
+                        pushRoom(&stack, crect.x, exact + 1, crect.w, crect.h - (exact - crect.y) - 1);
                         break;
                     }
                 }
