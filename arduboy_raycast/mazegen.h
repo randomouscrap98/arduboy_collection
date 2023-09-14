@@ -14,6 +14,16 @@ constexpr uint8_t ROOMSMAXWALLRETRIES = 3; // This changes the chance of "big" r
 //constexpr uint8_t ROOMSBIGMAX = 10;     // The maximum size of a "big" room
 //constexpr uint8_t ROOMSBIGCHANCE = 3;   // Actually inverted
 
+//constexpr uint8_t ROOMSF_[] PROGMEM = { };
+
+
+//void drawFeature(uint8_t * map, const uint8_t * features, uint8_t length, uint8_t x, uint8_t y)
+//{
+//    for(uint8_t i = 0; i < length; i += 2)
+//        setMazeCell(map, x + features[i], y + features[i + 1], TILEWALL);
+//}
+
+
 // Using some algorithm called "Eller's algorithm", which is constant memory.
 void genMazeType(uint8_t * map, uint8_t width, uint8_t height, float * posX, float * posY, float * dirX, float * dirY)
 {
@@ -242,25 +252,40 @@ void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, float * posX, fl
             }
         }
 
+        // Yes, I am AWARE this is not a scoped macro, I'm putting it here so >> I << 
+        // am aware it is supposed to be scoped. It's too hard to get these out of RAM otherwise.
+        // The compiler refused to put any of my arrays into PROGMEM even though I asked, so IDK
+        // what's going on there.
+        #define df(ofsx, ofsy) setMazeCell(map, crect.x + ofsx, crect.y + ofsy, TILEWALL)
+
         //If the room was not divided, generate some things
         if(wdiv == 0)
         {
-
+            if(crect.w == 5 && crect.h == 5) {
+                df(2,2);
+            }
+            else if(crect.w >= 9 && crect.h >= 9) {
+                df(2,3); df(2,2); df(3,2);
+                df(5,2); df(6,2); df(6,3);
+                df(6,5); df(6,6); df(5,6);
+                df(3,6); df(2,6); df(2,5);
+            }
+            else if(crect.w >= 7 && crect.h >= 7) {
+                df(2,2); df(2,4);
+                df(4,2); df(4,4);
+            }
         }
     }
 
     setMazeCell(map, width - 1, height - 3, TILEEXIT);
 
-    * posX = 1.6;
-     *posY = 1.6;
+    * posX = 1.6; *posY = 1.6;
 
-    if(getMazeCell(map, 2, 1) == TILEEMPTY)
-    {
+    if(getMazeCell(map, 2, 1) == TILEEMPTY) {
         * dirX = 1;
         * dirY = 0;
     }
-    else
-    {
+    else {
         * dirY = 1;
         * dirX = 0;
     }
