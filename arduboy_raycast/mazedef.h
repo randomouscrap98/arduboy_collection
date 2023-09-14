@@ -50,9 +50,7 @@ void setMazeCell(uint8_t * maze, uint8_t x, uint8_t y, uint8_t tile)
     maze[0] = (maze[0] & ~(TILEWALL << xshift)) | (tile << xshift);
 }
 
-// This is called in a tight loop, I really want it inlined, I don't care about
-// code size in this application
-inline uint8_t getMazeCell(uint8_t * maze, uint8_t x, uint8_t y)
+uint8_t getMazeCell(uint8_t * maze, uint8_t x, uint8_t y)
 {
     return (*(maze + mazeIndex(x, y)) >> mazeXShift(x)) & TILEWALL;
 }
