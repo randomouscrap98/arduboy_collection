@@ -7,6 +7,11 @@ constexpr uint8_t ELLERHZCHANCE = 2; //This is actually 1 / 2 chance
 constexpr uint8_t ELLERVTCHANCE = 2;
 constexpr uint8_t ELLERROWSIZE = MAXMAPWIDTH >> 1;
 
+constexpr uint8_t ROOMSMAXDEPTH = 20;    // Each room element is 4 bytes FYI (Rect)
+constexpr uint8_t ROOMSMINWIDTH = 2;    // Each room's minimum dimension must be this.
+constexpr uint8_t ROOMSDOORBUFFER = 1;  // Doors should not be generated this close to the edge
+constexpr uint8_t ROOMSMAXWALLRETRIES = 50;     // This is kinda high but like whatever
+
 // Using some algorithm called "Eller's algorithm", which is constant memory.
 void genMazeType(uint8_t * map, uint8_t width, uint8_t height, float * posX, float * posY, float * dirX, float * dirY)
 {
@@ -120,15 +125,121 @@ void genMazeType(uint8_t * map, uint8_t width, uint8_t height, float * posX, flo
     }
 }
 
-void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, float * posX, float * posY, float * dirX, float * dirY)
-{
-    resetMaze(map);
 
-    //They must be odd
-    oddify(width);
-    oddify(height);
+struct RoomStack {
+    MRect rooms[ROOMSMAXDEPTH];
+    uint8_t count = 0;  // 1 past the "top" of the stack
+};
+
+bool pushRoom(RoomStack * stack, const MRect room) //uint8_t x, uint8_t y, uint8_t w, uint8_t h)
+{
+    if(stack->count == ROOMSMAXDEPTH)
+        return false;
+    memcpy(&stack->rooms[stack->count], &room, sizeof(MRect));
+    stack->count += 1;
+    return true;
 }
 
+MRect popRoom(RoomStack * stack)
+{
+    MRect result;
+
+    if(stack->count != 0)
+    {
+        stack->count -= 1;
+        memcpy(&result, &stack->rooms[stack->count], sizeof(MRect));
+    }
+
+    return result;
+}
+
+// Split rooms into smaller rooms randomly until a minimum is reached. If a room cannot be split but it's of 
+// certain dimensions, randomly add "interesting" features to it.
+void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, float * posX, float * posY, float * dirX, float * dirY)
+{
+    //Note: For rooms type, doesn't have to be odd
+    resetMaze(map);
+
+    //Now clear out the whole inside. Might as well make the rect to represent it.
+    MRect crect; 
+    crect.x = 1; 
+    crect.y = 1; 
+    crect.w = width - 2; 
+    crect.h = height -2;
+
+    for(uint8_t i = 0; i < crect.h; ++i)
+        for(uint8_t j = 0; j < crect.w; ++j)
+            setMazeCell(map, crect.x + j, crect.y + i, TILEEMPTY);
+
+    RoomStack stack;
+
+    //Push the main room onto the stack
+    pushRoom(&stack, crect);
+
+    //Now the main loop
+    while(stack.count)
+    {
+        crect = popRoom(&stack); //this is 2 memcpys and a function call but it doesn't matter, it's just the generator
+
+        //Figure out the length of the longer side and thus the amount of places we can put a wall
+        uint8_t longest = max(crect.w, crect.h);
+        int8_t wallSpace = longest - 2 * ROOMSMINWIDTH;
+        uint8_t wdiv = 0;
+
+        //Only partition the room if there's wallSpace.
+        if(wallSpace > 0)
+        {
+            //We can precalc the door position
+            uint8_t door = ROOMSDOORBUFFER + random(longest - ROOMSDOORBUFFER * 2);
+            uint8_t exact;
+
+            for(uint8_t retries = 0; retries < ROOMSMAXWALLRETRIES; retries++)
+            {
+                uint8_t rnd = random(wallSpace);
+                if(longest == crect.w)
+                {
+                    //X and Y are always INSIDE the room, not in the walls
+                    exact = crect.x + ROOMSMINWIDTH + rnd;
+                    if(getMazeCell(map, exact, crect.y - 1) == TILEWALL &&
+                        getMazeCell(map, exact, crect.y + height) == TILEWALL)
+                    {
+                        wdiv = exact;
+                        // Now draw the wall, add a door, and add the two sides to the stack
+                        for(uint8_t i = 0; i < longest; i++)
+                            if(i != door)
+                                setMazeCell(map, exact, crect.y + i, TILEWALL);
+                        //Two sides are the original x,y,h + smaller width, then wall+1x,y,h + smaller width
+                        pushRoom(&stack, {(uint8_t)crect.x, (uint8_t)crect.y, (uint8_t)(exact - crect.x), (uint8_t)crect.h});
+                        break;
+                    }
+                }
+                else
+                {
+                    exact = crect.y + ROOMSMINWIDTH + rnd;
+                    if(getMazeCell(map, crect.x - 1, exact) == TILEWALL &&
+                        getMazeCell(map, crect.x + width, exact) == TILEWALL)
+                    {
+                        wdiv = exact;
+                        // Now draw the wall, add a door, and add the two sides to the stack
+                        for(uint8_t i = 0; i < longest; i++)
+                            if(i != door)
+                                setMazeCell(map, crect.x + i, exact, TILEWALL);
+                        break;
+                    }
+                }
+            }
+        }
+
+        //If the room was not divided, generate some things
+        if(wdiv == 0)
+        {
+
+        }
+    }
+}
+
+
+// Unused for now; may come back to this
 void genCellType(uint8_t * map, uint8_t width, uint8_t height, float * posX, float * posY, float * dirX, float * dirY)
 {
     resetMaze(map);
@@ -145,12 +256,12 @@ struct MazeType
     void (*func)(uint8_t*, uint8_t, uint8_t, float *, float *, float *, float *);
 };
 
-constexpr uint8_t MAZETYPECOUNT = 3;
+constexpr uint8_t MAZETYPECOUNT = 2;
 
 constexpr MazeType MAZETYPES[MAZETYPECOUNT] PROGMEM = {
     { "MAZ", &genMazeType },
-    { "RMS", &genRoomsType },
-    { "CEL", &genCellType }
+    { "BKR", &genRoomsType },
+    //{ "CEL", &genCellType }
 };
 
 MazeType getMazeType(uint8_t index) 

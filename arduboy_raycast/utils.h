@@ -22,3 +22,11 @@ constexpr uflot NEARZEROFIXED = 1.0f / 128; // Prefer accuracy (fixed decimal ex
 
 // Make value odd by subtracting 1 if necessary
 #define oddify(v) if((v & 1) == 0) v -= 1
+
+// A rectangle starting at x, y and having side w, h
+struct MRect {
+    uint8_t x = 0;
+    uint8_t y = 0;
+    uint8_t w = 0;
+    uint8_t h = 0;
+};
