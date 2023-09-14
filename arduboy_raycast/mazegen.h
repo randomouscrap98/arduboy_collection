@@ -7,21 +7,11 @@ constexpr uint8_t ELLERHZCHANCE = 2; //This is actually 1 / 2 chance
 constexpr uint8_t ELLERVTCHANCE = 2;
 constexpr uint8_t ELLERROWSIZE = MAXMAPWIDTH >> 1;
 
-constexpr uint8_t ROOMSMAXDEPTH = 20;    // Each room element is 4 bytes FYI (Rect)
-constexpr uint8_t ROOMSMINWIDTH = 2;    // Each room's minimum dimension must be this.
-constexpr uint8_t ROOMSDOORBUFFER = 1;  // Doors should not be generated this close to the edge
-constexpr uint8_t ROOMSMAXWALLRETRIES = 3; // This changes the chance of "big" rooms
-//constexpr uint8_t ROOMSBIGMAX = 10;     // The maximum size of a "big" room
-//constexpr uint8_t ROOMSBIGCHANCE = 3;   // Actually inverted
-
-//constexpr uint8_t ROOMSF_[] PROGMEM = { };
-
-
-//void drawFeature(uint8_t * map, const uint8_t * features, uint8_t length, uint8_t x, uint8_t y)
-//{
-//    for(uint8_t i = 0; i < length; i += 2)
-//        setMazeCell(map, x + features[i], y + features[i + 1], TILEWALL);
-//}
+constexpr uint8_t ROOMSMAXDEPTH = 20;       // Each room element is 4 bytes FYI (Rect)
+constexpr uint8_t ROOMSMINWIDTH = 2;        // Each room's minimum dimension must be this.
+constexpr uint8_t ROOMSDOORBUFFER = 1;      // Doors should not be generated this close to the edge
+constexpr uint8_t ROOMSMAXWALLRETRIES = 3;  // This changes the chance of "big" rooms
+constexpr uint8_t ROOMSNINEWEIGHT = 9;      // Actually inverted
 
 
 // Using some algorithm called "Eller's algorithm", which is constant memory.
@@ -122,16 +112,13 @@ void genMazeType(uint8_t * map, uint8_t width, uint8_t height, float * posX, flo
 
     setMazeCell(map, width - 1, yEnd, TILEEXIT);
 
-    * posX = 1.6;
-     *posY = 1.6;
+    * posX = 1.6; *posY = 1.6;
 
-    if(getMazeCell(map, 2, 1) == TILEEMPTY)
-    {
+    if(getMazeCell(map, 2, 1) == TILEEMPTY) {
         * dirX = 1;
         * dirY = 0;
     }
-    else
-    {
+    else {
         * dirY = 1;
         * dirX = 0;
     }
@@ -205,7 +192,7 @@ void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, float * posX, fl
         uint8_t wdiv = 0;
 
         //Only partition the room if there's wallSpace.
-        if(wallSpace > 0 && doorSpace > 0)
+        if(wallSpace > 0 && doorSpace > 0 && (crect.w != 9 || random(ROOMSNINEWEIGHT)))
         {
             //We can precalc the door position. Remember, the walls are all 'shorter' since they break up 'longer'
             uint8_t door = ROOMSDOORBUFFER + random(doorSpace);
@@ -261,18 +248,54 @@ void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, float * posX, fl
         //If the room was not divided, generate some things
         if(wdiv == 0)
         {
-            if(crect.w == 5 && crect.h == 5) {
-                df(2,2);
+            // 9 and 7 are EXCEPTIONALLY rare, so they're kind of fun to stumble across.
+            // The first checks are all "exact match" rooms. If not, go into the 
+            // "fuzzy match" rooms.
+            if(crect.w == 9 && crect.h >= 12) {
+                for(uint8_t i = 0; i < 5; ++i) {
+                    setMazeCell(map, crect.x + i + 2, crect.y + crect.h - 3, TILEWALL);
+                    setMazeCell(map, crect.x + i + 2, crect.y + crect.h - 7, TILEWALL);
+                    setMazeCell(map, crect.x + 2, crect.y + crect.h - i - 3, TILEWALL);
+                    setMazeCell(map, crect.x + 6, crect.y + crect.h - i - 3, TILEWALL);
+                }
+                setMazeCell(map, crect.x + 4, crect.y + crect.h - 7, TILEEMPTY);
+                setMazeCell(map, crect.x + 4, crect.y + crect.h - 5, TILEEXIT);
+                for(uint8_t y = crect.y + crect.h - 10; y >= crect.y + 2; y -= 3) {
+                    setMazeCell(map, crect.x + 2, y, TILEWALL);
+                    setMazeCell(map, crect.x + 6, y, TILEWALL);
+                }
             }
-            else if(crect.w >= 9 && crect.h >= 9) {
+            else if(crect.w == 9 && crect.h == 9) {
                 df(2,3); df(2,2); df(3,2);
                 df(5,2); df(6,2); df(6,3);
                 df(6,5); df(6,6); df(5,6);
                 df(3,6); df(2,6); df(2,5);
             }
-            else if(crect.w >= 7 && crect.h >= 7) {
+            else if(crect.w == 7 && crect.h == 7) {
                 df(2,2); df(2,4);
                 df(4,2); df(4,4);
+            }
+            else if(crect.w == 6 && crect.h == 6) {
+                df(1,1); df(4,1);
+                df(1,4); df(4,4);
+            }
+            else if(crect.w == 5 && crect.h == 5) {
+                df(2,2);
+            }
+            else if(crect.w == 3) {
+                if(crect.h > 5 && (crect.h & 1)) {
+                    for(uint8_t i = crect.y + 2; i < crect.y + crect.h - 2; i += 2)
+                        setMazeCell(map, crect.x + 1, i, TILEWALL);
+                }
+                else {
+                    // We can do a bit of fuzzy stuff here, it's fine. This is all 
+                    // imprecise anyway; 3 wide rooms are common
+                    if(getMazeCell(map, crect.x + 1, crect.y - 1) == TILEWALL && random(5) == 0)
+                        setMazeCell(map, crect.x + 1, crect.y, TILEWALL);
+                }
+            }
+            else {
+
             }
         }
     }
