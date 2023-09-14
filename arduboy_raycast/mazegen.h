@@ -3,13 +3,12 @@
 #include "utils.h"
 #include "mazedef.h"
 
-constexpr uint8_t ELLERHZCHANCE = 2; //This is actually 1 / 2
+constexpr uint8_t ELLERHZCHANCE = 2; //This is actually 1 / 2 chance
 constexpr uint8_t ELLERVTCHANCE = 2;
 constexpr uint8_t ELLERROWSIZE = MAXMAPWIDTH >> 1;
 
 // Using some algorithm called "Eller's algorithm", which is constant memory.
-void genMazeType(uint8_t * map, uint8_t width, uint8_t height, 
-float * posX, float * posY, float * dirX, float * dirY)
+void genMazeType(uint8_t * map, uint8_t width, uint8_t height, float * posX, float * posY, float * dirX, float * dirY)
 {
     resetMaze(map);
 
@@ -144,13 +143,18 @@ struct MazeType
 {
     char name[4];
     void (*func)(uint8_t*, uint8_t, uint8_t, float *, float *, float *, float *);
-    //void * func;
 };
 
 constexpr uint8_t MAZETYPECOUNT = 3;
 
-constexpr MazeType MAZETYPES[MAZETYPECOUNT] = {
+constexpr MazeType MAZETYPES[MAZETYPECOUNT] PROGMEM = {
     { "MAZ", &genMazeType },
     { "RMS", &genRoomsType },
     { "CEL", &genCellType }
 };
+
+MazeType getMazeType(uint8_t index) 
+{
+    //A macro to generate the same old code, don't feel like making some generics madness
+    getProgmemStruct(MazeType, MAZETYPES, index)
+}

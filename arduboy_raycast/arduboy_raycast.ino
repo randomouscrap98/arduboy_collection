@@ -297,7 +297,7 @@ void drawMenu(bool showHint)
     tinyfont.setCursor(MENUX + 4, MENUY);
     tinyfont.print(mzs.name);
 
-    MazeType mzt = MAZETYPES[mazeType];
+    MazeType mzt = getMazeType(mazeType);
     tinyfont.setCursor(MENUX + 4, MENUY + MENUSPACING);
     tinyfont.print(mzt.name);
 
@@ -335,7 +335,7 @@ void generateMaze()
     thisDistance = 0;
 
     MazeSize mzs = getMazeSize(mazeSize);
-    MazeType mzt = MAZETYPES[mazeType];
+    MazeType mzt = getMazeType(mazeType); //[mazeType];
 
     //Call the generator function chosen by the menu
     mzt.func(worldMap, mzs.width, mzs.height, &posX, &posY, &dirX, &dirY);
