@@ -19,3 +19,6 @@ constexpr uflot NEARZEROFIXED = 1.0f / 128; // Prefer accuracy (fixed decimal ex
 
 // Mod the given menu position m the given amount v against a max of x
 #define menumod(m, v, x) m = (m + v + x) % x
+
+// Make value odd by subtracting 1 if necessary
+#define oddify(v) if((v & 1) == 0) v -= 1

@@ -3,7 +3,7 @@
 #include "utils.h"
 
 constexpr uint8_t MAXMAPWIDTH = 48;
-constexpr uint8_t MAXMAPHEIGHT = 48;
+constexpr uint8_t MAXMAPHEIGHT = 47; // Maps are always odd anyway, save 12 bytes
 constexpr uint8_t TILESPERBYTE = 4;
 constexpr uint8_t REALMAPWIDTH = MAXMAPWIDTH / TILESPERBYTE;
 
@@ -28,11 +28,11 @@ struct MazeSize
 
 constexpr uint8_t MAZESIZECOUNT = 4;
 constexpr MazeSize MAZESIZES[MAZESIZECOUNT] PROGMEM = {
-    { "SML", 12, 12 },  //NOTE: must always be a multiple of 4 because each byte can hold 4 cells
-    { "MED", 24, 24 },
-    { "LRG", 36, 36 },
-    { "XL ", 48, 48 },
-    // { "XXL", 60, 60 } //Only if we have room
+    { "SML", 13, 13 },  //NOTE: must always be 2N + 1
+    { "MED", 23, 23 },
+    { "LRG", 35, 35 },
+    { "XL ", 47, 47 },
+    // { "XXL", 60, 60 } //Only if we have room (we don't)
 };
 
 // For a given mazeSize index, get a copy (8 bytes-ish?) of the size description struct
@@ -41,13 +41,6 @@ MazeSize getMazeSize(uint8_t index)
     //A macro to generate the same old code, don't feel like making some generics madness
     getProgmemStruct(MazeSize, MAZESIZES, index)
 }
-
-// Fill maze with all walls again (all of it)
-void resetMaze(uint8_t * maze)
-{
-    memset(maze, 0xFF, (size_t)MAXMAPHEIGHT / TILESPERBYTE * MAXMAPWIDTH);
-}
-
 
 void setMazeCell(uint8_t * maze, uint8_t x, uint8_t y, uint8_t tile)
 {
@@ -69,3 +62,19 @@ uint8_t isCellSolid(uint8_t * maze, uint8_t x, uint8_t y)
     //Might change later, idk. Right now first bit determines solidity.
     return getMazeCell(maze, x, y) & 1;
 }
+
+// Fill maze with all walls again (all of it)
+void resetMaze(uint8_t * maze)
+{
+    memset(maze, 0xFF, (size_t)MAXMAPHEIGHT * REALMAPWIDTH);
+}
+
+// Draw the given maze starting at the given screen x + y
+void drawMaze(Arduboy2Base * arduboy, uint8_t * map, uint8_t x, uint8_t y)
+{
+    //This is INCREDIBLY slow but should be fine
+    for(uint8_t i = 0; i < MAXMAPHEIGHT; ++i)
+        for(uint8_t j = 0; j < MAXMAPWIDTH; ++j)
+            arduboy->drawPixel(x + j, y + i, getMazeCell(map, j, i) ? WHITE : BLACK);
+}
+

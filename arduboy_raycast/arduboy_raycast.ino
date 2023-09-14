@@ -29,7 +29,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 #define DRAWMAP 1
 
 // Gameplay constants
-constexpr uint8_t FRAMERATE = 45; //Untextured can run at near 60; lots of headroom at 45
+constexpr uint8_t FRAMERATE = 30; //Untextured can run at near 60; lots of headroom at 45
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 constexpr uflot LIGHTINTENSITY = 1.5;
