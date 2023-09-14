@@ -25,6 +25,9 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // wastes cycles, so I made it a define
 // #define WALLHEIGHT 1.0
 
+// Display map (will take up large portion of screen)
+#define DRAWMAP 1
+
 // Gameplay constants
 constexpr uint8_t FRAMERATE = 45; //Untextured can run at near 60; lots of headroom at 45
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
@@ -338,9 +341,6 @@ void setup()
     drawMenu();
 }
 
-// Waste 20 bytes for a string buffer (might remove later)
-char buff[20];
-
 void loop()
 {
     if (!arduboy.nextFrame()) return;
@@ -359,23 +359,25 @@ void loop()
 
         tinyfont.setCursor(WINX, 24);
         tinyfont.print(F("COMPLETE!"));
-        sprintf(buff, "WINS: %d", totalWins);
         tinyfont.setCursor(WINX + 8, 32);
-        tinyfont.print(buff);
-        sprintf(buff, "DIST: %d", (int)thisDistance);
+        tinyfont.print(F("WINS: "));
+        tinyfont.print(totalWins);
         tinyfont.setCursor(WINX + 8, 37);
-        tinyfont.print(buff);
-        sprintf(buff, "TDIST: %d", (int)(totalDistance + thisDistance));
+        tinyfont.print("DIST: ");
+        tinyfont.print((int)thisDistance);
         tinyfont.setCursor(WINX + 3, 42);
-        tinyfont.print(buff);
-
-        //tinyfont.print(F("GOES DEEPER..."));
+        tinyfont.print("TDIST: ");
+        tinyfont.print((int)(totalDistance + thisDistance));
     }
     else
     {
         raycastFoundation();
         raycast();
         movement();
+
+        #ifdef DRAWMAP
+        drawMaze(&arduboy, worldMap, 0, 0);
+        #endif
     }
 
     arduboy.display();

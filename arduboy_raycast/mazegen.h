@@ -3,14 +3,6 @@
 #include "utils.h"
 #include "mazedef.h"
 
-struct MazeType
-{
-    char name[4];
-    void (*func)(uint8_t*, uint8_t, uint8_t);
-    //void * func;
-};
-
-
 void genMazeType(uint8_t * map, uint8_t width, uint8_t height)
 {
     resetMaze(map);
@@ -35,6 +27,23 @@ void genCellType(uint8_t * map, uint8_t width, uint8_t height)
 {
     resetMaze(map);
 }
+
+
+// Draw the given maze starting at the given screen x + y
+void drawMaze(Arduboy2Base * arduboy, uint8_t * map, uint8_t x, uint8_t y)
+{
+    //This is INCREDIBLY slow but should be fine
+    for(uint8_t i = 0; i < MAXMAPHEIGHT; ++i)
+        for(uint8_t j = 0; j < MAXMAPWIDTH; ++j)
+            arduboy->drawPixel(x + j, y + i, getMazeCell(map, j, i) ? WHITE : BLACK);
+}
+
+struct MazeType
+{
+    char name[4];
+    void (*func)(uint8_t*, uint8_t, uint8_t);
+    //void * func;
+};
 
 constexpr uint8_t MAZETYPECOUNT = 3;
 
