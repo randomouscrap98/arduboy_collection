@@ -26,10 +26,14 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // #define WALLHEIGHT 1.0
 
 // Display map (will take up large portion of screen)
- #define DRAWMAP 1
+// #define DRAWMAP 1
 
 // Gameplay constants
-constexpr uint8_t FRAMERATE = 20; //Untextured can run at near 60; lots of headroom at 45
+#ifdef DRAWMAP
+constexpr uint8_t FRAMERATE = 20; //Map is mega expensive because I didn't make it good (just debug anyway)
+#else
+constexpr uint8_t FRAMERATE = 45; //Untextured can run at near 60; lots of headroom at 45
+#endif
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 constexpr uflot LIGHTINTENSITY = 1.5;
@@ -246,7 +250,7 @@ inline bool inExit() { return getMazeCell(worldMap, (int)posX, (int)posY) == TIL
 //Menu functionality, move the cursor, select things (redraws automatically)
 void doMenu()
 {
-    constexpr uint8_t MENUITEMS = 3;
+    constexpr uint8_t MENUITEMS = 4;
     int8_t menuMod = 0;
     int8_t selectMod = 0;
 
@@ -268,15 +272,23 @@ void doMenu()
         }
     }
 
-    if(menuMod || selectMod)
-        drawMenu();
+    // We check released in case the user was showing a hint
+    if(menuMod || selectMod || arduboy.pressed(B_BUTTON) || arduboy.justReleased(B_BUTTON))
+        drawMenu(arduboy.pressed(B_BUTTON) && menuIndex == 3);
+    
+    //// Only show hint while user is holding down on that
+    //if(arduboy.pressed(B_BUTTON) && menuIndex == 2)
+    //{
+    //    // draw a little hint box. Don't use optimized draw commands, I don't care
+    //    arduboy.drawRect()
+    //}
 }
 
 // Draw just the menu section, does not overwrite the raycast area
-void drawMenu()
+void drawMenu(bool showHint)
 {
     constexpr uint8_t MENUX = 105;
-    constexpr uint8_t MENUY = 24;
+    constexpr uint8_t MENUY = 22;
     constexpr uint8_t MENUSPACING = 6;
 
     Sprites::drawOverwrite(VIEWWIDTH, 0, menu, 0);
@@ -296,8 +308,17 @@ void drawMenu()
     tinyfont.setCursor(MENUX + 4, MENUY + MENUSPACING * 2);
     tinyfont.print(F("NEW"));
 
+    tinyfont.setCursor(MENUX + 4, MENUY + MENUSPACING * 3);
+    tinyfont.print(F("HNT"));
+
     tinyfont.setCursor(MENUX, MENUY + menuIndex * MENUSPACING);
     tinyfont.print("o");
+
+    if(showHint)
+    {
+        arduboy.drawRect(MENUX + 5, HEIGHT - 15, 10, 10, WHITE);
+        arduboy.drawPixel(MENUX + 14, HEIGHT - 7, BLACK);
+    }
 }
 
 // Generate a new maze and reset the game to an initial playable state
@@ -346,7 +367,7 @@ void setup()
     arduboy.clear();
     arduboy.setFrameRate(FRAMERATE);
     generateMaze();
-    drawMenu();
+    drawMenu(false);
 }
 
 void loop()
