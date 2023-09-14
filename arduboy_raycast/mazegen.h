@@ -10,7 +10,9 @@ constexpr uint8_t ELLERROWSIZE = MAXMAPWIDTH >> 1;
 constexpr uint8_t ROOMSMAXDEPTH = 20;    // Each room element is 4 bytes FYI (Rect)
 constexpr uint8_t ROOMSMINWIDTH = 2;    // Each room's minimum dimension must be this.
 constexpr uint8_t ROOMSDOORBUFFER = 1;  // Doors should not be generated this close to the edge
-constexpr uint8_t ROOMSMAXWALLRETRIES = 50;     // This is kinda high but like whatever
+constexpr uint8_t ROOMSMAXWALLRETRIES = 3; // This changes the chance of "big" rooms
+//constexpr uint8_t ROOMSBIGMAX = 10;     // The maximum size of a "big" room
+//constexpr uint8_t ROOMSBIGCHANCE = 3;   // Actually inverted
 
 // Using some algorithm called "Eller's algorithm", which is constant memory.
 void genMazeType(uint8_t * map, uint8_t width, uint8_t height, float * posX, float * posY, float * dirX, float * dirY)
@@ -187,29 +189,31 @@ void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, float * posX, fl
 
         //Figure out the length of the longer side and thus the amount of places we can put a wall
         uint8_t longest = max(crect.w, crect.h);
+        uint8_t shortest = min(crect.w, crect.h);
         int8_t wallSpace = longest - 2 * ROOMSMINWIDTH;
+        int8_t doorSpace = shortest - 2 * ROOMSDOORBUFFER;
         uint8_t wdiv = 0;
 
         //Only partition the room if there's wallSpace.
-        if(wallSpace > 0)
+        if(wallSpace > 0 && doorSpace > 0)
         {
-            //We can precalc the door position
-            uint8_t door = ROOMSDOORBUFFER + random(longest - ROOMSDOORBUFFER * 2);
+            //We can precalc the door position. Remember, the walls are all 'shorter' since they break up 'longer'
+            uint8_t door = ROOMSDOORBUFFER + random(doorSpace);
             uint8_t exact;
 
             for(uint8_t retries = 0; retries < ROOMSMAXWALLRETRIES; retries++)
             {
-                uint8_t rnd = random(wallSpace);
+                uint8_t rnd = ROOMSMINWIDTH + random(wallSpace);
                 if(longest == crect.w)
                 {
                     //X and Y are always INSIDE the room, not in the walls
-                    exact = crect.x + ROOMSMINWIDTH + rnd;
+                    exact = crect.x + rnd;
                     if(getMazeCell(map, exact, crect.y - 1) == TILEWALL &&
-                        getMazeCell(map, exact, crect.y + height) == TILEWALL)
+                        getMazeCell(map, exact, crect.y + crect.h) == TILEWALL)
                     {
                         wdiv = exact;
                         // Now draw the wall, add a door, and add the two sides to the stack
-                        for(uint8_t i = 0; i < longest; i++)
+                        for(uint8_t i = 0; i < shortest; i++)
                             if(i != door)
                                 setMazeCell(map, exact, crect.y + i, TILEWALL);
                         //Two sides are the original x,y,h + smaller width, then wall+1x,y,h + smaller width
@@ -220,13 +224,13 @@ void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, float * posX, fl
                 }
                 else
                 {
-                    exact = crect.y + ROOMSMINWIDTH + rnd;
+                    exact = crect.y + rnd;
                     if(getMazeCell(map, crect.x - 1, exact) == TILEWALL &&
-                        getMazeCell(map, crect.x + width, exact) == TILEWALL)
+                        getMazeCell(map, crect.x + crect.w, exact) == TILEWALL)
                     {
                         wdiv = exact;
                         // Now draw the wall, add a door, and add the two sides to the stack
-                        for(uint8_t i = 0; i < longest; i++)
+                        for(uint8_t i = 0; i < shortest; i++)
                             if(i != door)
                                 setMazeCell(map, crect.x + i, exact, TILEWALL);
                         //Two sides are original x,y,w,smaller h, then x,wall+1,w, smaller h
@@ -243,6 +247,22 @@ void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, float * posX, fl
         {
 
         }
+    }
+
+    setMazeCell(map, width - 1, height - 3, TILEEXIT);
+
+    * posX = 1.6;
+     *posY = 1.6;
+
+    if(getMazeCell(map, 2, 1) == TILEEMPTY)
+    {
+        * dirX = 1;
+        * dirY = 0;
+    }
+    else
+    {
+        * dirY = 1;
+        * dirX = 0;
     }
 }
 

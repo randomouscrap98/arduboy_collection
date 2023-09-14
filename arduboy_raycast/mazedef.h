@@ -73,6 +73,6 @@ void drawMaze(Arduboy2Base * arduboy, uint8_t * map, uint8_t x, uint8_t y)
     //This is INCREDIBLY slow but should be fine
     for(uint8_t i = 0; i < MAXMAPHEIGHT; ++i)
         for(uint8_t j = 0; j < MAXMAPWIDTH; ++j)
-            arduboy->drawPixel(x + j, y + i, getMazeCell(map, j, i) ? WHITE : BLACK);
+            arduboy->drawPixel(x + j, y + i, getMazeCell(map, j, MAXMAPHEIGHT - i - 1) ? WHITE : BLACK);
 }
 
