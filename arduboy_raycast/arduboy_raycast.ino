@@ -50,9 +50,6 @@ constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 constexpr uflot LIGHTINTENSITY = 1.5;
 
-//Visual constants (Probably shouldn't change these)
-constexpr uint8_t LIGHTSTART = 34;
-
 //These are calculated constants based off your light intensity. The view 
 //distance is an optimization; increase light intensity to increase view distance.
 //We calculate "darkness" to avoid 100 divisions per frame (huuuge savings)
@@ -63,6 +60,7 @@ const uflot DARKNESS = 1 / LIGHTINTENSITY;
 constexpr uint8_t MIDSCREEN = HEIGHT / 2;
 constexpr uint8_t VIEWWIDTH = 100;
 constexpr flot NORMWIDTH = 2.0f / VIEWWIDTH;
+
 
 //Menu related stuff
 uint8_t menuIndex = 0;
@@ -83,6 +81,7 @@ float dirX, dirY;
 //The map itself!
 uint8_t worldMap[MAXMAPHEIGHT * REALMAPWIDTH];
 
+
 // Full clear the raycast area. Not always used
 void clearRaycast() 
 {
@@ -92,6 +91,7 @@ void clearRaycast()
 //Draw the floor underneath the raycast walls (ultra simple for now to save cycles)
 void raycastFoundation()
 {
+    constexpr uint8_t LIGHTSTART = 34;
     fastClear(&arduboy, 0, 0, VIEWWIDTH, LIGHTSTART);
     Sprites::drawOverwrite(0, LIGHTSTART, light, 0);
 }
