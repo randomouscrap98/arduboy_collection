@@ -30,3 +30,14 @@ struct MRect {
     uint8_t w = 0;
     uint8_t h = 0;
 };
+
+// Clear screen in a fast block. Note that y will be shifted down and y2
+// shifted up to the nearest multiple of 8 to be byte aligned, so you 
+// may not get the exact box you want. X2 and Y2 are exclusive
+void fastClear(Arduboy2Base * arduboy, uint8_t x, uint8_t y, uint8_t x2, uint8_t y2)
+{
+    uint8_t yEnd = (y2 >> 3) + (y2 & 7 ? 1 : 0);
+    //Arduboy2 fillrect is absurdly slow; I have the luxury of doing this instead
+    for(uint8_t i = y >> 3; i < yEnd; ++i)
+        memset(arduboy->sBuffer + (i << 7) + x, 0, x2 - x);
+}

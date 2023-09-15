@@ -17,6 +17,7 @@
 Arduboy2Base arduboy;
 Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
 
+
 // Define a fake FOV. Slightly more computation but not much honestly. 
 // It just doesn't do much. 1 = "90", more than 1 = more than 90
 // #define FAKEFOV 0.8
@@ -31,6 +32,13 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // Corner shadows are slightly more expensive, but help visually 
 // separate the darker walls (North/South) from the floor and gives a nice effect
 #define CORNERSHADOWS
+
+// You probably want the floor + whatever else that aren't walls
+#define DRAWFOUNDATION
+
+// Wall shading isn't SUPER expensive but it's definitely something...
+#define WALLSHADING
+
 
 // Gameplay constants
 #ifdef DRAWMAP
@@ -75,13 +83,16 @@ float dirX, dirY;
 //The map itself!
 uint8_t worldMap[MAXMAPHEIGHT * REALMAPWIDTH];
 
+// Full clear the raycast area. Not always used
+void clearRaycast() 
+{
+    fastClear(&arduboy, 0, 0, VIEWWIDTH, HEIGHT);
+}
 
 //Draw the floor underneath the raycast walls (ultra simple for now to save cycles)
 void raycastFoundation()
 {
-    //Arduboy2 fillrect is absurdly slow; I have the luxury of doing this instead
-    for(uint8_t i = 0; i <= LIGHTSTART >> 3; ++i)
-        memset(arduboy.sBuffer + i * WIDTH, 0, VIEWWIDTH);
+    fastClear(&arduboy, 0, 0, VIEWWIDTH, LIGHTSTART);
     Sprites::drawOverwrite(0, LIGHTSTART, light, 0);
 }
 
@@ -198,14 +209,17 @@ void raycast()
 //(so you can predraw a ceiling and floor before calling raycast)
 inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distance, uint8_t side, uint8_t tile) 
 {
+    //The entire cost of wall shading is basically right here
+    #ifdef WALLSHADING
     //NOTE: multiplication is WAY FASTER than division
     uint8_t dither = (uint8_t)(roundFixed(distance * DARKNESS * distance));
-
     //Oops, we're beyond dark (this shouldn't happen often but it CAN)
-    if(dither >= BAYERGRADIENTS)
-        return;
-
+    if(dither >= BAYERGRADIENTS) return;
     uint8_t shade = ((side & x) || tile == TILEEXIT) ? 0 : b_shading[(dither << 2) + (x & 3)];
+    #else
+    uint8_t shade = ((side & x) || tile == TILEEXIT) ? 0 : 0xFF;
+    #endif
+
     uint8_t start = yStart >> 3;
     uint8_t end = (yEnd - 1) >> 3; //This end needs to be inclusive
 
@@ -224,7 +238,11 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
             if(yEnd & 7)
                 m &= (0xFF << (yEnd & 7)) >> 8;
         }
+        #ifdef DRAWFOUNDATION
         arduboy.sBuffer[b * WIDTH + x] = (arduboy.sBuffer[b * WIDTH + x] & ~m) | (shade & m);
+        #else
+        arduboy.sBuffer[b * WIDTH + x] = shade & m;
+        #endif
     }
 }
 
@@ -331,7 +349,7 @@ void drawMenu(bool showHint)
 // Generate a new maze and reset the game to an initial playable state
 void generateMaze()
 {
-    arduboy.clear();
+    clearRaycast();
     tinyfont.setCursor(12, 28);
     tinyfont.print(F("Generating maze"));
     arduboy.display();
@@ -377,26 +395,31 @@ void loop()
     // Funny game no state variable haha
     if(inExit()) 
     {
-        for(uint8_t i = 0; i < HEIGHT >> 3; ++i)
-            memset(arduboy.sBuffer + i * WIDTH, 0, VIEWWIDTH);
+        clearRaycast();
 
         constexpr uint8_t WINX = 22;
+        constexpr uint8_t WINY = 32;
 
         tinyfont.setCursor(WINX, 24);
         tinyfont.print(F("COMPLETE!"));
-        tinyfont.setCursor(WINX + 8, 32);
+        tinyfont.setCursor(WINX + 8, WINY);
         tinyfont.print(F("WINS: "));
         tinyfont.print(totalWins);
-        tinyfont.setCursor(WINX + 8, 37);
+        tinyfont.setCursor(WINX + 8, WINY + 5);
         tinyfont.print("DIST: ");
         tinyfont.print((int)thisDistance);
-        tinyfont.setCursor(WINX + 3, 42);
+        tinyfont.setCursor(WINX + 3, WINY + 10);
         tinyfont.print("TDIST: ");
         tinyfont.print((int)(totalDistance + thisDistance));
     }
     else
     {
+        #ifdef DRAWFOUNDATION
         raycastFoundation();
+        #else
+        clearRaycast();
+        #endif
+
         raycast();
         movement();
 
