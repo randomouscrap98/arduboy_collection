@@ -6,7 +6,8 @@
 
 // Graphics
 #include "resources/menu.h"
-#include "resources/light2.h"
+#include "resources/ceiling.h"
+#include "resources/floor.h"
 
 // Libs (sort of; mostly just code organization)
 #include "utils.h"
@@ -42,9 +43,9 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 // Gameplay constants
 #ifdef DRAWMAP
-constexpr uint8_t FRAMERATE = 20; //Map is mega expensive because I didn't make it good (just debug anyway)
+constexpr uint8_t FRAMERATE = 15; //Map is mega expensive because I didn't make it good (just debug anyway)
 #else
-constexpr uint8_t FRAMERATE = 45; //Untextured can run at near 60; lots of headroom at 45
+constexpr uint8_t FRAMERATE = 30; //Untextured can run at near 60; lots of headroom at 45
 #endif
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
@@ -91,9 +92,11 @@ void clearRaycast()
 //Draw the floor underneath the raycast walls (ultra simple for now to save cycles)
 void raycastFoundation()
 {
-    constexpr uint8_t LIGHTSTART = 34;
-    fastClear(&arduboy, 0, 0, VIEWWIDTH, LIGHTSTART);
-    Sprites::drawOverwrite(0, LIGHTSTART, light, 0);
+    constexpr int8_t FLOORSTART = 34;
+    constexpr int8_t CEILSTART = -6;
+    fastClear(&arduboy, 0, ceilingImgHeight + CEILSTART, VIEWWIDTH, FLOORSTART);
+    Sprites::drawOverwrite(0, CEILSTART, ceilingImg, 0);
+    Sprites::drawOverwrite(0, FLOORSTART, floorImg, 0);
 }
 
 // The full function for raycasting. 
@@ -222,18 +225,27 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
 
     uint8_t start = yStart >> 3;
     uint8_t end = (yEnd - 1) >> 3; //This end needs to be inclusive
+    //#ifdef CORNERSHADOWS
+    //uint8_t cornbit = (1 + ((x & 1) << 1));
+    //#endif
 
     for(uint8_t b = start; b <= end; ++b)
     {
         //Mask to cut wall and insert floor / ceiling
         uint8_t m = 0xFF;
         if(b == start)
+        {
+            #ifdef CORNERSHADOWS
+            if(side && shade)
+                shade &= ~(1 << (yStart & 7));
+            #endif
             m &= (0xFF << (yStart & 7));
+        }
         if(b == end)
         {
             #ifdef CORNERSHADOWS
             if(side && shade)
-                shade &= ~((1 + ((x & 1) << 1)) << ((yEnd - 1) & 7));
+                shade &= ~(1 << ((yEnd - 1) & 7));
             #endif
             if(yEnd & 7)
                 m &= (0xFF << (yEnd & 7)) >> 8;
