@@ -58,8 +58,8 @@ constexpr flot NORMWIDTH = 2.0f / VIEWWIDTH;
 
 //Menu related stuff
 uint8_t menuIndex = 0;
-uint8_t mazeSize = 2;
-uint8_t mazeType = 1;
+uint8_t mazeSize = 0;
+uint8_t mazeType = 0;
 
 uint8_t curWidth = 0;
 uint8_t curHeight = 0;
