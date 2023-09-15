@@ -312,13 +312,6 @@ void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, float * posX, fl
                                 setMazeCell(map, crect.x + x, crect.y + crect.h - 1 - i, TILEWALL);
                     }
                 }
-                //else if(crect.h > 7)
-                //{
-                //    for(uint8_t y = 0; y < crect.h; y++)
-                //    {
-
-                //    }
-                //}
             }
         }
     }
@@ -359,7 +352,7 @@ constexpr uint8_t MAZETYPECOUNT = 2;
 
 constexpr MazeType MAZETYPES[MAZETYPECOUNT] PROGMEM = {
     { "MAZ", &genMazeType },
-    { "BKR", &genRoomsType },
+    { "BKR", &genRoomsType }, // I may add more later? (2023-09-14 for the lols)
     //{ "CEL", &genCellType }
 };
 

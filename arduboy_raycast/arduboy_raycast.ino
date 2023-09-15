@@ -26,7 +26,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // #define WALLHEIGHT 1.0
 
 // Display map (will take up large portion of screen)
-#define DRAWMAP 1
+// #define DRAWMAP 1
 
 // Corner shadows are slightly more expensive, but help visually 
 // separate the darker walls (North/South) from the floor and gives a nice effect
@@ -323,9 +323,7 @@ void drawMenu(bool showHint)
     if(showHint)
     {
         arduboy.drawRect(MENUX + 5, HEIGHT - 15, 10, 10, WHITE);
-        //arduboy.drawPixel(MENUX + 14, HEIGHT - 7, BLACK);
         arduboy.drawPixel(MENUX + 14, HEIGHT - 14, BLACK);
-        //arduboy.drawPixel(MENUX + 6 + (int)(posX / curWidth * 8), HEIGHT - 14 + (int)(posY / curHeight * 8), arduboy.frameCount & 0b10000 ? WHITE : BLACK);
         arduboy.drawPixel(MENUX + 6 + (int)(posX / curWidth * 8), HEIGHT - 7 - (int)(posY / curHeight * 8), arduboy.frameCount & 0b10000 ? WHITE : BLACK);
     }
 }
@@ -347,7 +345,7 @@ void generateMaze()
     thisDistance = 0;
 
     MazeSize mzs = getMazeSize(mazeSize);
-    MazeType mzt = getMazeType(mazeType); //[mazeType];
+    MazeType mzt = getMazeType(mazeType); 
 
     //Call the generator function chosen by the menu
     mzt.func(worldMap, mzs.width, mzs.height, &posX, &posY, &dirX, &dirY);
