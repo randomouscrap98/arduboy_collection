@@ -12,6 +12,8 @@ constexpr uint8_t ROOMSMINWIDTH = 2;        // Each room's minimum dimension mus
 constexpr uint8_t ROOMSDOORBUFFER = 1;      // Doors should not be generated this close to the edge
 constexpr uint8_t ROOMSMAXWALLRETRIES = 3;  // This changes the chance of "big" rooms
 constexpr uint8_t ROOMSNINEWEIGHT = 9;      // Actually inverted
+constexpr uint8_t ROOMSCUBICLECHANCE = 5;   // Actually inverted
+constexpr uint8_t ROOMSCUBICLEMAXLENGTH = 4;
 
 
 // Using some algorithm called "Eller's algorithm", which is constant memory.
@@ -191,8 +193,9 @@ void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, float * posX, fl
         int8_t doorSpace = shortest - 2 * ROOMSDOORBUFFER;
         uint8_t wdiv = 0;
 
-        //Only partition the room if there's wallSpace.
-        if(wallSpace > 0 && doorSpace > 0 && (crect.w != 9 || random(ROOMSNINEWEIGHT)))
+        //Only partition the room if there's wallSpace and doorSpace. We sometimes also don't touch
+        //rooms that are exactly 9 wide.
+        if(wallSpace > 0 && doorSpace > 0 && !(crect.w == 9 && random(ROOMSNINEWEIGHT) == 0))
         {
             //We can precalc the door position. Remember, the walls are all 'shorter' since they break up 'longer'
             uint8_t door = ROOMSDOORBUFFER + random(doorSpace);
@@ -260,7 +263,7 @@ void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, float * posX, fl
                 }
                 setMazeCell(map, crect.x + 4, crect.y + crect.h - 7, TILEEMPTY);
                 setMazeCell(map, crect.x + 4, crect.y + crect.h - 5, TILEEXIT);
-                for(uint8_t y = crect.y + crect.h - 10; y >= crect.y + 2; y -= 3) {
+                for(int8_t y = crect.y + crect.h - 10; y >= crect.y + 2; y -= 3) {
                     setMazeCell(map, crect.x + 2, y, TILEWALL);
                     setMazeCell(map, crect.x + 6, y, TILEWALL);
                 }
@@ -283,19 +286,39 @@ void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, float * posX, fl
                 df(2,2);
             }
             else if(crect.w == 3) {
+                // We can do a bit of fuzzy stuff here, it's fine. This is all 
+                // imprecise anyway; 3 wide rooms are common
                 if(crect.h > 5 && (crect.h & 1)) {
                     for(uint8_t i = crect.y + 2; i < crect.y + crect.h - 2; i += 2)
                         setMazeCell(map, crect.x + 1, i, TILEWALL);
                 }
                 else {
-                    // We can do a bit of fuzzy stuff here, it's fine. This is all 
-                    // imprecise anyway; 3 wide rooms are common
                     if(getMazeCell(map, crect.x + 1, crect.y - 1) == TILEWALL && random(5) == 0)
                         setMazeCell(map, crect.x + 1, crect.y, TILEWALL);
                 }
             }
             else {
+                // These don't have at least one required exact width or height, so they're "fuzzy"
+                if(crect.w > 7 && crect.h > ROOMSCUBICLEMAXLENGTH * 2)
+                {
+                    // Go around the perimeter and, with a low chance, add random length walls
+                    for(uint8_t x = 0; x < crect.w; ++x)
+                    {
+                        if(getMazeCell(map, crect.x + x, crect.y - 1) == TILEWALL && random(ROOMSCUBICLECHANCE) == 0)
+                            for(int8_t i = random(ROOMSCUBICLEMAXLENGTH); i >= 0; --i)
+                                setMazeCell(map, crect.x + x, crect.y + i, TILEWALL);
+                        if(getMazeCell(map, crect.x + x, crect.y + crect.h) == TILEWALL && random(ROOMSCUBICLECHANCE) == 0)
+                            for(int8_t i = random(ROOMSCUBICLEMAXLENGTH); i >= 0; --i)
+                                setMazeCell(map, crect.x + x, crect.y + crect.h - 1 - i, TILEWALL);
+                    }
+                }
+                //else if(crect.h > 7)
+                //{
+                //    for(uint8_t y = 0; y < crect.h; y++)
+                //    {
 
+                //    }
+                //}
             }
         }
     }
