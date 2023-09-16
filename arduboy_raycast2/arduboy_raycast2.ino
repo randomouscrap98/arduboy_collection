@@ -95,7 +95,7 @@ void raycastFoundation()
 // The full function for raycasting. 
 void raycast()
 {
-    //Waste 10 bytes of stack to save numerous cycles on render (and on programmer. leaving posX + posY floats so...)
+    //Waste < 20 bytes of stack to save numerous cycles on render (and on programmer. leaving posX + posY floats so...)
     uint8_t pmapX = int(posX);
     uint8_t pmapY = int(posY);
     uflot pmapofsX = posX - pmapX;
@@ -135,7 +135,7 @@ void raycast()
         // With this DDA stepping algorithm, have to be careful about making too-large values
         // with our tiny fixed point numbers. Make some arbitrarily small cutoff point for
         // even trying to deal with steps in that direction. As long as the map size is 
-        // never larger than 1 / NEARZEROFIXED on any side, it will be fine (that meeans
+        // never larger than 1 / NEARZEROFIXED on any side, it will be fine (that means
         // map has to be < 100 on a side with this)
         if(deltaDistX > NEARZEROFIXED) {
             deltaDistX = 1 / deltaDistX;
@@ -166,8 +166,8 @@ void raycast()
         uflot perpWallDist = 0;     // perpendicular distance (not real distance)
         uint8_t tile = TILEEMPTY;   // tile that was hit by ray
 
-        // perform DDA
-        while (perpWallDist < VIEWDISTANCE && tile == TILEEMPTY)
+        // perform DDA. A do/while loop is ever-so-slightly faster it seems?
+        do
         {
             // jump to next map square, either in x-direction, or in y-direction
             if (sideDistX < sideDistY) {
@@ -185,11 +185,13 @@ void raycast()
             // Check if ray has hit a wall
             tile = getMazeCell(worldMap, mapX, mapY);
         }
+        while (perpWallDist < VIEWDISTANCE && tile == TILEEMPTY);
 
         // If the above loop was exited without finding a tile, there's nothing to draw
         if(tile == TILEEMPTY) continue;
 
-        uflot wallX = uflot(side ? fposX + (flot)perpWallDist * rayDirX : fposY + (flot)perpWallDist * rayDirY);
+        //NOTE: wallX technically can only be positive, but I'm using flot to save a tiny amount from casting
+        flot wallX = side ? fposX + (flot)perpWallDist * rayDirX : fposY + (flot)perpWallDist * rayDirY;
         wallX -= floorFixed(wallX); //.getFraction isn't working!
         uint8_t texX = uint8_t(wallX * TILESIZE);
         if((side == 0 && rayDirX > 0) || (side == 1 && rayDirY < 0)) texX = TILESIZE - 1 - texX;
@@ -246,16 +248,17 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
     uflot texPos = (yStart + halfLine - MIDSCREEN) * step;
     #endif
 
-    //Individual bits
-    for(uint8_t b = yStart; b < yEnd; ++b)
+    //Individual bits. Again, a do/while loop is slightly faster, it actually makes a difference here
+    //over a for loop
+    do
     {
-        uint8_t bidx = b & 7;
+        uint8_t bidx = yStart & 7;
 
         // Every new byte, save the current (previous) byte and load the new byte from the screen. 
         // This might be wasteful, as only the first and last byte technically need to pull from the screen. 
         if(bidx == 0) {
             arduboy.sBuffer[bofs] = texByte;
-            bofs = (b & 0b1111000) * BWIDTH + x;
+            bofs = (yStart & 0b1111000) * BWIDTH + x;
             texByte = arduboy.sBuffer[bofs];
         }
 
@@ -269,6 +272,7 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
 
         texPos += step;
     }
+    while(++yStart < yEnd);
 
     //Just in case, store the last one too
     #ifdef CORNERSHADOWS
