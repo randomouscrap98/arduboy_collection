@@ -224,7 +224,7 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
     uint8_t dither = (uint8_t)(floorFixed(distance * DARKNESS * distance));
     //Oops, we're beyond dark (this shouldn't happen often but it CAN)
     if(dither >= BAYERGRADIENTS) return;
-    uint8_t shade = ((side & x)) ? 0 : b_shading[(dither * 4) + (x & 3)];
+    uint8_t shade = (side & x) ? 0 : pgm_read_byte(b_shading + (dither * 4) + (x & 3));
     #endif
 
     int16_t halfLine = lineHeight >> 1;

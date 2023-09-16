@@ -4,7 +4,7 @@ constexpr uint8_t BAYERGRADIENTS = 16;
 
 // Bayer gradients, not including the 0 fill (useless?).
 // Takes up 64 precious bytes of RAM
-constexpr uint8_t b_shading[] = {
+constexpr uint8_t b_shading[] PROGMEM = {
     0xFF, 0xFF, 0xFF, 0xFF, // Beyer 16
     0xEE, 0xFF, 0xFF, 0xFF, // 0
     0xEE, 0xFF, 0xBB, 0xFF,
