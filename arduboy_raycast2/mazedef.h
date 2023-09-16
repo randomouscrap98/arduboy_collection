@@ -1,15 +1,15 @@
 #pragma once
 
 #include "utils.h"
+#include "tile.h"
 
 constexpr uint8_t MAXMAPWIDTH = 29;
 constexpr uint8_t MAXMAPHEIGHT = 29;
-//constexpr uint8_t TILESPERBYTE = 4;
-//constexpr uint8_t REALMAPWIDTH = MAXMAPWIDTH / TILESPERBYTE;
 
-constexpr uint8_t TILEWALL = 0xFF; //Must always be full fill
-constexpr uint8_t TILEEXIT = 0x10;
-constexpr uint8_t TILEEMPTY = 0b00;
+constexpr uint8_t TILEEMPTY = 0x00;
+constexpr uint8_t TILEWALL = 0x01;
+constexpr uint8_t TILEEXIT = 0x02;
+
 
 // Make sure to modify the constants here if you change the tile count
 
@@ -39,7 +39,7 @@ uint8_t getMazeCell(uint8_t * maze, uint8_t x, uint8_t y)
 // Fill maze with all walls again (all of it)
 void resetMaze(uint8_t * maze)
 {
-    memset(maze, 0xFF, (size_t)MAXMAPHEIGHT * MAXMAPWIDTH);
+    memset(maze, TILEWALL, (size_t)MAXMAPHEIGHT * MAXMAPWIDTH);
 }
 
 // Draw the given maze starting at the given screen x + y

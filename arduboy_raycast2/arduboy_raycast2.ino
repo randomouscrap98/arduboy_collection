@@ -39,7 +39,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 
 // Gameplay constants
-constexpr uint8_t FRAMERATE = 20;
+constexpr uint8_t FRAMERATE = 22;
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 constexpr uflot LIGHTINTENSITY = 1.5;
@@ -224,16 +224,17 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
     uint8_t dither = (uint8_t)(floorFixed(distance * DARKNESS * distance));
     //Oops, we're beyond dark (this shouldn't happen often but it CAN)
     if(dither >= BAYERGRADIENTS) return;
-    uint8_t shade = ((side & x) || tile == TILEEXIT) ? 0 : b_shading[(dither * 4) + (x & 3)];
+    uint8_t shade = ((side & x)) ? 0 : b_shading[(dither * 4) + (x & 3)];
     #endif
 
     int16_t halfLine = lineHeight >> 1;
     uint8_t yStart = max(0, MIDSCREEN - halfLine);
     uint8_t yEnd = min(HEIGHT, MIDSCREEN + halfLine);
 
+    uint16_t tofs = (tile - 1) * TILEBYTES + texX;
     uint16_t bofs = (yStart & 0b1111000) * BWIDTH;
     uint8_t texByte = arduboy.sBuffer[bofs + x];
-    uint16_t texData = pgm_read_byte(wallTile + texX) + 256 * pgm_read_byte(wallTile + texX + TILESIZE);
+    uint16_t texData = pgm_read_byte(wallTile + tofs) + 256 * pgm_read_byte(wallTile + tofs + TILESIZE);
 
     #if TEXPRECISION == 2
     UFixed<16,16> step = (float)TILESIZE / lineHeight;
@@ -261,7 +262,6 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
         }
 
         uint8_t bm = fastlshift8(bidx);
-        uint8_t bt = shade & bm;
 
         //Texture stuff goes here, after shade & bm (for shortcutting)
         if ((shade & bm) && (texData & fastlshift16(texPos.getInteger())))

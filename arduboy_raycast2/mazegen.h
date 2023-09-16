@@ -38,7 +38,7 @@ void genMazeType(uint8_t * map, uint8_t width, uint8_t height, float * posX, flo
         // row set tracker
         for(uint8_t x = 1; x < width; x += 2)
         {
-            setMazeCell(map, x, y, 0);
+            setMazeCell(map, x, y, TILEEMPTY);
 
             // This works no matter which row we're on because the top row has a 
             // full ceiling, and thus will "initialize" the row sets to all individual
