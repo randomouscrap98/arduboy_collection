@@ -6,8 +6,7 @@
 
 // Graphics
 #include "resources/menu.h"
-#include "resources/ceiling.h"
-#include "resources/floor.h"
+#include "resources/raycastbg.h"
 
 // Libs (sort of; mostly just code organization)
 #include "utils.h"
@@ -92,11 +91,12 @@ void clearRaycast()
 //Draw the floor underneath the raycast walls (ultra simple for now to save cycles)
 void raycastFoundation()
 {
-    constexpr int8_t FLOORSTART = 34;
-    constexpr int8_t CEILSTART = -6;
-    fastClear(&arduboy, 0, ceilingImgHeight + CEILSTART, VIEWWIDTH, FLOORSTART);
-    Sprites::drawOverwrite(0, CEILSTART, ceilingImg, 0);
-    Sprites::drawOverwrite(0, FLOORSTART, floorImg, 0);
+    Sprites::drawOverwrite(0, 0, raycastBg, 0);
+    //constexpr int8_t FLOORSTART = 34;
+    //constexpr int8_t CEILSTART = -6;
+    //fastClear(&arduboy, 0, ceilingImgHeight + CEILSTART, VIEWWIDTH, FLOORSTART);
+    //Sprites::drawOverwrite(0, CEILSTART, ceilingImg, 0);
+    //Sprites::drawOverwrite(0, FLOORSTART, floorImg, 0);
 }
 
 // The full function for raycasting. 
