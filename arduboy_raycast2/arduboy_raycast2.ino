@@ -27,9 +27,6 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // wastes cycles, so I made it a define
 // #define WALLHEIGHT 1.0
 
-// Display map (will take up large portion of screen)
-// #define DRAWMAP 1
-
 // Corner shadows are slightly more expensive, but help visually 
 // separate the darker walls (North/South) from the floor and gives a nice effect
 #define CORNERSHADOWS
@@ -40,9 +37,13 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // Wall shading isn't SUPER expensive but it's definitely something...
 #define WALLSHADING
 
+// And now some debug stuff
+// #define DRAWMAPDEBUG     // Display map (will take up large portion of screen)
+// #define LINEHEIGHTDEBUG  // Display information about lineheight (only draws a few lines)
+
 
 // Gameplay constants
-#ifdef DRAWMAP
+#ifdef DRAWMAPDEBUG
 constexpr uint8_t FRAMERATE = 10; //Map is mega expensive because I didn't make it good (just debug anyway)
 #else
 constexpr uint8_t FRAMERATE = 30; //Untextured can run at near 60; lots of headroom at 45
@@ -58,10 +59,13 @@ const uflot VIEWDISTANCE = sqrt(BAYERGRADIENTS * (float)LIGHTINTENSITY);
 const uflot DARKNESS = 1 / LIGHTINTENSITY;
 
 //Screen calc constants (no need to do it at runtime)
-constexpr uint8_t MIDSCREEN = HEIGHT / 2;
+constexpr int16_t MIDSCREEN = HEIGHT / 2;
 constexpr uint8_t VIEWWIDTH = 100;
 constexpr flot NORMWIDTH = 2.0f / VIEWWIDTH;
 constexpr uint8_t BWIDTH = WIDTH >> 3;
+constexpr uint8_t LDISTSAFE = 4;
+constexpr uflot MINLDISTANCE = 1.0f / LDISTSAFE;
+constexpr uint16_t MAXLHEIGHT = HEIGHT * LDISTSAFE;
 
 //Menu related stuff
 uint8_t menuIndex = 0;
@@ -191,24 +195,39 @@ void raycast()
         // If the above loop was exited without finding a tile, there's nothing to draw
         if(tile == TILEEMPTY) continue;
 
+        uflot wallX = (side ? posX + (flot)perpWallDist * rayDirX : posY + (flot)perpWallDist * rayDirY).getFraction();
+        uint8_t texX = uint8_t(wallX * 8);
+        if((side == 0 && rayDirX > 0) || (side == 1 && rayDirY < 0))
+            texX = 8 - texX - 1;
+
         // Calculate half height of line to draw on screen. We already know the distance to the wall.
         // We can truncate the total height if too close to the wall right here and now and avoid future checks.
         #ifdef WALLHEIGHT
         uint8_t lineHeight = (perpWallDist < WALLHEIGHT ? HEIGHT : (int)(HEIGHT / perpWallDist * WALLHEIGHT)) >> 1;
         #else
-        uint8_t lineHeight = (perpWallDist <= 1 ? HEIGHT : (int)(HEIGHT / perpWallDist)) >> 1;
+        uint16_t lineHeight = (perpWallDist <= MINLDISTANCE) ? MAXLHEIGHT : (HEIGHT / perpWallDist).getInteger(); // >> 1;
+        #endif
+
+        #ifdef LINEHEIGHTDEBUG
+        tinyfont.setCursor(16, x * 16);
+        tinyfont.println(lineHeight);
+        tinyfont.setCursor(16, x * 16 + 8);
+        tinyfont.println((float)perpWallDist);
+        if(x > 2) break;
         #endif
 
         //NOTE: unless view distance is set to > 32, lineHeight will never be 0, so no need to check.
         //ending should be exclusive
-        draw_wall_line(x, MIDSCREEN - lineHeight, MIDSCREEN + lineHeight, perpWallDist, side, tile);
+        draw_wall_line(x, lineHeight, perpWallDist, side, tile, texX);
+        //draw_wall_line(x, MIDSCREEN - lineHeight, MIDSCREEN + lineHeight, perpWallDist, side, tile, texX);
+
     }
 }
 
 
 //Draw a single raycast wall line. Will only draw specifically the wall line and will clip out all the rest
 //(so you can predraw a ceiling and floor before calling raycast)
-inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distance, uint8_t side, uint8_t tile) 
+inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8_t side, uint8_t tile, uint8_t texX) 
 {
     //The entire cost of wall shading is basically right here
     #ifdef WALLSHADING
@@ -221,8 +240,13 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
     uint8_t shade = ((side & x) || tile == TILEEXIT) ? 0 : 0xFF;
     #endif
 
+    int16_t halfLine = lineHeight >> 1;
+    uint8_t yStart = max(0, MIDSCREEN - halfLine);
+    uint8_t yEnd = min(HEIGHT, MIDSCREEN + halfLine);
+
     uint16_t bofs = (yStart & 0b1111000) * BWIDTH;
     uint8_t texByte = arduboy.sBuffer[bofs + x]; // = (arduboy.sBuffer[b * WIDTH + x] & ~m) | (shade & m);
+    uint8_t texData = wallTile[texX];
 
     //Individual bits
     for(uint8_t b = yStart; b < yEnd; ++b)
@@ -432,7 +456,7 @@ void loop()
         raycast();
         movement();
 
-        #ifdef DRAWMAP
+        #ifdef DRAWMAPDEBUG
         drawMaze(&arduboy, worldMap, 0, 0);
         #endif
     }
