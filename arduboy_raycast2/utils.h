@@ -41,3 +41,6 @@ void fastClear(Arduboy2Base * arduboy, uint8_t x, uint8_t y, uint8_t x2, uint8_t
     for(uint8_t i = y >> 3; i < yEnd; ++i)
         memset(arduboy->sBuffer + (i << 7) + x, 0, x2 - x);
 }
+
+// Left shift lookup table for 1 << N
+constexpr uint8_t shift1Lookup[8] = { 1, 2, 4, 8, 16, 32, 64, 128 };

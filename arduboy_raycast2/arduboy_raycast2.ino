@@ -7,6 +7,7 @@
 // Graphics
 #include "resources/menu.h"
 #include "resources/raycastbg.h"
+#include "tile.h"
 
 // Libs (sort of; mostly just code organization)
 #include "utils.h"
@@ -42,7 +43,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 // Gameplay constants
 #ifdef DRAWMAP
-constexpr uint8_t FRAMERATE = 15; //Map is mega expensive because I didn't make it good (just debug anyway)
+constexpr uint8_t FRAMERATE = 10; //Map is mega expensive because I didn't make it good (just debug anyway)
 #else
 constexpr uint8_t FRAMERATE = 30; //Untextured can run at near 60; lots of headroom at 45
 #endif
@@ -60,7 +61,7 @@ const uflot DARKNESS = 1 / LIGHTINTENSITY;
 constexpr uint8_t MIDSCREEN = HEIGHT / 2;
 constexpr uint8_t VIEWWIDTH = 100;
 constexpr flot NORMWIDTH = 2.0f / VIEWWIDTH;
-
+constexpr uint8_t BWIDTH = WIDTH >> 3;
 
 //Menu related stuff
 uint8_t menuIndex = 0;
@@ -204,7 +205,6 @@ void raycast()
     }
 }
 
-constexpr uint8_t dumb[8] = { 1, 2, 4, 8, 16, 32, 64, 128 };
 
 //Draw a single raycast wall line. Will only draw specifically the wall line and will clip out all the rest
 //(so you can predraw a ceiling and floor before calling raycast)
@@ -216,40 +216,43 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
     uint8_t dither = (uint8_t)(roundFixed(distance * DARKNESS * distance));
     //Oops, we're beyond dark (this shouldn't happen often but it CAN)
     if(dither >= BAYERGRADIENTS) return;
-    uint8_t shade = ((side & x) || tile == TILEEXIT) ? 0 : b_shading[(dither << 2) + (x & 3)];
+    uint8_t shade = ((side & x) || tile == TILEEXIT) ? 0 : b_shading[(dither * 4) + (x & 3)];
     #else
     uint8_t shade = ((side & x) || tile == TILEEXIT) ? 0 : 0xFF;
     #endif
 
-    uint16_t bofs = (yStart >> 3) * WIDTH;
+    uint16_t bofs = (yStart & 0b1111000) * BWIDTH;
     uint8_t texByte = arduboy.sBuffer[bofs + x]; // = (arduboy.sBuffer[b * WIDTH + x] & ~m) | (shade & m);
-    uint8_t bm, bt;
 
     //Individual bits
-    for(uint8_t b = yStart; b < yEnd; b++)
+    for(uint8_t b = yStart; b < yEnd; ++b)
     {
-        uint8_t dumber = b & 7;
+        uint8_t bidx = b & 7;
+
         // Every new byte, save the current (previous) byte and load the new byte from the screen. 
         // This might be wasteful, as only the first and last byte technically need to pull from the screen. 
-        if(dumber == 0) {
+        if(bidx == 0) {
             arduboy.sBuffer[bofs + x] = texByte;
-            bofs = (b >> 3) * WIDTH;
+            bofs = (b & 0b1111000) * BWIDTH;
             texByte = arduboy.sBuffer[bofs + x];
         }
 
-        bm = dumb[dumber];
-        bt = shade & bm;
+        uint8_t bm = shift1Lookup[bidx];
+        uint8_t bt = shade & bm;
 
-        //Texture stuff goes here
-
-        if (bt)
+        //Texture stuff goes here, after shade & bm (for shortcutting)
+        if (shade & bm)
             texByte |= bm;
         else
             texByte &= ~bm;
     }
 
     //Just in case, store the last one too
+    #ifdef CORNERSHADOWS
+    arduboy.sBuffer[bofs + x] = texByte & ~(shift1Lookup[(yEnd - 1) & 7]);
+    #else
     arduboy.sBuffer[bofs + x] = texByte;
+    #endif
 }
 
 // Perform ONLY player movement updates! No drawing!
