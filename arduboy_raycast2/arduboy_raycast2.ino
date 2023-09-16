@@ -100,6 +100,8 @@ void raycast()
     uint8_t pmapY = int(posY);
     uflot pmapofsX = posX - pmapX;
     uflot pmapofsY = posY - pmapY;
+    SFixed<15,16> fposX = posX;
+    SFixed<15,16> fposY = posY;
     flot dx = dirX; //NO floating points inside critical loop!!
     flot dy = dirY;
 
@@ -187,10 +189,10 @@ void raycast()
         // If the above loop was exited without finding a tile, there's nothing to draw
         if(tile == TILEEMPTY) continue;
 
-        SFixed<1,14> wallX = (side ? posX + (flot)perpWallDist * rayDirX : posY + (flot)perpWallDist * rayDirY).getFraction();
+        SFixed<15,16> wallX = (side ? fposX + (flot)perpWallDist * rayDirX : fposY + (flot)perpWallDist * rayDirY); //.getFraction();
+        wallX = wallX - floorFixed(wallX);
         uint8_t texX = uint8_t(wallX * TILESIZE);
-        if((side == 0 && rayDirX > 0) || (side == 1 && rayDirY < 0))
-            texX = 7 - texX;
+        if((side == 0 && rayDirX > 0) || (side == 1 && rayDirY < 0)) texX = TILESIZE - 1 - texX;
 
         // Calculate half height of line to draw on screen. We already know the distance to the wall.
         // We can truncate the total height if too close to the wall right here and now and avoid future checks.
@@ -231,7 +233,14 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
 
     uint16_t bofs = (yStart & 0b1111000) * BWIDTH;
     uint8_t texByte = arduboy.sBuffer[bofs + x];
-    uint8_t texData = wallTile[1];
+    //uint16_t texData = pgm_read_word(wallTile + texX * 2); //pgm_read_byte(wallTile + texX) + 256 * pgm_read_byte(wallTile + texX + TILESIZE);
+    uint16_t texData = pgm_read_byte(wallTile + texX);
+    texData += 256 * (uint16_t)pgm_read_byte(wallTile + (TILESIZE + texX));
+
+    //pgm_readWord_near(//[2];
+    //texData[0] = pgm_read_byte(wallTile + texX);
+    //texData[1] = pgm_read_byte(wallTile + texX + TILESIZE);
+    //uint16_t texData = pgm_read_word(wallTile + texX); //[texX];
 
     #ifdef TEXLOWPRECISION
     uflot step = (float)TILESIZE / lineHeight;
