@@ -233,18 +233,19 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
     {
         //Mask to cut wall and insert floor / ceiling
         uint8_t m = 0xFF;
+        //uint8_t s = shade;
         if(b == start)
         {
-            #ifdef CORNERSHADOWS
-            if(side && shade)
-                shade &= ~(1 << (yStart & 7));
-            #endif
+            //#ifdef CORNERSHADOWS
+            ////if(side && s)
+            ////    s &= ~(1 << (yStart & 7));
+            //#endif
             m &= (0xFF << (yStart & 7));
         }
         if(b == end)
         {
             #ifdef CORNERSHADOWS
-            if(side && shade)
+            //if(side && shade)
                 shade &= ~(1 << ((yEnd - 1) & 7));
             #endif
             if(yEnd & 7)
