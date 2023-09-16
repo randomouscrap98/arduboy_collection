@@ -206,12 +206,10 @@ void raycast()
         if(x > 2) break;
         #endif
 
-        //NOTE: unless view distance is set to > 32, lineHeight will never be 0, so no need to check.
         //ending should be exclusive
         draw_wall_line(x, lineHeight, perpWallDist, side, tile, texX);
     }
 }
-
 
 //Draw a single raycast wall line. Will only draw specifically the wall line and will clip out all the rest
 //(so you can predraw a ceiling and floor before calling raycast)
@@ -231,10 +229,10 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
     uint8_t yStart = max(0, MIDSCREEN - halfLine);
     uint8_t yEnd = min(HEIGHT, MIDSCREEN + halfLine);
 
-    uint16_t tofs = (tile - 1) * TILEBYTES + texX;
-    uint16_t bofs = (yStart & 0b1111000) * BWIDTH;
-    uint8_t texByte = arduboy.sBuffer[bofs + x];
-    uint16_t texData = pgm_read_byte(wallTile + tofs) + 256 * pgm_read_byte(wallTile + tofs + TILESIZE);
+    const uint8_t * tofs = wallTile + (tile - 1) * TILEBYTES + texX;
+    uint16_t bofs = (yStart & 0b1111000) * BWIDTH + x;
+    uint8_t texByte = arduboy.sBuffer[bofs];
+    uint16_t texData = pgm_read_byte(tofs) + 256 * pgm_read_byte(tofs + TILESIZE);
 
     #if TEXPRECISION == 2
     UFixed<16,16> step = (float)TILESIZE / lineHeight;
@@ -256,9 +254,9 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
         // Every new byte, save the current (previous) byte and load the new byte from the screen. 
         // This might be wasteful, as only the first and last byte technically need to pull from the screen. 
         if(bidx == 0) {
-            arduboy.sBuffer[bofs + x] = texByte;
-            bofs = (b & 0b1111000) * BWIDTH;
-            texByte = arduboy.sBuffer[bofs + x];
+            arduboy.sBuffer[bofs] = texByte;
+            bofs = (b & 0b1111000) * BWIDTH + x;
+            texByte = arduboy.sBuffer[bofs];
         }
 
         uint8_t bm = fastlshift8(bidx);
@@ -274,9 +272,9 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
 
     //Just in case, store the last one too
     #ifdef CORNERSHADOWS
-    arduboy.sBuffer[bofs + x] = texByte & ~(fastlshift8((yEnd - 1) & 7));
+    arduboy.sBuffer[bofs] = texByte & ~(fastlshift8((yEnd - 1) & 7));
     #else
-    arduboy.sBuffer[bofs + x] = texByte;
+    arduboy.sBuffer[bofs] = texByte;
     #endif
 }
 
