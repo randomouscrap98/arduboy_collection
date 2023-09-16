@@ -204,6 +204,8 @@ void raycast()
     }
 }
 
+constexpr uint8_t dumb[8] = { 1, 2, 4, 8, 16, 32, 64, 128 };
+
 //Draw a single raycast wall line. Will only draw specifically the wall line and will clip out all the rest
 //(so you can predraw a ceiling and floor before calling raycast)
 inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distance, uint8_t side, uint8_t tile) 
@@ -219,80 +221,35 @@ inline void draw_wall_line(uint8_t x, uint8_t yStart, uint8_t yEnd, uflot distan
     uint8_t shade = ((side & x) || tile == TILEEXIT) ? 0 : 0xFF;
     #endif
 
-    //uint8_t start = yStart >> 3;
-    //uint8_t end = (yEnd - 1) >> 3; //This end needs to be inclusive
-
-    uint8_t bofs = (yStart >> 3) * WIDTH;
+    uint16_t bofs = (yStart >> 3) * WIDTH;
     uint8_t texByte = arduboy.sBuffer[bofs + x]; // = (arduboy.sBuffer[b * WIDTH + x] & ~m) | (shade & m);
+    uint8_t bm, bt;
 
     //Individual bits
     for(uint8_t b = yStart; b < yEnd; b++)
     {
-        uint8_t bm = 1 << (b & 7);
-        uint8_t bt = shade & bm;
-        // For each bit, need to mix the computed texture with the shading, a simple &
+        uint8_t dumber = b & 7;
+        // Every new byte, save the current (previous) byte and load the new byte from the screen. 
+        // This might be wasteful, as only the first and last byte technically need to pull from the screen. 
+        if(dumber == 0) {
+            arduboy.sBuffer[bofs + x] = texByte;
+            bofs = (b >> 3) * WIDTH;
+            texByte = arduboy.sBuffer[bofs + x];
+        }
 
-        //#ifdef CORNERSHADOWS
-        //if(b == yEnd - 1)
-        //    bt = 0;
-        //    //arduboy.sBuffer[(b >> 3) * WIDTH + x] &= ~(1 << (b & 7));
-        //#endif
+        bm = dumb[dumber];
+        bt = shade & bm;
 
-        // Finally, to set a bit, simply figure out if it's 1 or not
+        //Texture stuff goes here
+
         if (bt)
-            arduboy.sBuffer[(b >> 3) * WIDTH + x] |= bm;
+            texByte |= bm;
         else
-            arduboy.sBuffer[(b >> 3) * WIDTH + x] &= ~bm;
-        //arduboy.sBuffer[(b >> 3) * WIDTH + x] &= ~(1 << (b & 7));
-
-        // Every new byte, load the old byte from the screen. This might be wasteful, as only the 
-        // first and last byte technically need to pull from the screen. Note that we have an
-        // extra check here every byte: it ends up being a very small penalty
-        //if((b & 7) == 0 || b == yStart) {
-        //    texByte = arduboy.sBuffer[(b >> 3) * WIDTH + x];
-        //}
-        //if((b & 7) == 7) // This is the last bit of this byte, so write it back
-        //{
-        //    arduboy.sBuffer
-        //}
-
-        //#ifdef CORNERSHADOWS
-        //if(b == yEnd - 1)
-        //    arduboy.sBuffer[(b >> 3) * WIDTH + x] &= ~(1 << (b & 7));
-        //#endif
+            texByte &= ~bm;
     }
 
-    //Get the last one too
-    //arduboy.sBuffer[(yEnd >> 3) * WIDTH + x] = texByte;
-
-    //for(uint8_t b = start; b <= end; ++b)
-    //{
-    //    //Mask to cut wall and insert floor / ceiling
-    //    uint8_t m = 0xFF;
-    //    //uint8_t s = shade;
-    //    if(b == start)
-    //    {
-    //        //#ifdef CORNERSHADOWS
-    //        ////if(side && s)
-    //        ////    s &= ~(1 << (yStart & 7));
-    //        //#endif
-    //        m &= (0xFF << (yStart & 7));
-    //    }
-    //    if(b == end)
-    //    {
-    //        #ifdef CORNERSHADOWS
-    //        //if(side && shade)
-    //            shade &= ~(1 << ((yEnd - 1) & 7));
-    //        #endif
-    //        if(yEnd & 7)
-    //            m &= (0xFF << (yEnd & 7)) >> 8;
-    //    }
-    //    #ifdef DRAWFOUNDATION
-    //    arduboy.sBuffer[b * WIDTH + x] = (arduboy.sBuffer[b * WIDTH + x] & ~m) | (shade & m);
-    //    #else
-    //    arduboy.sBuffer[b * WIDTH + x] = shade & m;
-    //    #endif
-    //}
+    //Just in case, store the last one too
+    arduboy.sBuffer[bofs + x] = texByte;
 }
 
 // Perform ONLY player movement updates! No drawing!
