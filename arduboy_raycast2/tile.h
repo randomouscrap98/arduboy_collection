@@ -3,6 +3,7 @@
 //All tiles should be 8 bytes I think
 
 constexpr uint8_t TILESIZE = 16;
+//constexpr UFixed<16,16> FTILESIZE = TILESIZE;
 
 constexpr uint8_t wallTile[TILESIZE * 2] PROGMEM = { //0x18, 0xDB, 0xC3, 0xDB, 0x18, 0xDB, 0xC3, 0xDB };
   //Frame 0

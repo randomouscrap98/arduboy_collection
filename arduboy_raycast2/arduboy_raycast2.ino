@@ -19,10 +19,6 @@ Arduboy2Base arduboy;
 Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
 
 
-// Define a fake FOV. Slightly more computation but not much honestly. 
-// It just doesn't do much. 1 = "90", more than 1 = more than 90
-// #define FAKEFOV 0.8
-
 // Corner shadows are slightly more expensive, but help visually 
 // separate the darker walls (North/South) from the floor and gives a nice effect
 #define CORNERSHADOWS
@@ -30,13 +26,17 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // You probably want the floor + whatever else that aren't walls
 #define DRAWFOUNDATION
 
-// Wall shading isn't SUPER expensive but it's definitely something...
+// Texture precision. 0 is lowest, 2 is highest. Each level down saves
+// enough frames to matter
+#define TEXPRECISION 2 
+
 
 // And now some debug stuff
 // #define DRAWMAPDEBUG     // Display map (will take up large portion of screen)
 // #define LINEHEIGHTDEBUG  // Display information about lineheight (only draws a few lines)
-// #define TEXLOWPRECISION  // Much lower texture precision
 // #define NOWALLSHADING    // Wall shading actually reduces the cost... I must have a bug
+// #define FAKEFOV 0.8      // Not that useful, may break. 1 = 90, higher = more than 90
+
 
 // Gameplay constants
 constexpr uint8_t FRAMERATE = 20;
@@ -189,8 +189,8 @@ void raycast()
         // If the above loop was exited without finding a tile, there's nothing to draw
         if(tile == TILEEMPTY) continue;
 
-        SFixed<15,16> wallX = (side ? fposX + (flot)perpWallDist * rayDirX : fposY + (flot)perpWallDist * rayDirY); //.getFraction();
-        wallX = wallX - floorFixed(wallX);
+        uflot wallX = uflot(side ? fposX + (flot)perpWallDist * rayDirX : fposY + (flot)perpWallDist * rayDirY);
+        wallX -= floorFixed(wallX); //.getFraction isn't working!
         uint8_t texX = uint8_t(wallX * TILESIZE);
         if((side == 0 && rayDirX > 0) || (side == 1 && rayDirY < 0)) texX = TILESIZE - 1 - texX;
 
@@ -235,12 +235,16 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
     uint8_t texByte = arduboy.sBuffer[bofs + x];
     uint16_t texData = pgm_read_byte(wallTile + texX) + 256 * pgm_read_byte(wallTile + texX + TILESIZE);
 
-    #ifdef TEXLOWPRECISION
-    uflot step = (float)TILESIZE / lineHeight;
-    uflot texPos = (yStart + halfLine - MIDSCREEN) * step;
-    #else
+    #if TEXPRECISION == 2
     UFixed<16,16> step = (float)TILESIZE / lineHeight;
     UFixed<16,16> texPos = (yStart + halfLine - MIDSCREEN) * step;
+    #elif TEXPRECISION == 1
+    UFixed<4,12> step = (float)TILESIZE / lineHeight;
+    uflot tp1 = (yStart + halfLine - MIDSCREEN) * (uflot)step;
+    UFixed<4,12> texPos = (UFixed<4,12>)tp1;
+    #else
+    uflot step = (float)TILESIZE / lineHeight;
+    uflot texPos = (yStart + halfLine - MIDSCREEN) * step;
     #endif
 
     //Individual bits
@@ -260,7 +264,7 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
         uint8_t bt = shade & bm;
 
         //Texture stuff goes here, after shade & bm (for shortcutting)
-        if ((shade & bm) && (texData & shift1Lookup[texPos.getInteger() & (TILESIZE - 1)]))
+        if ((shade & bm) && (texData & shift1Lookup[texPos.getInteger()])) // & (TILESIZE - 1)]))
             texByte |= bm;
         else
             texByte &= ~bm;
