@@ -31,7 +31,7 @@ void setMazeCell(uint8_t * maze, uint8_t x, uint8_t y, uint8_t tile)
     //*maze = (*maze & ~(TILEWALL << xshift)) | (tile << xshift);
 }
 
-uint8_t getMazeCell(uint8_t * maze, uint8_t x, uint8_t y)
+inline uint8_t getMazeCell(uint8_t * maze, uint8_t x, uint8_t y)
 {
     return maze[mazeIndex(x,y)]; //(maze[mazeIndex(x, y)] >> mazeXShift(x)) & TILEWALL;
 }

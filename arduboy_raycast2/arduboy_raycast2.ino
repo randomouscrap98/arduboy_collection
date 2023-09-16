@@ -100,8 +100,8 @@ void raycast()
     uint8_t pmapY = int(posY);
     uflot pmapofsX = posX - pmapX;
     uflot pmapofsY = posY - pmapY;
-    SFixed<15,16> fposX = posX;
-    SFixed<15,16> fposY = posY;
+    flot fposX = posX;
+    flot fposY = posY;
     flot dx = dirX; //NO floating points inside critical loop!!
     flot dy = dirY;
 
