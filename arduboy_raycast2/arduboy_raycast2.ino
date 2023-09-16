@@ -55,7 +55,7 @@ constexpr int16_t MIDSCREEN = HEIGHT / 2;
 constexpr uint8_t VIEWWIDTH = 100;
 constexpr flot NORMWIDTH = 2.0f / VIEWWIDTH;
 constexpr uint8_t BWIDTH = WIDTH >> 3;
-constexpr uint8_t LDISTSAFE = 4;
+constexpr uint8_t LDISTSAFE = 16;
 constexpr uflot MINLDISTANCE = 1.0f / LDISTSAFE;
 constexpr uint16_t MAXLHEIGHT = HEIGHT * LDISTSAFE;
 
@@ -196,7 +196,7 @@ void raycast()
 
         // Calculate half height of line to draw on screen. We already know the distance to the wall.
         // We can truncate the total height if too close to the wall right here and now and avoid future checks.
-        uint16_t lineHeight = (perpWallDist <= MINLDISTANCE) ? MAXLHEIGHT : (HEIGHT / perpWallDist).getInteger();
+        uint16_t lineHeight = (perpWallDist <= MINLDISTANCE) ? MAXLHEIGHT : (HEIGHT / (float)perpWallDist);
 
         #ifdef LINEHEIGHTDEBUG
         tinyfont.setCursor(16, x * 16);
@@ -260,11 +260,11 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
             texByte = arduboy.sBuffer[bofs + x];
         }
 
-        uint8_t bm = shift1Lookup[bidx];
+        uint8_t bm = fastlshift8(bidx);
         uint8_t bt = shade & bm;
 
         //Texture stuff goes here, after shade & bm (for shortcutting)
-        if ((shade & bm) && (texData & shift1Lookup[texPos.getInteger()])) // & (TILESIZE - 1)]))
+        if ((shade & bm) && (texData & fastlshift16(texPos.getInteger())))
             texByte |= bm;
         else
             texByte &= ~bm;
@@ -274,7 +274,7 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
 
     //Just in case, store the last one too
     #ifdef CORNERSHADOWS
-    arduboy.sBuffer[bofs + x] = texByte & ~(shift1Lookup[(yEnd - 1) & 7]);
+    arduboy.sBuffer[bofs + x] = texByte & ~(fastlshift8((yEnd - 1) & 7));
     #else
     arduboy.sBuffer[bofs + x] = texByte;
     #endif

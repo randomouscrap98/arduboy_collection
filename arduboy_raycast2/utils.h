@@ -43,7 +43,14 @@ void fastClear(Arduboy2Base * arduboy, uint8_t x, uint8_t y, uint8_t x2, uint8_t
 }
 
 // Left shift lookup table for 1 << N
-constexpr uint16_t shift1Lookup[16] = { 
+constexpr uint16_t shift1Lookup16[16] PROGMEM = { 
     1, 2, 4, 8, 16, 32, 64, 128,
     256, 512, 1024, 2048, 4096, 8192, 16384, 32768
 };
+
+constexpr uint8_t shift1Lookup8[8] PROGMEM = {
+    1, 2, 4, 8, 16, 32, 64, 128,
+};
+
+#define fastlshift8(x) pgm_read_byte(shift1Lookup8 + (x))
+#define fastlshift16(x) pgm_read_word(shift1Lookup16 + (x))
