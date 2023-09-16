@@ -36,10 +36,10 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // #define DRAWMAPDEBUG     // Display map (will take up large portion of screen)
 // #define LINEHEIGHTDEBUG  // Display information about lineheight (only draws a few lines)
 // #define TEXLOWPRECISION  // Much lower texture precision
- #define NOWALLSHADING    // Wall shading actually reduces the cost... I must have a bug
+// #define NOWALLSHADING    // Wall shading actually reduces the cost... I must have a bug
 
 // Gameplay constants
-constexpr uint8_t FRAMERATE = 22;
+constexpr uint8_t FRAMERATE = 20;
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 constexpr uflot LIGHTINTENSITY = 1.5;
@@ -233,14 +233,7 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
 
     uint16_t bofs = (yStart & 0b1111000) * BWIDTH;
     uint8_t texByte = arduboy.sBuffer[bofs + x];
-    //uint16_t texData = pgm_read_word(wallTile + texX * 2); //pgm_read_byte(wallTile + texX) + 256 * pgm_read_byte(wallTile + texX + TILESIZE);
-    uint16_t texData = pgm_read_byte(wallTile + texX);
-    texData += 256 * (uint16_t)pgm_read_byte(wallTile + (TILESIZE + texX));
-
-    //pgm_readWord_near(//[2];
-    //texData[0] = pgm_read_byte(wallTile + texX);
-    //texData[1] = pgm_read_byte(wallTile + texX + TILESIZE);
-    //uint16_t texData = pgm_read_word(wallTile + texX); //[texX];
+    uint16_t texData = pgm_read_byte(wallTile + texX) + 256 * pgm_read_byte(wallTile + texX + TILESIZE);
 
     #ifdef TEXLOWPRECISION
     uflot step = (float)TILESIZE / lineHeight;
