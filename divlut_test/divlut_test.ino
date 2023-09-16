@@ -28,8 +28,13 @@ void loop()
 
     arduboy.pollButtons();
 
-    if(arduboy.justPressed(A_BUTTON))
-        current++;
+    int mod = 0;
+    if(arduboy.justPressed(A_BUTTON) || arduboy.pressed(UP_BUTTON))
+        mod = 1;
+    if(arduboy.pressed(DOWN_BUTTON))
+        mod = -1;
+        
+    current = (current + 256 + mod) % 256;
 
     arduboy.clear();
     flot truef = flot::fromInternal(current);

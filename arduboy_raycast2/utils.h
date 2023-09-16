@@ -107,3 +107,12 @@ uflot uReciprocalUnit(uflot x)
     return uflot::fromInternal(pgm_read_word(DIVISORS + (x.getInternal() & 0xFF)));
 }
 
+// Reciprocal of ALMOST unit length (ie 2 to -2) Reduces precision when in the outer range
+uflot uReciprocalNearUnit(uflot x)
+{
+    if(x.getInteger())
+        return uflot::fromInternal(pgm_read_word(DIVISORS + ((x * 0.5).getInternal() & 0xFF))) * 0.5;
+    else
+        return uflot::fromInternal(pgm_read_word(DIVISORS + (x.getInternal() & 0xFF)));
+}
+

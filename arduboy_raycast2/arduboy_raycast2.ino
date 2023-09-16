@@ -28,11 +28,15 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 // Texture precision. 0 is lowest, 2 is highest. Each level down saves
 // enough frames to matter
-#define TEXPRECISION 2 
+#define TEXPRECISION 0 
 
-// Use a lookup table for reciprocal division. Adds 512 bytes to progmem 
-// and might affect visual output, but in general gives a ton of performance
-#define RECIPROCALLUT
+// Choose a method for unsigned reciprocal of unit lengths (or close to it).
+// 1: greatly increases speed but with visual artifacts and 512 extra program bytes
+// 2: greatly increases speed without visual artifacts and 512 extra program bytes (marginally slower than 1; prefer 2)
+// 3: very slow but saves the 512 bytes
+//#define URCPLUNIT(x) uReciprocalUnit(x)
+#define URCPLUNIT(x) uReciprocalNearUnit(x)
+//#define URCPLUNIT(x) (1 / (x))
 
 
 // And now some debug stuff
@@ -43,7 +47,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 
 // Gameplay constants
-constexpr uint8_t FRAMERATE = 22;
+constexpr uint8_t FRAMERATE = 35;
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 constexpr uflot LIGHTINTENSITY = 1.5;
@@ -62,6 +66,7 @@ constexpr uint8_t BWIDTH = WIDTH >> 3;
 constexpr uint8_t LDISTSAFE = 16;
 constexpr uflot MINLDISTANCE = 1.0f / LDISTSAFE;
 constexpr uint16_t MAXLHEIGHT = HEIGHT * LDISTSAFE;
+
 
 //Menu related stuff
 uint8_t menuIndex = 0;
@@ -142,12 +147,7 @@ void raycast()
         // never larger than 1 / NEARZEROFIXED on any side, it will be fine (that means
         // map has to be < 100 on a side with this)
         if(deltaDistX > NEARZEROFIXED) {
-            deltaDistX = 
-            #ifdef RECIPROCALLUT
-                uReciprocalUnit(deltaDistX);
-            #else
-                1 / deltaDistX;
-            #endif
+            deltaDistX = URCPLUNIT(deltaDistX);
             if (rayDirX < 0) {
                 stepX = -1;
                 sideDistX = pmapofsX * deltaDistX;
@@ -158,12 +158,7 @@ void raycast()
             }
         }
         if(deltaDistY > NEARZEROFIXED) {
-            deltaDistY = 
-            #ifdef RECIPROCALLUT
-                uReciprocalUnit(deltaDistY);
-            #else
-                1 / deltaDistY;
-            #endif
+            deltaDistY = URCPLUNIT(deltaDistY);
             if (rayDirY < 0) {
                 stepY = -1;
                 sideDistY = pmapofsY * deltaDistY;
