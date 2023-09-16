@@ -30,6 +30,10 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // enough frames to matter
 #define TEXPRECISION 2 
 
+// Use a lookup table for reciprocal division. Adds 512 bytes to progmem 
+// and might affect visual output, but in general gives a ton of performance
+#define RECIPROCALLUT
+
 
 // And now some debug stuff
 // #define DRAWMAPDEBUG     // Display map (will take up large portion of screen)
@@ -138,7 +142,12 @@ void raycast()
         // never larger than 1 / NEARZEROFIXED on any side, it will be fine (that means
         // map has to be < 100 on a side with this)
         if(deltaDistX > NEARZEROFIXED) {
-            deltaDistX = 1 / deltaDistX;
+            deltaDistX = 
+            #ifdef RECIPROCALLUT
+                uReciprocalUnit(deltaDistX);
+            #else
+                1 / deltaDistX;
+            #endif
             if (rayDirX < 0) {
                 stepX = -1;
                 sideDistX = pmapofsX * deltaDistX;
@@ -149,7 +158,12 @@ void raycast()
             }
         }
         if(deltaDistY > NEARZEROFIXED) {
-            deltaDistY = 1 / deltaDistY;
+            deltaDistY = 
+            #ifdef RECIPROCALLUT
+                uReciprocalUnit(deltaDistY);
+            #else
+                1 / deltaDistY;
+            #endif
             if (rayDirY < 0) {
                 stepY = -1;
                 sideDistY = pmapofsY * deltaDistY;

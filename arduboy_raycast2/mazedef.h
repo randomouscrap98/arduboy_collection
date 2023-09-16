@@ -16,7 +16,7 @@ constexpr uint8_t TILEEXIT = 0x02;
 //Amount to shift value to get desired 2 bit x value in correct position
 //#define mazeXShift(x) ((x & TILEWALL) << 1)
 //Get single index into 1d maze using 2d coordinates
-#define mazeIndex(x, y) (y * MAXMAPWIDTH + x)
+#define mazeIndex(x, y) ((y) * MAXMAPWIDTH + (x))
 //#define getMazeCell(maze, x, y) (maze[mazeIndex(x,y)])
 //Does what it says; it's a macro because I don't trust the compiler
 #define isCellSolid(maze, x, y) (getMazeCell(maze, x, y) & 1)
