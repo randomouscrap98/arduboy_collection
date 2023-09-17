@@ -17,7 +17,7 @@ constexpr uint8_t ROOMSCUBICLEMAXLENGTH = 4;
 
 
 // Using some algorithm called "Eller's algorithm", which is constant memory.
-void genMazeType(uint8_t * map, uint8_t width, uint8_t height, uflot * posX, uflot * posY, flot * dirX, flot * dirY)
+void genMazeType(uint8_t * map, uint8_t width, uint8_t height, uflot * posX, uflot * posY, float * dirX, float * dirY)
 {
     resetMaze(map);
 
@@ -160,7 +160,7 @@ MRect popRoom(RoomStack * stack)
 
 // Split rooms into smaller rooms randomly until a minimum is reached. If a room cannot be split but it's of 
 // certain dimensions, randomly add "interesting" features to it.
-void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, uflot * posX, uflot * posY, flot * dirX, flot * dirY)
+void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, uflot * posX, uflot * posY, float * dirX, float * dirY)
 {
     //Note: For rooms type, doesn't have to be odd
     resetMaze(map);
@@ -345,7 +345,7 @@ void genRoomsType(uint8_t * map, uint8_t width, uint8_t height, uflot * posX, uf
 struct MazeType
 {
     char name[4];
-    void (*func)(uint8_t*, uint8_t, uint8_t, uflot *, uflot *, flot *, flot *);
+    void (*func)(uint8_t*, uint8_t, uint8_t, uflot *, uflot *, float *, float *);
 };
 
 constexpr uint8_t MAZETYPECOUNT = 2;
