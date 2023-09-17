@@ -87,6 +87,7 @@ float dirX, dirY;
 //The map itself!
 uint8_t worldMap[MAXMAPHEIGHT * MAXMAPWIDTH];
 
+//uflot darkmod = 0;
 
 // Full clear the raycast area. Not always used
 void clearRaycast() 
@@ -104,6 +105,7 @@ void raycastFoundation()
 // The full function for raycasting. 
 void raycast()
 {
+    //darkmod = sin(arduboy.frameCount) * 0.1; // + 2) * 0.333;
     //Waste < 20 bytes of stack to save numerous cycles on render (and on programmer. leaving posX + posY floats so...)
     uint8_t pmapX = int(posX);
     uint8_t pmapY = int(posY);
