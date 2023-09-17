@@ -58,9 +58,12 @@ constexpr uflot NORMWIDTH = 2.0f / VIEWWIDTH;
 constexpr uint8_t MIDSCREENY = HEIGHT / 2;
 constexpr uint8_t MIDSCREENX = VIEWWIDTH / 2;
 constexpr uint8_t BWIDTH = WIDTH >> 3;
+
+//Distance-based stuff
 constexpr uint8_t LDISTSAFE = 16;
 constexpr uflot MINLDISTANCE = 1.0f / LDISTSAFE;
 constexpr uint16_t MAXLHEIGHT = HEIGHT * LDISTSAFE;
+constexpr flot MINSPRITEDISTANCE = 0.5;
 
 constexpr uint8_t NUMSPRITES = 16;
 
@@ -87,9 +90,16 @@ struct RSprite {
     muflot y;
     uint8_t frame = 0;
     uint8_t state = 0; // First bit is active, next 2 are how many times to /2 for size
+
+    //Note: if we sacrifice 2 bytes per sprite to store the distance (so 32 bytes currently), 
+    //you can potentially save computation by sorting the sprite list itself. Sorted lists 
+    //generally don't require as much computation. I don't know realistically how much is 
+    //being saved though, so I'm not using that. I think having the sort struct below is
+    //significantly more flexible and may actually end up being faster overall
 };
 
-// Sorted sprite. Sacrifice memory for some computation?
+// Sorted sprite. Needed to save memory in RSprite (distance). May add more data here
+// for precomputation
 struct SSprite {
     RSprite * sprite; 
     UFixed<12,4> distance;    //Unfortunately, distance kinda has to be large... 12 bits = 4096, should be more than enough
@@ -357,7 +367,7 @@ void drawSprites()
         flot transformY = invDet * (-planeY * spriteX + planeX * spriteY); // this is actually the depth inside the screen, that what Z is in 3D
 
         // Nice quick shortcut to get out for sprites behind us (and ones that are too close)
-        if(transformY < (flot)MINLDISTANCE) continue;
+        if(transformY < MINSPRITEDISTANCE) continue;
 
         flot transformX = invDet * (dY * spriteX - dX * spriteY);
 
