@@ -42,7 +42,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 
 // And now some debug stuff
-// #define DRAWMAPDEBUG     // Display map (will take up large portion of screen)
+// #define DRAWMAPDEBUG     // Display map (will take up portion of screen)
 // #define LINEHEIGHTDEBUG  // Display information about lineheight (only draws a few lines)
 // #define NOWALLSHADING    // Wall shading actually reduces the cost... I must have a bug
 
@@ -90,7 +90,7 @@ float dirX, dirY; //These HAVE TO be float, or something with a lot more precisi
 struct RSprite {
     UFixed<5,3> x;
     UFixed<5,3> y;
-    UFixed<5,3> distance = 0; // Can't be precise here...
+    //UFixed<5,3> distance = 0; // Can't be precise here...
     uint8_t frame = 0;
     uint8_t state = 0; // First bit is active, next 2 are how many times to /2 for size
     //uint8_t pos = 0; //bottom two bits = how many times to /2 for size
@@ -319,7 +319,7 @@ void drawSprites()
 
         flot sx = (flot)sprites[i].x - fposX;
         flot sy = (flot)sprites[i].y - fposY;
-        sprites[i].distance = (UFixed<5, 3>)(sx * sx + sy * sy); // sqrt not taken, unneeded
+        //sprites[i].distance = (UFixed<5, 3>)(sx * sx + sy * sy); // sqrt not taken, unneeded
     }
 
     //Some matrix math stuff
