@@ -344,7 +344,7 @@ void drawSprites()
         uint8_t spriteScreenX = uint8_t((VIEWWIDTH / 2) * (1 + transformX / transformY));
 
         // calculate height of the sprite on screen
-        uint8_t spriteHeight = abs(uint8_t(HEIGHT / (transformY))); // using 'transformY' instead of the real distance prevents fisheye
+        uint8_t spriteHeight = abs(uint8_t(HEIGHT / 2 / (transformY))); // using 'transformY' instead of the real distance prevents fisheye
         // calculate lowest and highest pixel to fill in current stripe
         uint8_t dsyr = -spriteHeight / 2 + MIDSCREEN;
         uint8_t drawStartY = drawStartY < 0 ? 0 : dsyr;
@@ -353,7 +353,7 @@ void drawSprites()
             drawEndY = HEIGHT - 1;
 
         // calculate width of the sprite
-        uint8_t spriteWidth = abs(uint8_t(HEIGHT / (transformY)));
+        uint8_t spriteWidth = abs(uint8_t(HEIGHT / 2 / (transformY)));
         uint8_t dsxr = -spriteWidth / 2 + spriteScreenX;
         uint8_t drawStartX = drawStartX < 0 ? 0 : dsxr;
         uint8_t drawEndX = spriteWidth / 2 + spriteScreenX;
