@@ -3,11 +3,9 @@
 #include "utils.h"
 #include "tile.h"
 
-//Weird numbers but we always expect the outer walls to be filled + maze needs odd width.
-//This way, the inner usable area is 16 or less, which takes up little memory + can be indexed
-//with only 4 bits (if you offset by 1)
-constexpr uint8_t MAXMAPWIDTH = 17;
-constexpr uint8_t MAXMAPHEIGHT = 17;
+//Unfortunately, everything has to be small
+constexpr uint8_t MAXMAPWIDTH = 16;
+constexpr uint8_t MAXMAPHEIGHT = 16;
 
 constexpr uint8_t TILEEMPTY = 0x00;
 constexpr uint8_t TILEWALL = 0x01;
@@ -58,7 +56,7 @@ struct MazeSize
 constexpr uint8_t MAZESIZECOUNT = 2;
 constexpr MazeSize MAZESIZES[MAZESIZECOUNT] PROGMEM = {
     { "SML", 11, 11 },  //NOTE: must always be 2N + 1
-    { "MED", 17, 17 },
+    { "MED", 15, 15 },
     //{ "LRG", 15, 15},
     //{ "XL ", 47, 47 },
     // { "XXL", 60, 60 } //Only if we have room (we don't)

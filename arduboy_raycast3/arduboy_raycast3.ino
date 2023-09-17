@@ -32,19 +32,11 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 #define TEXPRECISION 2
 
 
-// Choose a method for unsigned reciprocal of unit lengths (or close to it).
-// 1: greatly increases speed but with visual artifacts and 512 extra program bytes
-// 2: greatly increases speed without visual artifacts and 512 extra program bytes (marginally slower than 1; prefer 2)
-// 3: very slow but saves the 512 bytes
-//#define URCPLUNIT(x) uReciprocalUnit(x)
-//#define URCPLUNIT(x) uReciprocalNearUnit(x)
-//#define URCPLUNIT(x) (1 / (x))
-
-
 // And now some debug stuff
 // #define DRAWMAPDEBUG     // Display map (will take up portion of screen)
 // #define LINEHEIGHTDEBUG  // Display information about lineheight (only draws a few lines)
 // #define NOWALLSHADING    // Wall shading actually reduces the cost... I must have a bug
+// #define NOSPRITES        // Remove all sprites
 
 
 // Gameplay constants
@@ -70,6 +62,8 @@ constexpr uint8_t LDISTSAFE = 16;
 constexpr uflot MINLDISTANCE = 1.0f / LDISTSAFE;
 constexpr uint16_t MAXLHEIGHT = HEIGHT * LDISTSAFE;
 
+constexpr uint8_t NUMSPRITES = 16;
+
 
 //Menu related stuff
 uint8_t menuIndex = 0;
@@ -87,19 +81,23 @@ uint16_t totalDistance = 0;
 uflot posX, posY;
 float dirX, dirY; //These HAVE TO be float, or something with a lot more precision
 
+// Try to make this fit into as little space as possible
 struct RSprite {
-    UFixed<5,3> x;
-    UFixed<5,3> y;
-    //UFixed<5,3> distance = 0; // Can't be precise here...
+    muflot x; //Precision for x/y is low but doesn't really need to be high
+    muflot y;
     uint8_t frame = 0;
     uint8_t state = 0; // First bit is active, next 2 are how many times to /2 for size
-    //uint8_t pos = 0; //bottom two bits = how many times to /2 for size
 };
 
-//The map itself!
+// Sorted sprite. Sacrifice memory for some computation?
+struct SSprite {
+    RSprite * sprite; 
+    UFixed<12,4> distance;    //Unfortunately, distance kinda has to be large... 12 bits = 4096, should be more than enough
+};
+
+//Big data!
 uint8_t worldMap[MAXMAPHEIGHT * MAXMAPWIDTH];
 UFixed<4,4> distCache[VIEWWIDTH / 2];
-#define NUMSPRITES 20
 RSprite sprites[NUMSPRITES];
 
 
@@ -155,7 +153,7 @@ void raycast()
         // never larger than 1 / NEARZEROFIXED on any side, it will be fine (that means
         // map has to be < 100 on a side with this)
         if(deltaDistX > NEARZEROFIXED) {
-            deltaDistX = uReciprocalNearUnit(deltaDistX); //URCPLUNIT(deltaDistX);
+            deltaDistX = uReciprocalNearUnit(deltaDistX); 
             if (rayDirX < 0) {
                 stepX = -1;
                 sideDistX = pmapofsX * deltaDistX;
@@ -166,7 +164,7 @@ void raycast()
             }
         }
         if(deltaDistY > NEARZEROFIXED) {
-            deltaDistY = uReciprocalNearUnit(deltaDistY); //URCPLUNIT((uflot)deltaDistY);
+            deltaDistY = uReciprocalNearUnit(deltaDistY); 
             if (rayDirY < 0) {
                 stepY = -1;
                 sideDistY = pmapofsY * deltaDistY;
@@ -311,7 +309,11 @@ void drawSprites()
     flot dX = dirX, dY = dirY;
     flot planeX = dY * (flot)FAKEFOV, planeY = - dX * (flot)FAKEFOV; // Camera vector or something, simple -90 degree rotate from dir
 
-    // Calc distance
+    //Make a temp sort array on stack
+    uint8_t usedSprites = 0;
+    SSprite sorted[NUMSPRITES];
+
+    // Calc distance. Also, sort elements (might as well, we're already here)
     for (uint8_t i = 0; i < NUMSPRITES; ++i)
     {
         if (!(sprites[i].state & 1))
@@ -319,27 +321,43 @@ void drawSprites()
 
         flot sx = (flot)sprites[i].x - fposX;
         flot sy = (flot)sprites[i].y - fposY;
-        //sprites[i].distance = (UFixed<5, 3>)(sx * sx + sy * sy); // sqrt not taken, unneeded
+
+        SSprite toSort;
+        toSort.distance = UFixed<12, 4>(sx * sx) + UFixed<12,4>(sy * sy); // sqrt not taken, unneeded
+        toSort.sprite = &sprites[i];
+
+        //Insertion sort (it's faster for small arrays; if you increase sprite count to some 
+        //absurd number, change this to something else).
+        int8_t insertPos = usedSprites - 1;
+
+        while(insertPos >= 0 && sorted[insertPos].distance < toSort.distance)
+        {
+            sorted[insertPos + 1] = sorted[insertPos];
+            insertPos--;
+        }
+
+        sorted[insertPos + 1] = toSort;
+        usedSprites++;
     }
 
     //Some matrix math stuff
     flot invDet = 1.0 / (planeX * dY - planeY * dX); // required for correct matrix multiplication
 
-    // after sorting the sprites, do the projection and draw them
-    for (uint8_t i = 0; i < NUMSPRITES; i++)
+    // after sorting the sprites, do the projection and draw them. We know all sprites in the array are active
+    for (uint8_t i = 0; i < usedSprites; i++)
     {
-        //This sprite isn't active
-        if (!(sprites[i].state & 1)) continue;
+        //Get the current sprite. Copy so we don't have to derefence a pointer a million times
+        RSprite sprite = * sorted[i].sprite;
 
-        // translate sprite position to relative to camera
-        flot spriteX = (flot)sprites[i].x - fposX;
-        flot spriteY = (flot)sprites[i].y - fposY;
+        // translate sprite position to relative to camera (we calculated this before, but need to save mem)
+        flot spriteX = (flot)sprite.x - fposX;
+        flot spriteY = (flot)sprite.y - fposY;
 
         // X and Y will always be very small, so these transforms will still fit within a 7 bit int part
         flot transformY = invDet * (-planeY * spriteX + planeX * spriteY); // this is actually the depth inside the screen, that what Z is in 3D
 
-        // Nice quick shortcut to get out for sprites behind us
-        if(transformY < 0) continue;
+        // Nice quick shortcut to get out for sprites behind us (and ones that are too close)
+        if(transformY < (flot)MINLDISTANCE) continue;
 
         flot transformX = invDet * (dY * spriteX - dX * spriteY);
 
@@ -521,8 +539,8 @@ void generateMaze()
     curWidth = mzs.width;
     curHeight = mzs.height;
 
-    sprites[0].x = (UFixed<5,3>)((flot)posX + dirX);
-    sprites[0].y = (UFixed<5,3>)((flot)posY + dirY);
+    sprites[0].x = muflot((flot)posX + dirX);
+    sprites[0].y = muflot((flot)posY + dirY);
     sprites[0].frame = 0;
     sprites[0].state = 1; //active
 }
@@ -577,7 +595,9 @@ void loop()
         #endif
 
         raycast();
+        #ifndef NOSPRITES
         drawSprites();
+        #endif
         movement();
 
         #ifdef DRAWMAPDEBUG

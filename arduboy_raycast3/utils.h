@@ -4,6 +4,11 @@
 typedef SFixed<7,8> flot;
 typedef UFixed<8,8> uflot;
 
+// A very tiny float, but generally enough to place you within the map.
+// Map max is currently 16x16, so 4 bits is enough to place anything within.
+// NOTE: NOT ENOUGH FOR RENDERING, NEED MORE FLOAT PRECISION!
+typedef UFixed<4,4> muflot;
+
 // Funny hack constants. We're working with very small ranges, so 
 // the values have to be picked carefully. The following must remain true:
 // 1 / NEARZEROFIXED < MAXFIXED. It may even need to be < MAXFIXED / 2
