@@ -13,8 +13,8 @@
 // Graphics
 #include "resources/menu.h"
 #include "resources/raycastbg.h"
-#include "resources/faceSprite.h"
-#include "tile.h"
+#include "sprites.h"
+#include "tiles.h"
 
 
 Arduboy2Base arduboy;
