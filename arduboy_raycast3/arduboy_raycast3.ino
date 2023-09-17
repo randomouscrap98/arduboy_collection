@@ -31,12 +31,17 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // enough frames to matter
 #define TEXPRECISION 2
 
+// Sprite precision. Only options are 2 and 0 (all else are 0). Note: I haven't 
+// been able to see a difference, so I set it to 0
+#define SPRITEPRECISION 0
+
 
 // And now some debug stuff
-// #define DRAWMAPDEBUG     // Display map (will take up portion of screen)
-// #define LINEHEIGHTDEBUG  // Display information about lineheight (only draws a few lines)
-// #define NOWALLSHADING    // Wall shading actually reduces the cost... I must have a bug
-// #define NOSPRITES        // Remove all sprites
+// #define DRAWMAPDEBUG         // Display map (will take up portion of screen)
+// #define LINEHEIGHTDEBUG      // Display information about lineheight (only draws a few lines)
+// #define NOWALLSHADING        // Wall shading actually reduces the cost... I must have a bug
+// #define NOSPRITES            // Remove all sprites
+#define ADDDEBUGSPRITES 4    // How many debug sprites to add at generation
 // #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
 
 
@@ -64,7 +69,7 @@ constexpr uint8_t BWIDTH = WIDTH >> 3;
 constexpr uint8_t LDISTSAFE = 16;
 constexpr uflot MINLDISTANCE = 1.0f / LDISTSAFE;
 constexpr uint16_t MAXLHEIGHT = HEIGHT * LDISTSAFE;
-constexpr flot MINSPRITEDISTANCE = 0.5;
+constexpr flot MINSPRITEDISTANCE = 0.2;
 
 constexpr uint8_t NUMSPRITES = 16;
 
@@ -84,6 +89,10 @@ uint16_t totalDistance = 0;
 // Position and facing direction
 uflot posX, posY;
 float dirX, dirY; //These HAVE TO be float, or something with a lot more precision
+
+// These are bitmasks to get data out of state
+constexpr uint8_t RSSTATEACTIVE = 1;
+constexpr uint8_t RSSTATESHRINK = 6;
 
 // Try to make this fit into as little space as possible
 struct RSprite {
@@ -248,7 +257,7 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
     #ifdef NOWALLSHADING
     uint8_t shade = ((side & x) || tile == TILEEXIT) ? 0 : 0xFF;
     #else
-    //NOTE: multiplication is WAY FASTER than division
+    //NOTE: multiplication is WAY FASTER than division, hence "darkness" value instead of light
     uint8_t dither = (uint8_t)(floorFixed(distance * DARKNESS * distance));
     //Oops, we're beyond dark (this shouldn't happen often but it CAN)
     if(dither >= BAYERGRADIENTS) return;
@@ -378,11 +387,10 @@ void drawSprites()
         // NOTE: this is the CENTER of the sprite, not the edge (thankfully)
         int16_t spriteScreenX = int16_t(MIDSCREENX * (1 + (float)transformX / (float)transformYT));
 
-        // calculate the dimensions of the sprite on screen. All sprites are square
-        uint8_t spriteHeight = (HEIGHT / transformY).getInteger(); // using 'transformY' instead of the real distance prevents fisheye
-        uint8_t spriteWidth = spriteHeight; //Size mods go here
-
-        //NOTE: if the sprite is too close, those above can overflow! That probably won't happen...
+        // calculate the dimensions of the sprite on screen. All sprites are square. Size mods go here
+        // using 'transformY' instead of the real distance prevents fisheye
+        uint16_t spriteHeight = uint16_t(HEIGHT / (float)transformY) >> ((sprite.state & RSSTATESHRINK) >> 1); 
+        uint16_t spriteWidth = spriteHeight; 
 
         // calculate lowest and highest pixel to fill. Sprite screen/start X and Sprite screen/start Y
         // Because we have 1 fewer bit to store things, we unfortunately need an int16
@@ -400,23 +408,47 @@ void drawSprites()
         uint8_t drawStartX = ssX < 0 ? 0 : ssX;
         uint8_t drawEndX = ssXe >= VIEWWIDTH ? VIEWWIDTH - 1 : ssXe;
 
+        //Setup stepping to avoid costly mult (and div) in critical loops
+        //These float divisions happen just once per sprite, hopefully that's not too bad
+        #if SPRITEPRECISION == 2
+        UFixed<16,16> stepX = (float)TILESIZE / spriteWidth;
+        UFixed<16,16> stepY = (float)TILESIZE / spriteHeight;
+        UFixed<16,16> texX = (drawStartX - ssX) * stepX;
+        #else
+        uflot stepX = (float)TILESIZE / spriteWidth;
+        uflot stepY = (float)TILESIZE / spriteHeight;
+        uflot texX = (drawStartX - ssX) * stepX;
+        #endif
+
+        uint8_t x = drawStartX;
+
         // loop through every vertical stripe of the sprite on screen
-        for (uint8_t stripe = drawStartX; stripe < drawEndX; stripe++)
+        do
         {
             //If the sprite is hidden, most processing disappears
-            if (transformY < distCache[stripe >> 1])
+            if (transformY < distCache[x >> 1])
             {
-                uint8_t texX = (stripe - ssX) * TILESIZE / spriteWidth;
-                const uint8_t *tofs = faceSprite + sprites[i].frame * TILEBYTES + texX;
+                const uint8_t *tofs = faceSprite + sprites[i].frame * TILEBYTES + texX.getInteger();
                 uint16_t texData = pgm_read_byte(tofs) + 256 * pgm_read_byte(tofs + TILESIZE);
 
-                for (uint8_t y = drawStartY; y < drawEndY; y++) // for every pixel of the current stripe
+                #if SPRITEPRECISION == 2
+                UFixed<16,16> texY = (drawStartY - ssY) * stepY;
+                #else
+                uflot texY = (drawStartY - ssY) * stepY;
+                #endif
+
+                uint8_t y = drawStartY;
+
+                do //For every pixel of the current sprite
                 {
-                    uint8_t texY = ((y - ssY) * TILESIZE) / spriteHeight;
-                    arduboy.drawPixel(stripe, y, texData & fastlshift16(texY) ? WHITE : BLACK);
+                    arduboy.drawPixel(x, y, texData & fastlshift16(texY.getInteger()) ? WHITE : BLACK);
+                    texY += stepY;
                 }
+                while(++y < drawEndY);
             }
+            texX += stepX;
         }
+        while(++x < drawEndX);
 
         #ifdef PRINTSPRITEDATA
         //Clear a section for us to use
@@ -565,10 +597,15 @@ void generateMaze()
     curWidth = mzs.width;
     curHeight = mzs.height;
 
-    sprites[0].x = muflot((flot)posX + dirX);
-    sprites[0].y = muflot((flot)posY + dirY);
-    sprites[0].frame = 0;
-    sprites[0].state = 1; //active
+    #ifdef ADDDEBUGSPRITES
+    for(uint8_t i = 0; i < ADDDEBUGSPRITES; i++)
+    {
+        sprites[i].x = muflot((flot)posX + dirX * (1 + i));
+        sprites[i].y = muflot((flot)posY + dirY * (1 + i));
+        sprites[i].frame = 0;
+        sprites[i].state = 1 | (i << 1) ; //active + shrink
+    }
+    #endif
 }
 
 
