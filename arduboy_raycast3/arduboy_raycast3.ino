@@ -7,6 +7,7 @@
 // Graphics
 #include "resources/menu.h"
 #include "resources/raycastbg.h"
+#include "resources/faceSprite.h"
 #include "tile.h"
 
 // Libs (sort of; mostly just code organization)
@@ -28,7 +29,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 // Texture precision. 0 is lowest, 2 is highest. Each level down saves
 // enough frames to matter
-#define TEXPRECISION 2
+#define TEXPRECISION 0
 
 // Choose a method for unsigned reciprocal of unit lengths (or close to it).
 // 1: greatly increases speed but with visual artifacts and 512 extra program bytes
@@ -47,7 +48,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 
 // Gameplay constants
-constexpr uint8_t FRAMERATE = 30;
+constexpr uint8_t FRAMERATE = 20;
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 constexpr uflot LIGHTINTENSITY = 1.5;
@@ -84,10 +85,21 @@ float totalDistance = 0;
 float posX, posY; 
 float dirX, dirY;
 
+struct RSprite {
+    UFixed<5,3> x;
+    UFixed<5,3> y;
+    UFixed<5,3> distance = 0; // Can't be precise here...
+    uint8_t frame = 0;
+    uint8_t state = 0;
+};
+
 //The map itself!
 uint8_t worldMap[MAXMAPHEIGHT * MAXMAPWIDTH];
+UFixed<4,4> distCache[VIEWWIDTH / 2];
+#define NUMSPRITES 20
+RSprite sprites[NUMSPRITES];
 
-//uflot darkmod = 0;
+//uint8_t numSprites = 0;
 
 // Full clear the raycast area. Not always used
 void clearRaycast() 
@@ -105,7 +117,6 @@ void raycastFoundation()
 // The full function for raycasting. 
 void raycast()
 {
-    //darkmod = sin(arduboy.frameCount) * 0.1; // + 2) * 0.333;
     //Waste < 20 bytes of stack to save numerous cycles on render (and on programmer. leaving posX + posY floats so...)
     uint8_t pmapX = int(posX);
     uint8_t pmapY = int(posY);
@@ -197,6 +208,8 @@ void raycast()
             tile = getMazeCell(worldMap, mapX, mapY);
         }
         while (perpWallDist < VIEWDISTANCE && tile == TILEEMPTY);
+
+        distCache[x / 2] = (UFixed<4,4>)perpWallDist;
 
         // If the above loop was exited without finding a tile, there's nothing to draw
         if(tile == TILEEMPTY) continue;
@@ -291,6 +304,85 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
     #else
     arduboy.sBuffer[bofs] = texByte;
     #endif
+}
+
+void drawSprites()
+{
+    uint8_t pmapX = int(posX);
+    uint8_t pmapY = int(posY);
+    uflot pmapofsX = posX - pmapX;
+    uflot pmapofsY = posY - pmapY;
+    flot fposX = posX, fposY = posY;
+    flot dx = dirX; // NO floating points inside critical loop!!
+    flot dy = dirY;
+
+    // Calc distance
+    for (uint8_t i = 0; i < NUMSPRITES; ++i)
+    {
+        if (!(sprites[i].state & 1))
+            continue;
+
+        flot sx = fposX - (flot)sprites[i].x;
+        flot sy = fposY - (flot)sprites[i].y;
+        sprites[i].distance = (UFixed<5, 3>)(sx * sx + sy * sy); // sqrt not taken, unneeded
+    }
+
+    flot invDet = 1.0 / (dy * dy + dx * dx); // required for correct matrix multiplication
+
+    // after sorting the sprites, do the projection and draw them
+    for (uint8_t i = 0; i < NUMSPRITES; i++)
+    {
+        if (!(sprites[i].state & 1))
+            continue;
+        // translate sprite position to relative to camera
+        flot spriteX = (flot)sprites[i].x - fposX;
+        flot spriteY = (flot)sprites[i].y - fposY;
+
+        flot transformX = invDet * (dy * spriteX - dx * spriteY);
+        flot transformY = invDet * (dirX * spriteX + dirY * spriteY); // this is actually the depth inside the screen, that what Z is in 3D
+
+        uint8_t spriteScreenX = uint8_t((VIEWWIDTH / 2) * (1 + transformX / transformY));
+
+        // calculate height of the sprite on screen
+        uint8_t spriteHeight = abs(uint8_t(HEIGHT / (transformY))); // using 'transformY' instead of the real distance prevents fisheye
+        // calculate lowest and highest pixel to fill in current stripe
+        uint8_t dsyr = -spriteHeight / 2 + MIDSCREEN;
+        uint8_t drawStartY = drawStartY < 0 ? 0 : dsyr;
+        uint8_t drawEndY = spriteHeight / 2 + MIDSCREEN;
+        if (drawEndY >= HEIGHT)
+            drawEndY = HEIGHT - 1;
+
+        // calculate width of the sprite
+        uint8_t spriteWidth = abs(uint8_t(HEIGHT / (transformY)));
+        uint8_t dsxr = -spriteWidth / 2 + spriteScreenX;
+        uint8_t drawStartX = drawStartX < 0 ? 0 : dsxr;
+        uint8_t drawEndX = spriteWidth / 2 + spriteScreenX;
+        if (drawEndX >= VIEWWIDTH)
+            drawEndX = VIEWWIDTH - 1;
+
+        // loop through every vertical stripe of the sprite on screen
+        for (uint8_t stripe = drawStartX; stripe < drawEndX; stripe++)
+        {
+            // the conditions in the if are:
+            // 1) it's in front of camera plane so you don't see things behind you
+            // 2) it's on the screen (left)
+            // 3) it's on the screen (right)
+            // 4) ZBuffer, with perpendicular distance
+            if (transformY > 0 && stripe > 0 && stripe < VIEWWIDTH && transformY < (flot)distCache[stripe / 2])
+            {
+                uint8_t texX = (stripe - dsxr) * TILESIZE / spriteWidth;
+                const uint8_t *tofs = faceSprite + (0) * TILEBYTES + texX;
+                uint16_t texData = pgm_read_byte(tofs) + 256 * pgm_read_byte(tofs + TILESIZE);
+
+                for (uint8_t y = drawStartY; y < drawEndY; y++) // for every pixel of the current stripe
+                {
+                    // int d = (y)*256 - HEIGHT * 128 + spriteHeight * 128; // 256 and 128 factors to avoid floats
+                    uint8_t texY = ((y - dsyr) * TILESIZE) / spriteHeight;
+                    arduboy.drawPixel(stripe, y, texData & fastlshift16(texY) ? WHITE : BLACK);
+                }
+            }
+        }
+    }
 }
 
 // Perform ONLY player movement updates! No drawing!
@@ -416,6 +508,11 @@ void generateMaze()
     mzt.func(worldMap, mzs.width, mzs.height, &posX, &posY, &dirX, &dirY);
     curWidth = mzs.width;
     curHeight = mzs.height;
+
+    sprites[0].x = posX + dirX;
+    sprites[0].y = posY + dirY;
+    sprites[0].frame = 0;
+    sprites[0].state = 1; //active
 }
 
 
@@ -468,6 +565,7 @@ void loop()
         #endif
 
         raycast();
+        drawSprites();
         movement();
 
         #ifdef DRAWMAPDEBUG
