@@ -28,7 +28,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 // Texture precision. 0 is lowest, 2 is highest. Each level down saves
 // enough frames to matter
-#define TEXPRECISION 0 
+#define TEXPRECISION 2
 
 // Choose a method for unsigned reciprocal of unit lengths (or close to it).
 // 1: greatly increases speed but with visual artifacts and 512 extra program bytes
@@ -47,7 +47,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 
 // Gameplay constants
-constexpr uint8_t FRAMERATE = 35;
+constexpr uint8_t FRAMERATE = 30;
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 constexpr uflot LIGHTINTENSITY = 1.5;

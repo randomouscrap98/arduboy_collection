@@ -116,3 +116,59 @@ uflot uReciprocalNearUnit(uflot x)
         return uflot::fromInternal(pgm_read_word(DIVISORS + (x.getInternal() & 0xFF)));
 }
 
+// Taken from https://github.com/tiberiusbrown/arduboy_minigolf/blob/master/mul.cpp
+uint16_t mul_f8_u16(uint16_t a, uint8_t b)
+{
+#ifdef ARDUINO_ARCH_AVR
+    /*
+               A1 A0
+                  B0
+            ========
+               A0*B0
+            A1*B0
+         ===========
+            R1 R0
+    */
+    uint16_t r;
+    asm volatile(
+        "mul  %B[a], %A[b]      \n\t"
+        "movw %A[r], r0         \n\t" // r = A1*B0
+        "mul  %A[a], %A[b]      \n\t"
+        "add  %A[r], r1         \n\t" // R0 += hi(A0*B0)
+        "clr  r1                \n\t"
+        "adc  %B[r], r1         \n\t" // R1 += C
+        : [r] "=&r" (r)
+        : [a] "r"   (a),
+          [b] "r"   (b)
+        :
+    );
+    return r;
+#else
+    return uint16_t((u24(a) * b) >> 8);
+#endif
+}
+
+
+uint16_t inv16(uint16_t x)
+{
+    // initial guess
+    uint16_t const* p = &DIVISORS[x >> 8];
+    uint16_t y = pgm_read_word(p);
+    {
+        // refine initial guess by linear interpolation
+        uint16_t ty = pgm_read_word(p + 1);
+        uint8_t t1 = uint8_t(x);
+        uint8_t t0 = 255 - t1;
+        y = mul_f8_u16(y, t0) + mul_f8_u16(ty, t1) + (y >> 8);
+    }
+    // one iter of newton raphson to refine further
+    //for(uint8_t i = 0; i < 1; ++i)
+    {
+        uint32_t xy = (uint32_t(y) * x) >> 8;
+        // 2 - x * y
+        uint32_t t = 0x20000 - xy;
+        // y' = y * (2 - x * y)
+        y = uint16_t((t * y) >> 16);
+    }
+    return y;
+}
