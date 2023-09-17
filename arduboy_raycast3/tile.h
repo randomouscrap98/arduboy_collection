@@ -1,9 +1,18 @@
 #pragma once
 
 //All tiles should be 8 bytes I think
+constexpr uint8_t TILEEMPTY = 0x00;
+constexpr uint8_t TILEWALL = 0x01;
+constexpr uint8_t TILEEXIT = 0x02;
 
 constexpr uint8_t TILESIZE = 16;
 constexpr uint8_t TILEBYTES = 32;
+
+inline bool isCellSolid(RcMap * map, uint8_t x, uint8_t y)
+{
+  return getMapCell(map, x, y) & 1;
+}
+
 
 constexpr uint8_t wallTile[] PROGMEM = { //0x18, 0xDB, 0xC3, 0xDB, 0x18, 0xDB, 0xC3, 0xDB };
   //Frame 0: wall

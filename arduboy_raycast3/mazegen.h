@@ -1,11 +1,12 @@
 #pragma once
 
 #include "utils.h"
-#include "mazedef.h"
+#include "rcmap.h"
+#include "tile.h"
 
 constexpr uint8_t ELLERHZCHANCE = 2; //This is actually 1 / 2 chance
 constexpr uint8_t ELLERVTCHANCE = 2;
-constexpr uint8_t ELLERROWSIZE = MAXMAPWIDTH >> 1;
+constexpr uint8_t ELLERROWSIZE = 32 >> 1; //This eller function will only operate on maps with dims 32 or smaller
 
 constexpr uint8_t SPARSEFILLRATE = 8; //Actually 1 / N
 
@@ -18,12 +19,13 @@ constexpr uint8_t SPARSEFILLRATE = 8; //Actually 1 / N
 //constexpr uint8_t ROOMSCUBICLEMAXLENGTH = 4;
 
 
-// Using some algorithm called "Eller's algorithm", which is constant memory.
-void genMazeType(uint8_t * map, uint8_t width, uint8_t height, uflot * posX, uflot * posY, float * dirX, float * dirY)
+// Using some algorithm called "Eller's algorithm", which is constant memory. Note that width and height 
+// are generated width and height; we don't use the width/height provided by map
+void genMazeType(RcMap * map, uint8_t width, uint8_t height, uflot * posX, uflot * posY, float * dirX, float * dirY)
 {
-    resetMaze(map);
+    fillMap(map, TILEWALL);
 
-    //They must be odd
+    //They MUST be odd
     oddify(width);
     oddify(height);
 
@@ -43,12 +45,12 @@ void genMazeType(uint8_t * map, uint8_t width, uint8_t height, uflot * posX, ufl
         // row set tracker
         for(uint8_t x = xStart; x <= xEnd; x += 2)
         {
-            setMazeCell(map, x, y, TILEEMPTY);
+            setMapCell(map, x, y, TILEEMPTY);
 
             // This works no matter which row we're on because the top row has a 
             // full ceiling, and thus will "initialize" the row sets to all individual
             // sets. Otherwise, the row retains the set from the previous row.
-            if(getMazeCell(map, x, y - 1) == TILEWALL)
+            if(getMapCell(map, x, y - 1) == TILEWALL)
                 row[x >> 1] = ++setId;
         }
         
@@ -69,7 +71,7 @@ void genMazeType(uint8_t * map, uint8_t width, uint8_t height, uflot * posX, ufl
                         break;
                     row[i] = flood; //min(row[xrow - 1], row[xrow]);
                 }
-                setMazeCell(map, x - 1, y, TILEEMPTY);
+                setMapCell(map, x - 1, y, TILEEMPTY);
             }
         }
 
@@ -100,7 +102,7 @@ void genMazeType(uint8_t * map, uint8_t width, uint8_t height, uflot * posX, ufl
                     //connect to the next row
                     for(uint8_t i = xStart; i <= xEnd; i += 2)
                     {
-                        if(row[(x >> 1)] == row[(i >> 1)] && getMazeCell(map, i, y + 1) == TILEEMPTY)
+                        if(row[(x >> 1)] == row[(i >> 1)] && getMapCell(map, i, y + 1) == TILEEMPTY)
                         {
                             mustConnect = 0;
                             break;
@@ -111,17 +113,17 @@ void genMazeType(uint8_t * map, uint8_t width, uint8_t height, uflot * posX, ufl
                 if(mustConnect || random(ELLERVTCHANCE) == 0)
                 {
                     // DON'T need to set the row, we scan for walls in the next iteration
-                    setMazeCell(map, x, y + 1, TILEEMPTY);
+                    setMapCell(map, x, y + 1, TILEEMPTY);
                 }
             }
         }
     } 
 
-    setMazeCell(map, xEnd + 1, yEnd, TILEEXIT);
+    setMapCell(map, xEnd + 1, yEnd, TILEEXIT);
 
     * posX = 1.6; *posY = 1.6;
 
-    if(getMazeCell(map, xStart + 1, yStart) == TILEEMPTY) {
+    if(getMapCell(map, xStart + 1, yStart) == TILEEMPTY) {
         * dirX = 1;
         * dirY = 0;
     }
@@ -131,9 +133,9 @@ void genMazeType(uint8_t * map, uint8_t width, uint8_t height, uflot * posX, ufl
     }
 }
 
-void genSparseRandom(uint8_t * map, uint8_t width, uint8_t height, uflot * posX, uflot * posY, float * dirX, float * dirY)
+void genSparseRandom(RcMap * map, uint8_t width, uint8_t height, uflot * posX, uflot * posY, float * dirX, float * dirY)
 {
-    resetMaze(map);
+    fillMap(map, TILEWALL);
 
     uint8_t xStart = 1;
     uint8_t yStart = 1;
@@ -142,7 +144,7 @@ void genSparseRandom(uint8_t * map, uint8_t width, uint8_t height, uflot * posX,
 
     for(uint8_t y = yStart; y <= yEnd; ++y)
         for(uint8_t x = xStart; x <= xEnd; ++x)
-            setMazeCell(map, x, y, TILEEMPTY);
+            setMapCell(map, x, y, TILEEMPTY);
 
     //Generate an amount of random dots proportional to filling 1/8 of the total inner area. Don't place any
     //on the edges
@@ -150,10 +152,10 @@ void genSparseRandom(uint8_t * map, uint8_t width, uint8_t height, uflot * posX,
     uint8_t inHeight = height - 4;
     for(uint8_t i = 0; i < inWidth * inHeight / SPARSEFILLRATE; ++i)
     {
-        setMazeCell(map, xStart + 1 + random(inWidth), yStart + 1 + random(inHeight), TILEWALL);
+        setMapCell(map, xStart + 1 + random(inWidth), yStart + 1 + random(inHeight), TILEWALL);
     }
 
-    setMazeCell(map, xEnd + 1, yEnd, TILEEXIT);
+    setMapCell(map, xEnd + 1, yEnd, TILEEXIT);
 
     * posX = 1.6; *posY = 1.6;
     * dirX = 1;
@@ -374,21 +376,25 @@ void genSparseRandom(uint8_t * map, uint8_t width, uint8_t height, uflot * posX,
 //    oddify(height);
 //}
 
+struct MazeSize 
+{
+    char name[4];
+    uint8_t width;
+    uint8_t height;
+};
 
 struct MazeType
 {
     char name[4];
-    void (*func)(uint8_t*, uint8_t, uint8_t, uflot *, uflot *, float *, float *);
+    void (*func)(RcMap*, uint8_t, uint8_t, uflot *, uflot *, float *, float *);
 };
 
-constexpr uint8_t MAZETYPECOUNT = 2;
-
-constexpr MazeType MAZETYPES[MAZETYPECOUNT] PROGMEM = {
-    { "MAZ", &genMazeType },
-    { "EPT", &genSparseRandom },
-    //{ "BKR", &genRoomsType }, // I may add more later? (2023-09-14 for the lols)
-    //{ "CEL", &genCellType }
-};
+// For a given mazeSize index, get a copy (8 bytes-ish?) of the size description struct
+MazeSize getMazeSize(uint8_t index) 
+{
+    //A macro to generate the same old code, don't feel like making some generics madness
+    getProgmemStruct(MazeSize, MAZESIZES, index)
+}
 
 MazeType getMazeType(uint8_t index) 
 {

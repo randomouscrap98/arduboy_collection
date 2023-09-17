@@ -12,7 +12,7 @@
 
 // Libs (sort of; mostly just code organization)
 #include "utils.h"
-#include "mazedef.h"
+#include "rcmap.h"
 #include "mazegen.h"
 #include "shading.h"
 
@@ -71,7 +71,11 @@ constexpr uflot MINLDISTANCE = 1.0f / LDISTSAFE;
 constexpr uint16_t MAXLHEIGHT = HEIGHT * LDISTSAFE;
 constexpr flot MINSPRITEDISTANCE = 0.2;
 
+// Size limit for data structures
 constexpr uint8_t NUMSPRITES = 16;
+constexpr uint8_t MAPWIDTH = 16;
+constexpr uint8_t MAPHEIGHT = 16;
+
 
 
 //Menu related stuff
@@ -115,8 +119,31 @@ struct SSprite {
     UFixed<12,4> distance;    //Unfortunately, distance kinda has to be large... 12 bits = 4096, should be more than enough
 };
 
+constexpr uint8_t MAZETYPECOUNT = 2;
+constexpr MazeType MAZETYPES[MAZETYPECOUNT] PROGMEM = {
+    { "MAZ", &genMazeType },
+    { "EPT", &genSparseRandom },
+    //{ "BKR", &genRoomsType }, // I may add more later? (2023-09-14 for the lols)
+    //{ "CEL", &genCellType }
+};
+
+constexpr uint8_t MAZESIZECOUNT = 2;
+constexpr MazeSize MAZESIZES[MAZESIZECOUNT] PROGMEM = {
+    { "SML", 11, 11 },  //NOTE: must always be 2N + 1
+    { "MED", 15, 15 },
+    //{ "LRG", 15, 15},
+    //{ "XL ", 47, 47 },
+    // { "XXL", 60, 60 } //Only if we have room (we don't)
+};
+
+
 //Big data!
-uint8_t worldMap[MAXMAPHEIGHT * MAXMAPWIDTH];
+uint8_t worldMap[MAPHEIGHT * MAPWIDTH];
+RcMap map {
+    worldMap,
+    MAPWIDTH,
+    MAPHEIGHT
+};
 uflot distCache[VIEWWIDTH / 2]; // Half distance resolution means sprites will clip 1 pixel into walls sometimes but otherwise...
 RSprite sprites[NUMSPRITES];
 
@@ -218,7 +245,7 @@ void raycast()
                 side = 1; //1 = yside hit
             }
             // Check if ray has hit a wall
-            tile = getMazeCell(worldMap, mapX, mapY);
+            tile = getMapCell(&map, mapX, mapY);
         }
         while (perpWallDist < VIEWDISTANCE && tile == TILEEMPTY);
 
@@ -477,8 +504,8 @@ void movement()
         float movX = dirX * MOVESPEED;
         float movY = dirY * MOVESPEED;
 
-        if(isCellSolid(worldMap, ((flot)posX + movX).getInteger(), posY.getInteger())) movX = 0;
-        if(isCellSolid(worldMap, posX.getInteger(), (int)((flot)posY + movY))) movY = 0;
+        if(isCellSolid(&map, ((flot)posX + movX).getInteger(), posY.getInteger())) movX = 0;
+        if(isCellSolid(&map, posX.getInteger(), (int)((flot)posY + movY))) movY = 0;
 
         thisDistance += sqrt((movX * movX + movY * movY));
 
@@ -503,7 +530,7 @@ void movement()
     }
 }
 
-inline bool inExit() { return getMazeCell(worldMap, (int)posX, (int)posY) == TILEEXIT; }
+inline bool inExit() { return getMapCell(&map, (int)posX, (int)posY) == TILEEXIT; }
 
 //Menu functionality, move the cursor, select things (redraws automatically)
 void doMenu()
@@ -593,7 +620,7 @@ void generateMaze()
     MazeType mzt = getMazeType(mazeType); 
 
     //Call the generator function chosen by the menu
-    mzt.func(worldMap, mzs.width, mzs.height, &posX, &posY, &dirX, &dirY);
+    mzt.func(&map, mzs.width, mzs.height, &posX, &posY, &dirX, &dirY);
     curWidth = mzs.width;
     curHeight = mzs.height;
 
