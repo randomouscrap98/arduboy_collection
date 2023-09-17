@@ -37,6 +37,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // #define LINEHEIGHTDEBUG  // Display information about lineheight (only draws a few lines)
 // #define NOWALLSHADING    // Wall shading actually reduces the cost... I must have a bug
 // #define NOSPRITES        // Remove all sprites
+#define PRINTSPRITEDATA  // Having trouble with sprites sometimes
 
 
 // Gameplay constants
@@ -353,7 +354,8 @@ void drawSprites()
     //Some matrix math stuff
     flot invDet = 1.0 / (planeX * dY - planeY * dX); // required for correct matrix multiplication
 
-    // after sorting the sprites, do the projection and draw them. We know all sprites in the array are active
+    // after sorting the sprites, do the projection and draw them. We know all sprites in the array are active,
+    // since we're looping against the sorted array.
     for (uint8_t i = 0; i < usedSprites; i++)
     {
         //Get the current sprite. Copy so we don't have to derefence a pointer a million times
@@ -363,7 +365,7 @@ void drawSprites()
         flot spriteX = (flot)sprite.x - fposX;
         flot spriteY = (flot)sprite.y - fposY;
 
-        // X and Y will always be very small, so these transforms will still fit within a 7 bit int part
+        // X and Y will always be very small (map only 4 bit size), so these transforms will still fit within a 7 bit int part
         flot transformY = invDet * (-planeY * spriteX + planeX * spriteY); // this is actually the depth inside the screen, that what Z is in 3D
 
         // Nice quick shortcut to get out for sprites behind us (and ones that are too close)
@@ -375,9 +377,6 @@ void drawSprites()
         // NOTE: this is the CENTER of the sprite, not the edge (thankfully)
         int16_t spriteScreenX = int16_t(MIDSCREENX * (1 + (float)transformX / (float)transformY));
 
-        //I don't care how big or how close your sprite is, shortcut tons of calcs if you're just too far outside range
-        if(spriteScreenX < -VIEWWIDTH || spriteScreenX > VIEWWIDTH * 2) continue;
-
         // calculate the dimensions of the sprite on screen. All sprites are square
         uint8_t spriteHeight = abs(HEIGHT / transformY).getInteger(); // using 'transformY' instead of the real distance prevents fisheye
         uint8_t spriteWidth = spriteHeight; //Size mods go here
@@ -387,9 +386,14 @@ void drawSprites()
         // calculate lowest and highest pixel to fill. Sprite screen/start X and Sprite screen/start Y
         // Because we have 1 fewer bit to store things, we unfortunately need an int16
         int16_t ssX = -(spriteHeight >> 1) + spriteScreenX;   //Offsets go here, but modified by distance or something?
-        int16_t ssY = -(spriteWidth >> 1) + MIDSCREENY;
         int16_t ssXe = ssX + spriteWidth;
+
+        // Get out if sprite is completely outside view
+        if(ssXe < 0 || ssX >= VIEWWIDTH) continue; //spriteScreenX < -VIEWWIDTH || spriteScreenX > VIEWWIDTH * 2) continue;
+
+        int16_t ssY = -(spriteWidth >> 1) + MIDSCREENY;
         int16_t ssYe = ssY + spriteHeight;
+
 
         uint8_t drawStartY = ssY < 0 ? 0 : ssY; //Because of these checks, we can store them in 1 byte stuctures
         uint8_t drawEndY = ssYe >= HEIGHT ? HEIGHT - 1 : ssYe;
@@ -417,6 +421,22 @@ void drawSprites()
                 }
             }
         }
+
+        #ifdef PRINTSPRITEDATA
+        //Clear a section for us to use
+        constexpr uint8_t sdh = 10;
+        arduboy.fillRect(0, HEIGHT - sdh, VIEWWIDTH, sdh, BLACK);
+        //Print some junk
+        tinyfont.setCursor(0, HEIGHT - sdh);
+        tinyfont.print((float)transformX, 4);
+        tinyfont.print(" X");
+        tinyfont.print(ssX);
+        tinyfont.setCursor(0, HEIGHT - sdh + 5);
+        tinyfont.print((float)transformY, 4);
+        tinyfont.print(" W");
+        tinyfont.print(spriteWidth);
+        #endif
+
     }
 }
 
