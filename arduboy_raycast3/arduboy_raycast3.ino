@@ -4,17 +4,18 @@
 
 #include <math.h>
 
+// Libs (sort of; mostly just code organization)
+#include "utils.h"
+#include "rcmap.h"
+#include "mazegen.h"
+#include "shading.h"
+
 // Graphics
 #include "resources/menu.h"
 #include "resources/raycastbg.h"
 #include "resources/faceSprite.h"
 #include "tile.h"
 
-// Libs (sort of; mostly just code organization)
-#include "utils.h"
-#include "rcmap.h"
-#include "mazegen.h"
-#include "shading.h"
 
 Arduboy2Base arduboy;
 Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
@@ -138,9 +139,9 @@ constexpr MazeSize MAZESIZES[MAZESIZECOUNT] PROGMEM = {
 
 
 //Big data!
-uint8_t worldMap[MAPHEIGHT * MAPWIDTH];
-RcMap map {
-    worldMap,
+uint8_t mapBuffer[MAPHEIGHT * MAPWIDTH];
+RcMap worldMap {
+    mapBuffer,
     MAPWIDTH,
     MAPHEIGHT
 };
@@ -245,7 +246,7 @@ void raycast()
                 side = 1; //1 = yside hit
             }
             // Check if ray has hit a wall
-            tile = getMapCell(&map, mapX, mapY);
+            tile = getMapCell(&worldMap, mapX, mapY);
         }
         while (perpWallDist < VIEWDISTANCE && tile == TILEEMPTY);
 
@@ -504,8 +505,8 @@ void movement()
         float movX = dirX * MOVESPEED;
         float movY = dirY * MOVESPEED;
 
-        if(isCellSolid(&map, ((flot)posX + movX).getInteger(), posY.getInteger())) movX = 0;
-        if(isCellSolid(&map, posX.getInteger(), (int)((flot)posY + movY))) movY = 0;
+        if(isCellSolid(&worldMap, ((flot)posX + movX).getInteger(), posY.getInteger())) movX = 0;
+        if(isCellSolid(&worldMap, posX.getInteger(), (int)((flot)posY + movY))) movY = 0;
 
         thisDistance += sqrt((movX * movX + movY * movY));
 
@@ -530,7 +531,7 @@ void movement()
     }
 }
 
-inline bool inExit() { return getMapCell(&map, (int)posX, (int)posY) == TILEEXIT; }
+inline bool inExit() { return getMapCell(&worldMap, (int)posX, (int)posY) == TILEEXIT; }
 
 //Menu functionality, move the cursor, select things (redraws automatically)
 void doMenu()
@@ -575,11 +576,11 @@ void drawMenu(bool showHint)
     tinyfont.setCursor(105, 9);
     tinyfont.print(F("MAZE"));
 
-    MazeSize mzs = getMazeSize(mazeSize);
+    MazeSize mzs = getMazeSize(MAZESIZES, mazeSize);
     tinyfont.setCursor(MENUX + 4, MENUY);
     tinyfont.print(mzs.name);
 
-    MazeType mzt = getMazeType(mazeType);
+    MazeType mzt = getMazeType(MAZETYPES, mazeType);
     tinyfont.setCursor(MENUX + 4, MENUY + MENUSPACING);
     tinyfont.print(mzt.name);
 
@@ -616,11 +617,11 @@ void generateMaze()
     totalDistance += thisDistance;
     thisDistance = 0;
 
-    MazeSize mzs = getMazeSize(mazeSize);
-    MazeType mzt = getMazeType(mazeType); 
+    MazeSize mzs = getMazeSize(MAZESIZES, mazeSize);
+    MazeType mzt = getMazeType(MAZETYPES, mazeType); 
 
     //Call the generator function chosen by the menu
-    mzt.func(&map, mzs.width, mzs.height, &posX, &posY, &dirX, &dirY);
+    mzt.func(&worldMap, mzs.width, mzs.height, &posX, &posY, &dirX, &dirY);
     curWidth = mzs.width;
     curHeight = mzs.height;
 

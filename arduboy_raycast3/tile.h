@@ -1,5 +1,7 @@
 #pragma once
 
+#include "rcmap.h"
+
 //All tiles should be 8 bytes I think
 constexpr uint8_t TILEEMPTY = 0x00;
 constexpr uint8_t TILEWALL = 0x01;

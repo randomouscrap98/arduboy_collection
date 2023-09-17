@@ -390,14 +390,16 @@ struct MazeType
 };
 
 // For a given mazeSize index, get a copy (8 bytes-ish?) of the size description struct
-MazeSize getMazeSize(uint8_t index) 
+MazeSize getMazeSize(const MazeSize * sizes, uint8_t index) 
 {
-    //A macro to generate the same old code, don't feel like making some generics madness
-    getProgmemStruct(MazeSize, MAZESIZES, index)
+    MazeSize result;
+    memcpy_P(&result, sizes, sizeof(MazeSize));
+    return result;
 }
 
-MazeType getMazeType(uint8_t index) 
+MazeType getMazeType(const MazeType * types, uint8_t index) 
 {
-    //A macro to generate the same old code, don't feel like making some generics madness
-    getProgmemStruct(MazeType, MAZETYPES, index)
+    MazeType result;
+    memcpy_P(&result, types, sizeof(MazeType));
+    return result;
 }
