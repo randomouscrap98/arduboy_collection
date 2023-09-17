@@ -37,7 +37,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // #define LINEHEIGHTDEBUG  // Display information about lineheight (only draws a few lines)
 // #define NOWALLSHADING    // Wall shading actually reduces the cost... I must have a bug
 // #define NOSPRITES        // Remove all sprites
-#define PRINTSPRITEDATA  // Having trouble with sprites sometimes
+// #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
 
 
 // Gameplay constants
@@ -108,7 +108,7 @@ struct SSprite {
 
 //Big data!
 uint8_t worldMap[MAXMAPHEIGHT * MAXMAPWIDTH];
-UFixed<4,4> distCache[VIEWWIDTH / 2];
+uflot distCache[VIEWWIDTH / 2]; // Half distance resolution means sprites will clip 1 pixel into walls sometimes but otherwise...
 RSprite sprites[NUMSPRITES];
 
 
@@ -213,7 +213,7 @@ void raycast()
         }
         while (perpWallDist < VIEWDISTANCE && tile == TILEEMPTY);
 
-        distCache[x >> 1] = (UFixed<4,4>)perpWallDist;
+        distCache[x >> 1] = perpWallDist;
 
         // If the above loop was exited without finding a tile, there's nothing to draw
         if(tile == TILEEMPTY) continue;
@@ -366,19 +366,20 @@ void drawSprites()
         flot spriteY = (flot)sprite.y - fposY;
 
         // X and Y will always be very small (map only 4 bit size), so these transforms will still fit within a 7 bit int part
-        flot transformY = invDet * (-planeY * spriteX + planeX * spriteY); // this is actually the depth inside the screen, that what Z is in 3D
+        flot transformYT = invDet * (-planeY * spriteX + planeX * spriteY); // this is actually the depth inside the screen, that what Z is in 3D
 
         // Nice quick shortcut to get out for sprites behind us (and ones that are too close)
-        if(transformY < MINSPRITEDISTANCE) continue;
+        if(transformYT < MINSPRITEDISTANCE) continue;
 
+        uflot transformY = (uflot)transformYT; //Need this as uflot for critical loop
         flot transformX = invDet * (dY * spriteX - dX * spriteY);
 
         //Easily overflow! if x is much larger than y, then you're effectively multiplying 50 by map width.
         // NOTE: this is the CENTER of the sprite, not the edge (thankfully)
-        int16_t spriteScreenX = int16_t(MIDSCREENX * (1 + (float)transformX / (float)transformY));
+        int16_t spriteScreenX = int16_t(MIDSCREENX * (1 + (float)transformX / (float)transformYT));
 
         // calculate the dimensions of the sprite on screen. All sprites are square
-        uint8_t spriteHeight = abs(HEIGHT / transformY).getInteger(); // using 'transformY' instead of the real distance prevents fisheye
+        uint8_t spriteHeight = (HEIGHT / transformY).getInteger(); // using 'transformY' instead of the real distance prevents fisheye
         uint8_t spriteWidth = spriteHeight; //Size mods go here
 
         //NOTE: if the sprite is too close, those above can overflow! That probably won't happen...
@@ -389,11 +390,10 @@ void drawSprites()
         int16_t ssXe = ssX + spriteWidth;
 
         // Get out if sprite is completely outside view
-        if(ssXe < 0 || ssX >= VIEWWIDTH) continue; //spriteScreenX < -VIEWWIDTH || spriteScreenX > VIEWWIDTH * 2) continue;
+        if(ssXe < 0 || ssX >= VIEWWIDTH) continue;
 
         int16_t ssY = -(spriteWidth >> 1) + MIDSCREENY;
         int16_t ssYe = ssY + spriteHeight;
-
 
         uint8_t drawStartY = ssY < 0 ? 0 : ssY; //Because of these checks, we can store them in 1 byte stuctures
         uint8_t drawEndY = ssYe >= HEIGHT ? HEIGHT - 1 : ssYe;
@@ -403,12 +403,8 @@ void drawSprites()
         // loop through every vertical stripe of the sprite on screen
         for (uint8_t stripe = drawStartX; stripe < drawEndX; stripe++)
         {
-            // the conditions in the if are:
-            // 1) it's in front of camera plane so you don't see things behind you
-            // 2) it's on the screen (left)
-            // 3) it's on the screen (right)
-            // 4) ZBuffer, with perpendicular distance
-            if (transformY < (flot)distCache[stripe / 2])
+            //If the sprite is hidden, most processing disappears
+            if (transformY < distCache[stripe >> 1])
             {
                 uint8_t texX = (stripe - ssX) * TILESIZE / spriteWidth;
                 const uint8_t *tofs = faceSprite + sprites[i].frame * TILEBYTES + texX;
