@@ -54,6 +54,29 @@ constexpr uint8_t shift1Lookup8[8] PROGMEM = {
 
 #define fastlshift8(x) pgm_read_byte(shift1Lookup8 + (x))
 #define fastlshift16(x) pgm_read_word(shift1Lookup16 + (x))
+//#define fastlshift16(x) shift1Lookup16[x]
+
+//Just wanted to see
+//inline uint16_t fastlshift16(uint16_t x) {
+//    switch (x) {
+//        case 0: return 1; 
+//        case 1: return 2; 
+//        case 2: return 4; 
+//        case 3: return 8; 
+//        case 4: return 16; 
+//        case 5: return 32; 
+//        case 6: return 64; 
+//        case 7: return 128; 
+//        case 8: return 256; 
+//        case 9: return 512; 
+//        case 10: return 1024; 
+//        case 11: return 2048;
+//        case 12: return 4096;
+//        case 13: return 8192;
+//        case 14: return 16384;
+//        case 15: return 32768;
+//    }
+//}
 
 // Taken from https://github.com/tiberiusbrown/arduboy_minigolf/blob/master/div.cpp
 constexpr uint16_t DIVISORS[256] PROGMEM =
