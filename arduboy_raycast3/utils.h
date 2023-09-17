@@ -139,6 +139,14 @@ uflot uReciprocalNearUnit(uflot x)
         return uflot::fromInternal(pgm_read_word(DIVISORS + (x.getInternal() & 0xFF)));
 }
 
+flot fReciprocalNearUnitNoSign(flot x)
+{
+    if(x.getInteger())
+        return flot::fromInternal(pgm_read_word(DIVISORS + ((x * 0.5).getInternal() & 0xFF))) * 0.5;
+    else
+        return flot::fromInternal(pgm_read_word(DIVISORS + (x.getInternal() & 0xFF)));
+}
+
 // Taken from https://github.com/tiberiusbrown/arduboy_minigolf/blob/master/mul.cpp
 uint16_t mul_f8_u16(uint16_t a, uint8_t b)
 {

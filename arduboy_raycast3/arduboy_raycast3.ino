@@ -29,14 +29,15 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 // Texture precision. 0 is lowest, 2 is highest. Each level down saves
 // enough frames to matter
-#define TEXPRECISION 0
+#define TEXPRECISION 2
+
 
 // Choose a method for unsigned reciprocal of unit lengths (or close to it).
 // 1: greatly increases speed but with visual artifacts and 512 extra program bytes
 // 2: greatly increases speed without visual artifacts and 512 extra program bytes (marginally slower than 1; prefer 2)
 // 3: very slow but saves the 512 bytes
 //#define URCPLUNIT(x) uReciprocalUnit(x)
-#define URCPLUNIT(x) uReciprocalNearUnit(x)
+//#define URCPLUNIT(x) uReciprocalNearUnit(x)
 //#define URCPLUNIT(x) (1 / (x))
 
 
@@ -44,14 +45,14 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // #define DRAWMAPDEBUG     // Display map (will take up large portion of screen)
 // #define LINEHEIGHTDEBUG  // Display information about lineheight (only draws a few lines)
 // #define NOWALLSHADING    // Wall shading actually reduces the cost... I must have a bug
-// #define FAKEFOV 0.8      // Not that useful, may break. 1 = 90, higher = more than 90
 
 
 // Gameplay constants
-constexpr uint8_t FRAMERATE = 20;
-constexpr float MOVESPEED = 3.5f / FRAMERATE;
+constexpr uint8_t FRAMERATE = 30;
+constexpr uflot MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 constexpr uflot LIGHTINTENSITY = 1.5;
+constexpr uflot FAKEFOV = 1.0;      // Not that useful, may break. 1 = 90, higher = more than 90
 
 //These are calculated constants based off your light intensity. The view 
 //distance is an optimization; increase light intensity to increase view distance.
@@ -62,7 +63,7 @@ const uflot DARKNESS = 1 / LIGHTINTENSITY;
 //Screen calc constants (no need to do it at runtime)
 constexpr int16_t MIDSCREEN = HEIGHT / 2;
 constexpr uint8_t VIEWWIDTH = 100;
-constexpr flot NORMWIDTH = 2.0f / VIEWWIDTH;
+constexpr uflot NORMWIDTH = 2.0f / VIEWWIDTH;
 constexpr uint8_t BWIDTH = WIDTH >> 3;
 constexpr uint8_t LDISTSAFE = 16;
 constexpr uflot MINLDISTANCE = 1.0f / LDISTSAFE;
@@ -79,11 +80,11 @@ uint8_t curHeight = 0;
 
 uint8_t totalWins = 1; //lol
 float thisDistance = 0;
-float totalDistance = 0;
+uint16_t totalDistance = 0;
 
 // Position and facing direction
-float posX, posY; 
-float dirX, dirY;
+uflot posX, posY;
+flot dirX, dirY;
 
 struct RSprite {
     UFixed<5,3> x;
@@ -99,7 +100,6 @@ UFixed<4,4> distCache[VIEWWIDTH / 2];
 #define NUMSPRITES 20
 RSprite sprites[NUMSPRITES];
 
-//uint8_t numSprites = 0;
 
 // Full clear the raycast area. Not always used
 void clearRaycast() 
@@ -118,28 +118,21 @@ void raycastFoundation()
 void raycast()
 {
     //Waste < 20 bytes of stack to save numerous cycles on render (and on programmer. leaving posX + posY floats so...)
-    uint8_t pmapX = int(posX);
-    uint8_t pmapY = int(posY);
+    uint8_t pmapX = posX.getInteger();
+    uint8_t pmapY = posY.getInteger();
     uflot pmapofsX = posX - pmapX;
     uflot pmapofsY = posY - pmapY;
-    flot fposX = posX;
-    flot fposY = posY;
-    flot dx = dirX; //NO floating points inside critical loop!!
-    flot dy = dirY;
+    flot fposX = (flot)posX, fposY = (flot)posY;
+    flot planeX = dirY * (flot)FAKEFOV, planeY = - dirX * (flot)FAKEFOV; // Camera vector or something, simple -90 degree rotate from dir
 
     for (uint8_t x = 0; x < VIEWWIDTH; x++)
     {
-        flot cameraX = (flot)x * NORMWIDTH - 1; // x-coordinate in camera space
+        flot cameraX = (flot)(x * NORMWIDTH) - 1; // x-coordinate in camera space
 
         // The camera plane is a simple -90 degree rotation on the player direction (as required for this algorithm).
         // As such, it's simply (dirY, -dirX) * FAKEFOV. The camera plane does NOT need to be tracked separately
-        #ifdef FAKEFOV
-        flot rayDirX = dx + dy * FAKEFOV * cameraX;
-        flot rayDirY = dy - dx * FAKEFOV * cameraX;
-        #else
-        flot rayDirX = dx + dy * cameraX;
-        flot rayDirY = dy - dx * cameraX;
-        #endif
+        flot rayDirX = dirX + planeX * cameraX;
+        flot rayDirY = dirY + planeY * cameraX;
 
         // length of ray from one x or y-side to next x or y-side. But we prefill it with
         // some initial data which has to be massaged later.
@@ -160,7 +153,7 @@ void raycast()
         // never larger than 1 / NEARZEROFIXED on any side, it will be fine (that means
         // map has to be < 100 on a side with this)
         if(deltaDistX > NEARZEROFIXED) {
-            deltaDistX = URCPLUNIT(deltaDistX);
+            deltaDistX = uReciprocalNearUnit(deltaDistX); //URCPLUNIT(deltaDistX);
             if (rayDirX < 0) {
                 stepX = -1;
                 sideDistX = pmapofsX * deltaDistX;
@@ -171,7 +164,7 @@ void raycast()
             }
         }
         if(deltaDistY > NEARZEROFIXED) {
-            deltaDistY = URCPLUNIT(deltaDistY);
+            deltaDistY = uReciprocalNearUnit(deltaDistY); //URCPLUNIT((uflot)deltaDistY);
             if (rayDirY < 0) {
                 stepY = -1;
                 sideDistY = pmapofsY * deltaDistY;
@@ -209,7 +202,7 @@ void raycast()
         }
         while (perpWallDist < VIEWDISTANCE && tile == TILEEMPTY);
 
-        distCache[x / 2] = (UFixed<4,4>)perpWallDist;
+        distCache[x >> 1] = (UFixed<4,4>)perpWallDist;
 
         // If the above loop was exited without finding a tile, there's nothing to draw
         if(tile == TILEEMPTY) continue;
@@ -306,15 +299,13 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
     #endif
 }
 
-void drawSprites()
+/*void drawSprites()
 {
-    uint8_t pmapX = int(posX);
-    uint8_t pmapY = int(posY);
-    uflot pmapofsX = posX - pmapX;
-    uflot pmapofsY = posY - pmapY;
-    flot fposX = posX, fposY = posY;
-    flot dx = dirX; // NO floating points inside critical loop!!
-    flot dy = dirY;
+    uint8_t pmapX = posX.getInteger();
+    uint8_t pmapY = posY.getInteger();
+    flot pmapofsX = posX - pmapX;
+    flot pmapofsY = posY - pmapY;
+    flot planeX = dirY, planeY = - dirX; // Camera vector or something, simple -90 degree rotate from dir
 
     // Calc distance
     for (uint8_t i = 0; i < NUMSPRITES; ++i)
@@ -322,12 +313,12 @@ void drawSprites()
         if (!(sprites[i].state & 1))
             continue;
 
-        flot sx = fposX - (flot)sprites[i].x;
-        flot sy = fposY - (flot)sprites[i].y;
+        flot sx = (flot)sprites[i].x - posX;
+        flot sy = (flot)sprites[i].y - posY;
         sprites[i].distance = (UFixed<5, 3>)(sx * sx + sy * sy); // sqrt not taken, unneeded
     }
 
-    flot invDet = 1.0 / (dy * dy + dx * dx); // required for correct matrix multiplication
+    flot invDet = 1.0 / (planeX * dirY - planeY * dirX); // required for correct matrix multiplication
 
     // after sorting the sprites, do the projection and draw them
     for (uint8_t i = 0; i < NUMSPRITES; i++)
@@ -335,10 +326,10 @@ void drawSprites()
         if (!(sprites[i].state & 1))
             continue;
         // translate sprite position to relative to camera
-        flot spriteX = (flot)sprites[i].x - fposX;
-        flot spriteY = (flot)sprites[i].y - fposY;
+        flot spriteX = (flot)sprites[i].x - posX;
+        flot spriteY = (flot)sprites[i].y - posY;
 
-        flot transformX = invDet * (dy * spriteX - dx * spriteY);
+        flot transformX = invDet * (dirY * spriteX - dirX * spriteY);
         flot transformY = invDet * (dirX * spriteX + dirY * spriteY); // this is actually the depth inside the screen, that what Z is in 3D
 
         uint8_t spriteScreenX = uint8_t((VIEWWIDTH / 2) * (1 + transformX / transformY));
@@ -383,7 +374,7 @@ void drawSprites()
             }
         }
     }
-}
+}*/
 
 // Perform ONLY player movement updates! No drawing!
 void movement()
@@ -391,17 +382,22 @@ void movement()
     // move forward if no wall in front of you
     if (arduboy.pressed(A_BUTTON))
     {
-        float movX = isCellSolid(worldMap, (int)(posX + dirX * MOVESPEED), (int)posY) ? 0 : dirX * MOVESPEED;
-        float movY = isCellSolid(worldMap, (int)posX, (int)(posY + dirY * MOVESPEED)) ? 0 : dirY * MOVESPEED;
-        thisDistance += sqrt(movX * movX + movY * movY);
-        posX += movX;
-        posY += movY;
+        flot movX = dirX * (flot)MOVESPEED;
+        flot movY = dirY * (flot)MOVESPEED;
+
+        if(isCellSolid(worldMap, ((flot)posX + movX).getInteger(), posY.getInteger())) movX = 0;
+        if(isCellSolid(worldMap, posX.getInteger(), (int)((flot)posY + movY))) movY = 0;
+
+        thisDistance += sqrt((float)(movX * movX + movY * movY));
+
+        posX = uflot((flot)posX + movX);
+        posY = uflot((flot)posY + movY);
     }
     // rotate to the right
     if (arduboy.pressed(RIGHT_BUTTON))
     {
         // both camera direction and camera plane must be rotated
-        float oldDirX = dirX;
+        flot oldDirX = dirX;
         dirX = dirX * cos(-ROTSPEED) - dirY * sin(-ROTSPEED);
         dirY = oldDirX * sin(-ROTSPEED) + dirY * cos(-ROTSPEED);
     }
@@ -409,7 +405,7 @@ void movement()
     if (arduboy.pressed(LEFT_BUTTON))
     {
         // both camera direction and camera plane must be rotated
-        float oldDirX = dirX;
+        flot oldDirX = dirX;
         dirX = dirX * cos(ROTSPEED) - dirY * sin(ROTSPEED);
         dirY = oldDirX * sin(ROTSPEED) + dirY * cos(ROTSPEED);
     }
@@ -509,8 +505,8 @@ void generateMaze()
     curWidth = mzs.width;
     curHeight = mzs.height;
 
-    sprites[0].x = posX + dirX;
-    sprites[0].y = posY + dirY;
+    sprites[0].x = (UFixed<5,3>)((flot)posX + dirX);
+    sprites[0].y = (UFixed<5,3>)((flot)posY + dirY);
     sprites[0].frame = 0;
     sprites[0].state = 1; //active
 }
@@ -565,7 +561,7 @@ void loop()
         #endif
 
         raycast();
-        drawSprites();
+        //drawSprites();
         movement();
 
         #ifdef DRAWMAPDEBUG
