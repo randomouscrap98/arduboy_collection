@@ -296,10 +296,9 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
     uint8_t yStart = max(0, MIDSCREENY - halfLine);
     uint8_t yEnd = min(HEIGHT, MIDSCREENY + halfLine);
 
-    const uint8_t * tofs = wallTile + (tile - 1) * TILEBYTES + texX;
     uint16_t bofs = (yStart & 0b1111000) * BWIDTH + x;
     uint8_t texByte = arduboy.sBuffer[bofs];
-    uint16_t texData = pgm_read_byte(tofs) + 256 * pgm_read_byte(tofs + TILESIZE);
+    uint16_t texData = readTextureStrip16(tilesheet, tile - 1, texX);
 
     #if TEXPRECISION == 2
     UFixed<16,16> step = (float)TILESIZE / lineHeight;
@@ -456,8 +455,8 @@ void drawSprites()
             //If the sprite is hidden, most processing disappears
             if (transformY < distCache[x >> 1])
             {
-                const uint8_t *tofs = faceSprite + sprites[i].frame * TILEBYTES + texX.getInteger();
-                uint16_t texData = pgm_read_byte(tofs) + 256 * pgm_read_byte(tofs + TILESIZE);
+                uint16_t texData = readTextureStrip16(spritesheet, sprites[i].frame, texX.getInteger());
+                uint16_t texMask = readTextureStrip16(spritesheet_Mask, sprites[i].frame, texX.getInteger());
 
                 #if SPRITEPRECISION == 2
                 UFixed<16,16> texY = (drawStartY - ssY) * stepY;
@@ -467,12 +466,37 @@ void drawSprites()
 
                 uint8_t y = drawStartY;
 
+                uint16_t bofs = (y & 0b1111000) * BWIDTH + x;
+                uint8_t texByte = arduboy.sBuffer[bofs];
+
                 do //For every pixel of the current sprite
                 {
-                    arduboy.drawPixel(x, y, texData & fastlshift16(texY.getInteger()) ? WHITE : BLACK);
+                    uint8_t bidx = y & 7;
+
+                    // Every new byte, save the current (previous) byte and load the new byte from the screen. 
+                    // This might be wasteful, as only the first and last byte technically need to pull from the screen. 
+                    if(bidx == 0) {
+                        arduboy.sBuffer[bofs] = texByte;
+                        bofs = (y & 0b1111000) * BWIDTH + x;
+                        texByte = arduboy.sBuffer[bofs];
+                    }
+
+                    if(texMask & fastlshift16(texY.getInteger()))
+                    {
+                        uint8_t bm = fastlshift8(bidx);
+
+                        if ((texData & fastlshift16(texY.getInteger())))
+                            texByte |= bm;
+                        else
+                            texByte &= ~bm;
+                    }
+
+                    //arduboy.drawPixel(x, y, texData & fastlshift16(texY.getInteger()) ? WHITE : BLACK);
                     texY += stepY;
                 }
                 while(++y < drawEndY);
+
+                arduboy.sBuffer[bofs] = texByte;
             }
             texX += stepX;
         }
