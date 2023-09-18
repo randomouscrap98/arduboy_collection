@@ -42,12 +42,12 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // #define LINEHEIGHTDEBUG      // Display information about lineheight (only draws a few lines)
 // #define NOWALLSHADING        // Wall shading actually reduces the cost... I must have a bug
 // #define NOSPRITES            // Remove all sprites
-#define ADDDEBUGSPRITES 4    // How many debug sprites to add at generation
+// #define ADDDEBUGSPRITES 4    // How many debug sprites to add at generation
 // #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
 
 
 // Gameplay constants
-constexpr uint8_t FRAMERATE = 20;
+constexpr uint8_t FRAMERATE = 30;
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 constexpr uflot LIGHTINTENSITY = 1.5;
@@ -61,7 +61,6 @@ const uflot DARKNESS = 1 / LIGHTINTENSITY;
 
 //Screen calc constants (no need to do it at runtime)
 constexpr uint8_t VIEWWIDTH = 100;
-constexpr uflot NORMWIDTH = 2.0f / VIEWWIDTH;
 constexpr uint8_t MIDSCREENY = HEIGHT / 2;
 constexpr uint8_t MIDSCREENX = VIEWWIDTH / 2;
 constexpr uint8_t BWIDTH = WIDTH >> 3;
@@ -73,7 +72,7 @@ constexpr uint16_t MAXLHEIGHT = HEIGHT * LDISTSAFE;
 constexpr flot MINSPRITEDISTANCE = 0.2;
 
 // Size limit for data structures
-constexpr uint8_t NUMSPRITES = 16;
+constexpr uint8_t NUMSPRITES = 32;
 constexpr uint8_t MAPWIDTH = 16;
 constexpr uint8_t MAPHEIGHT = 16;
 
@@ -81,7 +80,7 @@ constexpr uint8_t MAPHEIGHT = 16;
 
 //Menu related stuff
 uint8_t menuIndex = 0;
-uint8_t mazeSize = 0;
+uint8_t mazeSize = 1;
 uint8_t mazeType = 0;
 
 uint8_t curWidth = 0;
@@ -96,8 +95,9 @@ uflot posX, posY;
 float dirX, dirY; //These HAVE TO be float, or something with a lot more precision
 
 // These are bitmasks to get data out of state
-constexpr uint8_t RSSTATEACTIVE = 1;
-constexpr uint8_t RSSTATESHRINK = 6;
+constexpr uint8_t RSSTATEACTIVE = 0b00000001;
+constexpr uint8_t RSSTATESHRINK = 0b00000110;
+constexpr uint8_t RSTATEYOFFSET = 0b11111000;
 
 // Try to make this fit into as little space as possible
 struct RSprite {
@@ -173,10 +173,11 @@ void raycast()
     flot fposX = (flot)posX, fposY = (flot)posY;
     flot dX = dirX, dY = dirY;
     flot planeX = dY * (flot)FAKEFOV, planeY = - dX * (flot)FAKEFOV; // Camera vector or something, simple -90 degree rotate from dir
+    constexpr flot INVWIDTH = 2.0f / VIEWWIDTH;
 
     for (uint8_t x = 0; x < VIEWWIDTH; x++)
     {
-        flot cameraX = (flot)(x * NORMWIDTH) - 1; // x-coordinate in camera space
+        flot cameraX = x * INVWIDTH - 1; // x-coordinate in camera space
 
         // The camera plane is a simple -90 degree rotation on the player direction (as required for this algorithm).
         flot rayDirX = dX + planeX * cameraX;
@@ -282,6 +283,7 @@ void raycast()
 //(so you can predraw a ceiling and floor before calling raycast)
 inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8_t side, uint8_t tile, uint8_t texX) 
 {
+    // ------- BEGIN CRITICAL SECTION -------------
     #ifdef NOWALLSHADING
     uint8_t shade = ((side & x) || tile == TILEEXIT) ? 0 : 0xFF;
     #else
@@ -294,7 +296,7 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
 
     int16_t halfLine = lineHeight >> 1;
     uint8_t yStart = max(0, MIDSCREENY - halfLine);
-    uint8_t yEnd = min(HEIGHT, MIDSCREENY + halfLine);
+    uint8_t yEnd = min(HEIGHT, MIDSCREENY + halfLine) - 1;
 
     uint16_t bofs = (yStart & 0b1111000) * BWIDTH + x;
     uint8_t texByte = arduboy.sBuffer[bofs];
@@ -336,22 +338,19 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8
 
         texPos += step;
     }
-    while(++yStart < yEnd);
+    while(++yStart <= yEnd);
 
     //Just in case, store the last one too
     #ifdef CORNERSHADOWS
-    arduboy.sBuffer[bofs] = texByte & ~(fastlshift8((yEnd - 1) & 7));
+    arduboy.sBuffer[bofs] = texByte & ~(fastlshift8(yEnd & 7));
     #else
     arduboy.sBuffer[bofs] = texByte;
     #endif
+    // ------- END CRITICAL SECTION -------------
 }
 
 void drawSprites()
 {
-    uint8_t pmapX = posX.getInteger();
-    uint8_t pmapY = posY.getInteger();
-    uflot pmapofsX = posX - pmapX;
-    uflot pmapofsY = posY - pmapY;
     flot fposX = (flot)posX, fposY = (flot)posY;
     flot dX = dirX, dY = dirY;
     flot planeX = dY * (flot)FAKEFOV, planeY = - dX * (flot)FAKEFOV; // Camera vector or something, simple -90 degree rotate from dir
@@ -410,7 +409,7 @@ void drawSprites()
         uflot transformY = (uflot)transformYT; //Need this as uflot for critical loop
         flot transformX = invDet * (dY * spriteX - dX * spriteY);
 
-        //Easily overflow! if x is much larger than y, then you're effectively multiplying 50 by map width.
+        //int16 because easy overflow! if x is much larger than y, then you're effectively multiplying 50 by map width.
         // NOTE: this is the CENTER of the sprite, not the edge (thankfully)
         int16_t spriteScreenX = int16_t(MIDSCREENX * (1 + (float)transformX / (float)transformYT));
 
@@ -421,13 +420,18 @@ void drawSprites()
 
         // calculate lowest and highest pixel to fill. Sprite screen/start X and Sprite screen/start Y
         // Because we have 1 fewer bit to store things, we unfortunately need an int16
-        int16_t ssX = -(spriteHeight >> 1) + spriteScreenX;   //Offsets go here, but modified by distance or something?
+        int16_t ssX = -(spriteWidth >> 1) + spriteScreenX;   //Offsets go here, but modified by distance or something?
         int16_t ssXe = ssX + spriteWidth;
 
         // Get out if sprite is completely outside view
         if(ssXe < 0 || ssX >= VIEWWIDTH) continue;
 
-        int16_t ssY = -(spriteWidth >> 1) + MIDSCREENY;
+        //Calculate vMove from top 5 bits of state
+        uint8_t yShiftBits = sprite.state >> 3;
+        int8_t yShift = yShiftBits ? int8_t((yShiftBits & 16 ? -(yShiftBits & 15) : yShiftBits) * 2.0 / transformY) : 0;
+        //The above didn't work without float math, didn't feel like figuring out the ridiculous type casting
+
+        int16_t ssY = -(spriteHeight >> 1) + MIDSCREENY + yShift;
         int16_t ssYe = ssY + spriteHeight;
 
         uint8_t drawStartY = ssY < 0 ? 0 : ssY; //Because of these checks, we can store them in 1 byte stuctures
@@ -441,66 +445,69 @@ void drawSprites()
         UFixed<16,16> stepX = (float)TILESIZE / spriteWidth;
         UFixed<16,16> stepY = (float)TILESIZE / spriteHeight;
         UFixed<16,16> texX = (drawStartX - ssX) * stepX;
+        UFixed<16,16> texYInit = (drawStartY - ssY) * stepY;
+        UFixed<16,16> texY = texYInit;
         #else
         uflot stepX = (float)TILESIZE / spriteWidth;
         uflot stepY = (float)TILESIZE / spriteHeight;
         uflot texX = (drawStartX - ssX) * stepX;
+        uflot texYInit = (drawStartY - ssY) * stepY;
+        uflot texY = texYInit;
         #endif
 
+        uint8_t fr = sprites[i].frame;
         uint8_t x = drawStartX;
 
         // loop through every vertical stripe of the sprite on screen
+        // ------- BEGIN CRITICAL SECTION -------------
         do
         {
             //If the sprite is hidden, most processing disappears
-            if (transformY < distCache[x >> 1])
+            if (transformY >= distCache[x >> 1]) continue;
+
+            uint8_t tx = texX.getInteger();
+            uint16_t texData = readTextureStrip16(spritesheet, fr, tx);
+            uint16_t texMask = readTextureStrip16(spritesheet_Mask, fr, tx);
+
+            uflot texY = texYInit;
+            uint8_t y = drawStartY;
+
+            uint16_t bofs = (y & 0b1111000) * BWIDTH + x;
+            uint8_t texByte = arduboy.sBuffer[bofs];
+
+            do //For every pixel of the current sprite
             {
-                uint16_t texData = readTextureStrip16(spritesheet, sprites[i].frame, texX.getInteger());
-                uint16_t texMask = readTextureStrip16(spritesheet_Mask, sprites[i].frame, texX.getInteger());
+                uint8_t bidx = y & 7;
 
-                #if SPRITEPRECISION == 2
-                UFixed<16,16> texY = (drawStartY - ssY) * stepY;
-                #else
-                uflot texY = (drawStartY - ssY) * stepY;
-                #endif
-
-                uint8_t y = drawStartY;
-
-                uint16_t bofs = (y & 0b1111000) * BWIDTH + x;
-                uint8_t texByte = arduboy.sBuffer[bofs];
-
-                do //For every pixel of the current sprite
-                {
-                    uint8_t bidx = y & 7;
-
-                    // Every new byte, save the current (previous) byte and load the new byte from the screen. 
-                    // This might be wasteful, as only the first and last byte technically need to pull from the screen. 
-                    if(bidx == 0) {
-                        arduboy.sBuffer[bofs] = texByte;
-                        bofs = (y & 0b1111000) * BWIDTH + x;
-                        texByte = arduboy.sBuffer[bofs];
-                    }
-
-                    if(texMask & fastlshift16(texY.getInteger()))
-                    {
-                        uint8_t bm = fastlshift8(bidx);
-
-                        if ((texData & fastlshift16(texY.getInteger())))
-                            texByte |= bm;
-                        else
-                            texByte &= ~bm;
-                    }
-
-                    //arduboy.drawPixel(x, y, texData & fastlshift16(texY.getInteger()) ? WHITE : BLACK);
-                    texY += stepY;
+                // Every new byte, save the current (previous) byte and load the new byte from the screen. 
+                // This might be wasteful, as only the first and last byte technically need to pull from the screen. 
+                if(bidx == 0) {
+                    arduboy.sBuffer[bofs] = texByte;
+                    bofs = (y & 0b1111000) * BWIDTH + x;
+                    texByte = arduboy.sBuffer[bofs];
                 }
-                while(++y < drawEndY);
 
-                arduboy.sBuffer[bofs] = texByte;
+                uint16_t mask = fastlshift16(texY.getInteger());
+
+                if(texMask & mask)
+                {
+                    uint8_t bm = fastlshift8(bidx);
+
+                    if ((texData & mask))
+                        texByte |= bm;
+                    else
+                        texByte &= ~bm;
+                }
+
+                texY += stepY;
             }
+            while(++y < drawEndY);
+
+            arduboy.sBuffer[bofs] = texByte;
             texX += stepX;
         }
         while(++x < drawEndX);
+        // ------- END CRITICAL SECTION -------------
 
         #ifdef PRINTSPRITEDATA
         //Clear a section for us to use
@@ -655,7 +662,7 @@ void generateMaze()
         sprites[i].x = muflot((flot)posX + dirX * (1 + i));
         sprites[i].y = muflot((flot)posY + dirY * (1 + i));
         sprites[i].frame = 0;
-        sprites[i].state = 1 | (i << 1) ; //active + shrink
+        sprites[i].state = 1 | (i << 1) | ((i * 4) << 3); //active + shrink
     }
     #endif
 }

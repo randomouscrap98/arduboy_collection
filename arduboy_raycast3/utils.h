@@ -28,11 +28,16 @@ constexpr uflot NEARZEROFIXED = 1.0f / 128; // Prefer accuracy (fixed decimal ex
 // Make value odd by subtracting 1 if necessary
 #define oddify(v) if((v & 1) == 0) v -= 1
 
+inline const uint8_t * textureOffset16(const uint8_t * tex, uint8_t tile, uint8_t strip)
+{
+    return tex + tile * 32 + strip;
+}
+
 // Only works for 16x16 textures
 inline uint16_t readTextureStrip16(const uint8_t * tex, uint8_t tile, uint8_t strip)
 {
     //32 is a constant: 16x16 textures take up 32 bytes
-    const uint8_t * tofs = tex + tile * 32 + strip;
+    const uint8_t * tofs = textureOffset16(tex, tile, strip);
     return pgm_read_byte(tofs) + 256 * pgm_read_byte(tofs + 16);
 }
 
@@ -56,17 +61,19 @@ void fastClear(Arduboy2Base * arduboy, uint8_t x, uint8_t y, uint8_t x2, uint8_t
 }
 
 // Left shift lookup table for 1 << N
-constexpr uint16_t shift1Lookup16[16] PROGMEM = { 
+constexpr uint16_t shift1Lookup16[16] = { 
     1, 2, 4, 8, 16, 32, 64, 128,
     256, 512, 1024, 2048, 4096, 8192, 16384, 32768
 };
 
-constexpr uint8_t shift1Lookup8[8] PROGMEM = {
+constexpr uint8_t shift1Lookup8[8] = {
     1, 2, 4, 8, 16, 32, 64, 128,
 };
 
-#define fastlshift8(x) pgm_read_byte(shift1Lookup8 + (x))
-#define fastlshift16(x) pgm_read_word(shift1Lookup16 + (x))
+#define fastlshift8(x) shift1Lookup8[x]
+#define fastlshift16(x) shift1Lookup16[x]
+//#define fastlshift8(x) pgm_read_byte(shift1Lookup8 + (x))
+//#define fastlshift16(x) pgm_read_word(shift1Lookup16 + (x))
 //#define fastlshift16(x) shift1Lookup16[x]
 
 //Just wanted to see
