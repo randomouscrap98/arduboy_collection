@@ -461,7 +461,7 @@ void drawSprites()
         #endif
 
         uflot transformY = (uflot)transformYT; //Need this as uflot for critical loop
-        uint8_t fr = sprites[i].frame;
+        uint8_t fr = sprite.frame;
         uint8_t x = drawStartX;
 
         // ------- BEGIN CRITICAL SECTION -------------
