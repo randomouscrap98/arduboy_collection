@@ -13,6 +13,7 @@
 // Graphics
 #include "resources/menu.h"
 #include "resources/raycastbg.h"
+//#include "dualsheet.h"
 #include "sprites.h"
 #include "tiles.h"
 
@@ -306,7 +307,8 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
 
     uint16_t bofs = (yStart & 0b1111000) * BWIDTH + x;
     uint8_t texByte = arduboy.sBuffer[bofs];
-    uint16_t texData = readTextureStrip16(tilesheet, tile - 1, texX);
+    //uint16_t texData = readTextureStrip16(dualsheet, tile, texX);
+    uint16_t texData = readTextureStrip16(tilesheet, tile, texX);
 
     #if TEXPRECISION == 2
     UFixed<16,16> step = (float)TILESIZE / lineHeight;
@@ -469,6 +471,8 @@ void drawSprites()
             if (transformY < distCache[x >> 1])
             {
                 uint8_t tx = texX.getInteger();
+                //uint16_t texData = readTextureStrip16(dualsheet, fr, tx);
+                //uint16_t texMask = readTextureStrip16(dualsheet_Mask, fr, tx);
                 uint16_t texData = readTextureStrip16(spritesheet, fr, tx);
                 uint16_t texMask = readTextureStrip16(spritesheet_Mask, fr, tx);
 
@@ -638,10 +642,33 @@ void drawMenu(bool showHint)
     }
 }
 
+void resetSprites()
+{
+    memset(sprites, 0, sizeof(RSprite) * NUMSPRITES);
+}
+
+RSprite * addSprite(float x, float y, uint8_t frame, uint8_t shrinkLevel, int8_t heightAdjust)
+{
+    for(uint8_t i = 0; i < NUMSPRITES; i++)
+    {
+        if((sprites[i].state & 1) == 0)
+        {
+            sprites[i].x = muflot(x);
+            sprites[i].y = muflot(y);
+            sprites[i].frame = frame;
+            sprites[i].state = 1 | ((shrinkLevel << 1) & RSSTATESHRINK) | (heightAdjust < 0 ? 16 : 0) | ((abs(heightAdjust) << 3) & RSTATEYOFFSET);
+            return &sprites[i];
+        }
+    }
+
+    return NULL;
+}
+
 // Generate a new maze and reset the game to an initial playable state
 void generateMaze()
 {
     clearRaycast();
+    resetSprites();
     tinyfont.setCursor(12, 28);
     tinyfont.print(F("Generating maze"));
     arduboy.display();
@@ -663,13 +690,21 @@ void generateMaze()
     curHeight = mzs.height;
 
     #ifdef ADDDEBUGSPRITES
-    for(uint8_t i = 0; i < ADDDEBUGSPRITES; i++)
-    {
-        sprites[i].x = muflot((flot)posX + dirX * (1 + i));
-        sprites[i].y = muflot((flot)posY + dirY * (1 + i));
-        sprites[i].frame = 0;
-        sprites[i].state = 1 | (i << 1) | ((i * 4) << 3); //active + shrink
-    }
+    setMapCell(&worldMap, 5, 0, TILEDOOR);
+    addSprite(4.5, 1.4, SPRITEBARREL, 1, 8);
+    addSprite(6.5, 1.4, SPRITEBARREL, 1, 8);
+    addSprite(7, 5, SPRITECHEST, 1, 8);
+    //sprites[0].x = muflot(3.5);
+    //sprites[0].y = muflot(1.2);
+    //sprites[0].frame = SPRITEMONSTER;
+    //sprites[0].state = 1 | (i << 1) | ((i * 4) << 3); //active + shrink
+    //for(uint8_t i = 0; i < ADDDEBUGSPRITES; i++)
+    //{
+    //    sprites[i].x = muflot((flot)posX + dirX * (1 + i));
+    //    sprites[i].y = muflot((flot)posY + dirY * (1 + i));
+    //    sprites[i].frame = SPRITEMONSTER;
+    //    sprites[i].state = 1 | (i << 1) | ((i * 4) << 3); //active + shrink
+    //}
     #endif
 }
 
