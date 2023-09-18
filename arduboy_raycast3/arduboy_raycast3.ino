@@ -43,7 +43,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // #define NOWALLSHADING        // Wall shading actually reduces the cost... I must have a bug
 // #define NOSPRITES            // Remove all sprites
  #define ADDDEBUGSPRITES 4    // How many debug sprites to add at generation
-// #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
+//  #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
 
 
 // Gameplay constants
@@ -69,7 +69,7 @@ constexpr uint8_t BWIDTH = WIDTH >> 3;
 constexpr uint8_t LDISTSAFE = 16;
 constexpr uflot MINLDISTANCE = 1.0f / LDISTSAFE;
 constexpr uint16_t MAXLHEIGHT = HEIGHT * LDISTSAFE;
-constexpr flot MINSPRITEDISTANCE = 0.2;
+constexpr float MINSPRITEDISTANCE = 0.2;
 
 // Size limit for data structures
 constexpr uint8_t NUMSPRITES = 32;
@@ -116,7 +116,9 @@ struct RSprite {
 // for precomputation
 struct SSprite {
     RSprite * sprite; 
-    UFixed<12,4> distance;    //Unfortunately, distance kinda has to be large... 12 bits = 4096, should be more than enough
+    SFixed<11,4> dpx;   //Some precalc stuff to save compute (4 X NUMSPRITES extra bytes, here it's 128)
+    SFixed<11,4> dpy;
+    SFixed<11,4> distance;    //Unfortunately, distance kinda has to be large... 12 bits = 4096, should be more than enough
 };
 
 constexpr uint8_t MAZETYPECOUNT = 2;
@@ -355,9 +357,8 @@ inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_
 
 void drawSprites()
 {
-    flot fposX = (flot)posX, fposY = (flot)posY;
-    flot dX = dirX, dY = dirY;
-    flot planeX = dY * (flot)FAKEFOV, planeY = - dX * (flot)FAKEFOV; // Camera vector or something, simple -90 degree rotate from dir
+    SFixed<11,4> fposx = (SFixed<11,4>)posX;
+    SFixed<11,4> fposy = (SFixed<11,4>)posY;
 
     //Make a temp sort array on stack
     uint8_t usedSprites = 0;
@@ -369,11 +370,10 @@ void drawSprites()
         if (!(sprites[i].state & 1))
             continue;
 
-        flot sx = (flot)sprites[i].x - fposX;
-        flot sy = (flot)sprites[i].y - fposY;
-
         SSprite toSort;
-        toSort.distance = UFixed<12, 4>(sx * sx) + UFixed<12,4>(sy * sy); // sqrt not taken, unneeded
+        toSort.dpx = (SFixed<11,4>)sprites[i].x - fposx; //muposx < sprites[i].x ? sprites[i].x - muposx : muposx - sprites[i].x;
+        toSort.dpy = (SFixed<11,4>)sprites[i].y - fposy; //muposy < sprites[i].y ? sprites[i].y - muposy : muposy - sprites[i].y;
+        toSort.distance = toSort.dpx * toSort.dpx + toSort.dpy * toSort.dpy; // sqrt not taken, unneeded
         toSort.sprite = &sprites[i];
 
         //Insertion sort (it's faster for small arrays; if you increase sprite count to some 
@@ -390,8 +390,14 @@ void drawSprites()
         usedSprites++;
     }
 
-    //Some matrix math stuff
-    flot invDet = 1.0 / (planeX * dY - planeY * dX); // required for correct matrix multiplication
+    //flot fposX = (flot)posX, fposY = (flot)posY;
+    float planeX = dirY, planeY = -dirX;
+    //flot dX = dirX, dY = dirY;
+    //flot planeX = dY * (flot)FAKEFOV, planeY = - dX * (flot)FAKEFOV; // Camera vector or something, simple -90 degree rotate from dir
+
+    //Some matrix math stuff. Remember that planeX is dirY and planeY is -dirX. Original formula:
+    //1.0 / (planeX * dirY - planeY * dirX)
+    float invDet = 1.0 / (planeX * dirY - planeY * dirX); // required for correct matrix multiplication
 
     // after sorting the sprites, do the projection and draw them. We know all sprites in the array are active,
     // since we're looping against the sorted array.
@@ -401,25 +407,24 @@ void drawSprites()
         RSprite sprite = * sorted[i].sprite;
 
         // translate sprite position to relative to camera (we calculated this before, but need to save mem)
-        flot spriteX = (flot)sprite.x - fposX;
-        flot spriteY = (flot)sprite.y - fposY;
+        float spriteX = float(sorted[i].dpx);
+        float spriteY = float(sorted[i].dpy);
 
         // X and Y will always be very small (map only 4 bit size), so these transforms will still fit within a 7 bit int part
-        flot transformYT = invDet * (-planeY * spriteX + planeX * spriteY); // this is actually the depth inside the screen, that what Z is in 3D
+        float transformYT = invDet * (-planeY * spriteX + planeX * spriteY); // this is actually the depth inside the screen, that what Z is in 3D
 
         // Nice quick shortcut to get out for sprites behind us (and ones that are too close)
         if(transformYT < MINSPRITEDISTANCE) continue;
 
-        uflot transformY = (uflot)transformYT; //Need this as uflot for critical loop
-        flot transformX = invDet * (dY * spriteX - dX * spriteY);
+        float transformXT = invDet * (dirY * spriteX - dirX * spriteY);
 
         //int16 because easy overflow! if x is much larger than y, then you're effectively multiplying 50 by map width.
         // NOTE: this is the CENTER of the sprite, not the edge (thankfully)
-        int16_t spriteScreenX = int16_t(MIDSCREENX * (1 + (float)transformX / (float)transformYT));
+        int16_t spriteScreenX = int16_t(MIDSCREENX * (1 + transformXT / transformYT));
 
         // calculate the dimensions of the sprite on screen. All sprites are square. Size mods go here
         // using 'transformY' instead of the real distance prevents fisheye
-        uint16_t spriteHeight = uint16_t(HEIGHT / (float)transformY) >> ((sprite.state & RSSTATESHRINK) >> 1); 
+        uint16_t spriteHeight = uint16_t(HEIGHT / transformYT) >> ((sprite.state & RSSTATESHRINK) >> 1); 
         uint16_t spriteWidth = spriteHeight; 
 
         // calculate lowest and highest pixel to fill. Sprite screen/start X and Sprite screen/start Y
@@ -432,7 +437,7 @@ void drawSprites()
 
         //Calculate vMove from top 5 bits of state
         uint8_t yShiftBits = sprite.state >> 3;
-        int8_t yShift = yShiftBits ? int8_t((yShiftBits & 16 ? -(yShiftBits & 15) : yShiftBits) * 2.0 / transformY) : 0;
+        int8_t yShift = yShiftBits ? int8_t((yShiftBits & 16 ? -(yShiftBits & 15) : yShiftBits) * 2.0 / transformYT) : 0;
         //The above didn't work without float math, didn't feel like figuring out the ridiculous type casting
 
         int16_t ssY = -(spriteHeight >> 1) + MIDSCREENY + yShift;
@@ -459,12 +464,12 @@ void drawSprites()
         uflot texY = texYInit;
         #endif
 
+        uflot transformY = (uflot)transformYT; //Need this as uflot for critical loop
         uint8_t fr = sprites[i].frame;
         uint8_t x = drawStartX;
 
-        // loop through every vertical stripe of the sprite on screen
         // ------- BEGIN CRITICAL SECTION -------------
-        do
+        do //For every strip (x)
         {
             //If the sprite is hidden, most processing disappears
             if (transformY >= distCache[x >> 1]) continue;
@@ -519,11 +524,11 @@ void drawSprites()
         arduboy.fillRect(0, HEIGHT - sdh, VIEWWIDTH, sdh, BLACK);
         //Print some junk
         tinyfont.setCursor(0, HEIGHT - sdh);
-        tinyfont.print((float)transformX, 4);
+        tinyfont.print((float)transformXT, 4);
         tinyfont.print(" X");
         tinyfont.print(ssX);
         tinyfont.setCursor(0, HEIGHT - sdh + 5);
-        tinyfont.print((float)transformY, 4);
+        tinyfont.print((float)transformYT, 4);
         tinyfont.print(" W");
         tinyfont.print(spriteWidth);
         #endif
