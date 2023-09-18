@@ -297,7 +297,7 @@ void raycast()
 
 //Draw a single raycast wall line. Will only draw specifically the wall line and will clip out all the rest
 //(so you can predraw a ceiling and floor before calling raycast)
-inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side, uint8_t tile, uint8_t texX) 
+void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side, uint8_t tile, uint8_t texX) 
 {
     // ------- BEGIN CRITICAL SECTION -------------
     int16_t halfLine = lineHeight >> 1;
@@ -371,8 +371,8 @@ void drawSprites()
             continue;
 
         SSprite toSort;
-        toSort.dpx = (SFixed<11,4>)sprites[i].x - fposx; //muposx < sprites[i].x ? sprites[i].x - muposx : muposx - sprites[i].x;
-        toSort.dpy = (SFixed<11,4>)sprites[i].y - fposy; //muposy < sprites[i].y ? sprites[i].y - muposy : muposy - sprites[i].y;
+        toSort.dpx = (SFixed<11,4>)sprites[i].x - fposx;
+        toSort.dpy = (SFixed<11,4>)sprites[i].y - fposy;
         toSort.distance = toSort.dpx * toSort.dpx + toSort.dpy * toSort.dpy; // sqrt not taken, unneeded
         toSort.sprite = &sprites[i];
 
@@ -390,13 +390,7 @@ void drawSprites()
         usedSprites++;
     }
 
-    //flot fposX = (flot)posX, fposY = (flot)posY;
     float planeX = dirY, planeY = -dirX;
-    //flot dX = dirX, dY = dirY;
-    //flot planeX = dY * (flot)FAKEFOV, planeY = - dX * (flot)FAKEFOV; // Camera vector or something, simple -90 degree rotate from dir
-
-    //Some matrix math stuff. Remember that planeX is dirY and planeY is -dirX. Original formula:
-    //1.0 / (planeX * dirY - planeY * dirX)
     float invDet = 1.0 / (planeX * dirY - planeY * dirX); // required for correct matrix multiplication
 
     // after sorting the sprites, do the projection and draw them. We know all sprites in the array are active,
@@ -406,7 +400,7 @@ void drawSprites()
         //Get the current sprite. Copy so we don't have to derefence a pointer a million times
         RSprite sprite = * sorted[i].sprite;
 
-        // translate sprite position to relative to camera (we calculated this before, but need to save mem)
+        //Already stored pos relative to camera earlier, but want extra precision, use floats
         float spriteX = float(sorted[i].dpx);
         float spriteY = float(sorted[i].dpy);
 
@@ -472,47 +466,50 @@ void drawSprites()
         do //For every strip (x)
         {
             //If the sprite is hidden, most processing disappears
-            if (transformY >= distCache[x >> 1]) continue;
-
-            uint8_t tx = texX.getInteger();
-            uint16_t texData = readTextureStrip16(spritesheet, fr, tx);
-            uint16_t texMask = readTextureStrip16(spritesheet_Mask, fr, tx);
-
-            uflot texY = texYInit;
-            uint8_t y = drawStartY;
-
-            uint16_t bofs = (y & 0b1111000) * BWIDTH + x;
-            uint8_t texByte = arduboy.sBuffer[bofs];
-
-            do //For every pixel of the current sprite
+            if (transformY < distCache[x >> 1])
             {
-                uint8_t bidx = y & 7;
+                uint8_t tx = texX.getInteger();
+                uint16_t texData = readTextureStrip16(spritesheet, fr, tx);
+                uint16_t texMask = readTextureStrip16(spritesheet_Mask, fr, tx);
 
-                // Every new byte, save the current (previous) byte and load the new byte from the screen. 
-                // This might be wasteful, as only the first and last byte technically need to pull from the screen. 
-                if(bidx == 0) {
-                    arduboy.sBuffer[bofs] = texByte;
-                    bofs = (y & 0b1111000) * BWIDTH + x;
-                    texByte = arduboy.sBuffer[bofs];
-                }
+                uflot texY = texYInit;
+                uint8_t y = drawStartY;
 
-                uint16_t mask = fastlshift16(texY.getInteger());
+                uint16_t bofs = (y & 0b1111000) * BWIDTH + x;
+                uint8_t texByte = arduboy.sBuffer[bofs];
 
-                if(texMask & mask)
+                do // For every pixel of the current sprite
                 {
-                    uint8_t bm = fastlshift8(bidx);
+                    uint8_t bidx = y & 7;
 
-                    if ((texData & mask))
-                        texByte |= bm;
-                    else
-                        texByte &= ~bm;
-                }
+                    // Every new byte, save the current (previous) byte and load the new byte from the screen.
+                    // This might be wasteful, as only the first and last byte technically need to pull from the screen.
+                    if (bidx == 0)
+                    {
+                        arduboy.sBuffer[bofs] = texByte;
+                        bofs = (y & 0b1111000) * BWIDTH + x;
+                        texByte = arduboy.sBuffer[bofs];
+                    }
 
-                texY += stepY;
+                    uint16_t mask = fastlshift16(texY.getInteger());
+
+                    if (texMask & mask)
+                    {
+                        uint8_t bm = fastlshift8(bidx);
+
+                        if ((texData & mask))
+                            texByte |= bm;
+                        else
+                            texByte &= ~bm;
+                    }
+
+                    texY += stepY;
+                } while (++y < drawEndY);
+
+                arduboy.sBuffer[bofs] = texByte;
             }
-            while(++y < drawEndY);
 
-            arduboy.sBuffer[bofs] = texByte;
+            //This ONE step is why there has to be a big if statement up there. 
             texX += stepX;
         }
         while(++x < drawEndX);
