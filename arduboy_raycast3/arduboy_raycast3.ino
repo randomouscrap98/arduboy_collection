@@ -42,12 +42,12 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // #define LINEHEIGHTDEBUG      // Display information about lineheight (only draws a few lines)
 // #define NOWALLSHADING        // Wall shading actually reduces the cost... I must have a bug
 // #define NOSPRITES            // Remove all sprites
-// #define ADDDEBUGSPRITES 4    // How many debug sprites to add at generation
+ #define ADDDEBUGSPRITES 4    // How many debug sprites to add at generation
 // #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
 
 
 // Gameplay constants
-constexpr uint8_t FRAMERATE = 30;
+constexpr uint8_t FRAMERATE = 24;
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 constexpr uflot LIGHTINTENSITY = 1.5;
@@ -75,7 +75,6 @@ constexpr flot MINSPRITEDISTANCE = 0.2;
 constexpr uint8_t NUMSPRITES = 32;
 constexpr uint8_t MAPWIDTH = 16;
 constexpr uint8_t MAPHEIGHT = 16;
-
 
 
 //Menu related stuff
@@ -175,6 +174,8 @@ void raycast()
     flot planeX = dY * (flot)FAKEFOV, planeY = - dX * (flot)FAKEFOV; // Camera vector or something, simple -90 degree rotate from dir
     constexpr flot INVWIDTH = 2.0f / VIEWWIDTH;
 
+    uint8_t shade = 0; //(side & x) ? 0 : pgm_read_byte(b_shading + (dither * 4) + (x & 3));
+
     for (uint8_t x = 0; x < VIEWWIDTH; x++)
     {
         flot cameraX = x * INVWIDTH - 1; // x-coordinate in camera space
@@ -251,7 +252,20 @@ void raycast()
         }
         while (perpWallDist < VIEWDISTANCE && tile == TILEEMPTY);
 
-        distCache[x >> 1] = perpWallDist;
+        if((x & 1) == 0)
+        {
+            distCache[x >> 1] = perpWallDist;
+
+            #ifdef NOWALLSHADING
+            shade = (side & x) ? 0 : 0xFF;
+            #else
+            //NOTE: multiplication is WAY FASTER than division, hence "darkness" value instead of light
+            uint8_t dither = floorFixed(perpWallDist * DARKNESS * perpWallDist).getInteger();
+            shade = (dither >= BAYERGRADIENTS) ? 0 : pgm_read_byte(b_shading + (dither * 4) + (x & 3));
+            #endif
+        }
+
+        if(side & x) shade = 0;
 
         // If the above loop was exited without finding a tile, there's nothing to draw
         if(tile == TILEEMPTY) continue;
@@ -275,25 +289,15 @@ void raycast()
         #endif
 
         //ending should be exclusive
-        draw_wall_line(x, lineHeight, perpWallDist, side, tile, texX);
+        draw_wall_line(x, lineHeight, shade, side, tile, texX);
     }
 }
 
 //Draw a single raycast wall line. Will only draw specifically the wall line and will clip out all the rest
 //(so you can predraw a ceiling and floor before calling raycast)
-inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uflot distance, uint8_t side, uint8_t tile, uint8_t texX) 
+inline void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side, uint8_t tile, uint8_t texX) 
 {
     // ------- BEGIN CRITICAL SECTION -------------
-    #ifdef NOWALLSHADING
-    uint8_t shade = ((side & x) || tile == TILEEXIT) ? 0 : 0xFF;
-    #else
-    //NOTE: multiplication is WAY FASTER than division, hence "darkness" value instead of light
-    uint8_t dither = (uint8_t)(floorFixed(distance * DARKNESS * distance));
-    //Oops, we're beyond dark (this shouldn't happen often but it CAN)
-    if(dither >= BAYERGRADIENTS) return;
-    uint8_t shade = (side & x) ? 0 : pgm_read_byte(b_shading + (dither * 4) + (x & 3));
-    #endif
-
     int16_t halfLine = lineHeight >> 1;
     uint8_t yStart = max(0, MIDSCREENY - halfLine);
     uint8_t yEnd = min(HEIGHT, MIDSCREENY + halfLine) - 1;
