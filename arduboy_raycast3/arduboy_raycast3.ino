@@ -37,7 +37,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // been able to see a difference, so I set it to 0
 #define SPRITEPRECISION 0
 
-// This adds a large (greater than 1kb) amount of code but significantly speeds
+// This adds a large (~1.5kb) amount of code but significantly speeds
 // up execution. If possible, try to use this
 #define CRITICALLOOPUNROLLING
 
@@ -52,7 +52,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 
 // Gameplay constants
-constexpr uint8_t FRAMERATE = 30;
+constexpr uint8_t FRAMERATE = 35;
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 constexpr uflot LIGHTINTENSITY = 1.5;
@@ -153,7 +153,7 @@ void raycast()
     flot planeX = dY * (flot)FAKEFOV, planeY = - dX * (flot)FAKEFOV; // Camera vector or something, simple -90 degree rotate from dir
     constexpr flot INVWIDTH = 2.0f / VIEWWIDTH;
 
-    uint8_t shade = 0; //(side & x) ? 0 : pgm_read_byte(b_shading + (dither * 4) + (x & 3));
+    uint8_t shade = 0;
 
     for (uint8_t x = 0; x < VIEWWIDTH; x++)
     {
@@ -299,9 +299,6 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
     uint16_t texData = readTextureStrip16(tilesheet, tile, texX);
     uint8_t thisWallByte = (((yStart >> 1) >> 1) >> 1);
 
-    uint8_t startByte = thisWallByte; //The byte within which we start, always inclusive
-    uint8_t endByte = (((yEnd >> 1) >> 1) >> 1);  //The byte to end the unrolled loop on. Could be inclusive or exclusive
-
     //Pull wall byte, save location
     #define _WALLREADBYTE() bofs = thisWallByte * WIDTH + x; texByte = arduboy.sBuffer[bofs];
     //Write previously read wall byte, go to next byte
@@ -312,6 +309,9 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
     _WALLREADBYTE();
 
     #ifdef CRITICALLOOPUNROLLING
+
+    uint8_t startByte = thisWallByte; //The byte within which we start, always inclusive
+    uint8_t endByte = (((yEnd >> 1) >> 1) >> 1);  //The byte to end the unrolled loop on. Could be inclusive or exclusive
 
     //First and last bytes are tricky
     if(yStart & 7)
@@ -371,7 +371,6 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
         }
 
         uint8_t bm = fastlshift8(bidx);
-
         _WALLBITUNROLL(bm, ~bm);
     }
     while(++yStart <= yEnd);
@@ -503,42 +502,95 @@ void drawSprites()
             if (transformY < distCache[x >> 1])
             {
                 uint8_t tx = texX.getInteger();
-                uint16_t texData = readTextureStrip16(spritesheet, fr, tx);
-                uint16_t texMask = readTextureStrip16(spritesheet_Mask, fr, tx);
 
                 uflot texY = texYInit;
+
+                //These five variables are needed as part of the loop unrolling system
+                uint16_t bofs;
+                uint8_t texByte;
+                uint16_t texData = readTextureStrip16(spritesheet, fr, tx);
+                uint16_t texMask = readTextureStrip16(spritesheet_Mask, fr, tx);
+                uint8_t thisWallByte = (((drawStartY >> 1) >> 1) >> 1); //right shift 3 without loop
+
+                //Pull screen byte, save location
+                #define _SPRITEREADSCRBYTE() bofs = thisWallByte * WIDTH + x; texByte = arduboy.sBuffer[bofs];
+                //Write previously read screen byte, go to next byte
+                #define _SPRITEWRITESCRNEXT() arduboy.sBuffer[bofs] = texByte; thisWallByte++;
+                //Work for setting bits of screen byte
+                #define _SPRITEBITUNROLL(bm,nbm) { uint16_t btmask = fastlshift16(texY.getInteger()); if (texMask & btmask) { if (texData & btmask) texByte |= bm; else texByte &= nbm; } texY += stepY; }
+
+                _SPRITEREADSCRBYTE();
+
+                #ifdef CRITICALLOOPUNROLLING
+
+                uint8_t startByte = thisWallByte; //The byte within which we start, always inclusive
+                uint8_t endByte = (((drawEndY >> 1) >> 1) >> 1);  //The byte to end the unrolled loop on. Could be inclusive or exclusive
+
+                //First and last bytes are tricky
+                if(drawStartY & 7)
+                {
+                    uint8_t endFirst = min((startByte + 1) * 8, drawEndY);
+
+                    for (uint8_t i = drawStartY; i < endFirst; i++)
+                    {
+                        uint8_t bm = fastlshift8(i & 7);
+                        _SPRITEBITUNROLL(bm, (~bm));
+                    }
+
+                    //Move to next, like it never happened
+                    _SPRITEWRITESCRNEXT();
+                    _SPRITEREADSCRBYTE();
+                }
+
+                //Now the unrolled loop
+                while(thisWallByte < endByte)
+                {
+                    _SPRITEBITUNROLL(0b00000001, 0b11111110);
+                    _SPRITEBITUNROLL(0b00000010, 0b11111101);
+                    _SPRITEBITUNROLL(0b00000100, 0b11111011);
+                    _SPRITEBITUNROLL(0b00001000, 0b11110111);
+                    _SPRITEBITUNROLL(0b00010000, 0b11101111);
+                    _SPRITEBITUNROLL(0b00100000, 0b11011111);
+                    _SPRITEBITUNROLL(0b01000000, 0b10111111);
+                    _SPRITEBITUNROLL(0b10000000, 0b01111111);
+                    _SPRITEWRITESCRNEXT();
+                    _SPRITEREADSCRBYTE();
+                }
+
+                //Last byte, but only need to do it if we don't simply span one byte
+                if((drawEndY & 7) && startByte != endByte)
+                {
+                    for (uint8_t i = thisWallByte * 8; i < drawEndY; i++)
+                    {
+                        uint8_t bm = fastlshift8(i & 7);
+                        _SPRITEBITUNROLL(bm, (~bm));
+                    }
+                }
+
+                #else // No loop unrolling
+
                 uint8_t y = drawStartY;
 
-                uint16_t bofs = (y & 0b1111000) * BWIDTH + x;
-                uint8_t texByte = arduboy.sBuffer[bofs];
+                //Funny hack; code is written for loop unrolling first, so we have to kind of "fit in" to the macro system
+                if((drawStartY & 7) == 0) thisWallByte--;
 
-                do // For every pixel of the current sprite
+                do
                 {
                     uint8_t bidx = y & 7;
 
-                    // Every new byte, save the current (previous) byte and load the new byte from the screen.
-                    // This might be wasteful, as only the first and last byte technically need to pull from the screen.
-                    if (bidx == 0)
-                    {
-                        arduboy.sBuffer[bofs] = texByte;
-                        bofs = (y & 0b1111000) * BWIDTH + x;
-                        texByte = arduboy.sBuffer[bofs];
+                    // Every new byte, save the current (previous) byte and load the new byte from the screen. 
+                    // This might be wasteful, as only the first and last byte technically need to pull from the screen. 
+                    if(bidx == 0) {
+                        _SPRITEWRITESCRNEXT();
+                        _SPRITEREADSCRBYTE();
                     }
 
-                    uint16_t mask = fastlshift16(texY.getInteger());
+                    uint8_t bm = fastlshift8(bidx);
+                    _SPRITEBITUNROLL(bm, ~bm);
+                }
+                while(++y <= drawEndY);
 
-                    if (texMask & mask)
-                    {
-                        uint8_t bm = fastlshift8(bidx);
-
-                        if ((texData & mask))
-                            texByte |= bm;
-                        else
-                            texByte &= ~bm;
-                    }
-
-                    texY += stepY;
-                } while (++y < drawEndY);
+                #endif
 
                 arduboy.sBuffer[bofs] = texByte;
             }
