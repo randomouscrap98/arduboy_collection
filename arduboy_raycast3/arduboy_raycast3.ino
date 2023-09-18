@@ -14,7 +14,6 @@
 // Graphics
 #include "resources/menu.h"
 #include "resources/raycastbg.h"
-//#include "dualsheet.h"
 #include "sprites.h"
 #include "tiles.h"
 
@@ -38,6 +37,10 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // been able to see a difference, so I set it to 0
 #define SPRITEPRECISION 0
 
+// This adds a large (greater than 1kb) amount of code but significantly speeds
+// up execution. If possible, try to use this
+#define CRITICALLOOPUNROLLING
+
 
 // And now some debug stuff
 // #define DRAWMAPDEBUG         // Display map (will take up portion of screen)
@@ -49,7 +52,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 
 // Gameplay constants
-constexpr uint8_t FRAMERATE = 24;
+constexpr uint8_t FRAMERATE = 30;
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 constexpr uflot LIGHTINTENSITY = 1.5;
@@ -276,12 +279,7 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
     // ------- BEGIN CRITICAL SECTION -------------
     int16_t halfLine = lineHeight >> 1;
     uint8_t yStart = max(0, MIDSCREENY - halfLine);
-    uint8_t yEnd = min(HEIGHT, MIDSCREENY + halfLine) - 1;
-
-    uint16_t bofs = (yStart & 0b1111000) * BWIDTH + x;
-    uint8_t texByte = arduboy.sBuffer[bofs];
-    //uint16_t texData = readTextureStrip16(dualsheet, tile, texX);
-    uint16_t texData = readTextureStrip16(tilesheet, tile, texX);
+    uint8_t yEnd = min(HEIGHT, MIDSCREENY + halfLine);
 
     #if TEXPRECISION == 2
     UFixed<16,16> step = (float)TILESIZE / lineHeight;
@@ -295,8 +293,72 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
     uflot texPos = (yStart + halfLine - MIDSCREENY) * step;
     #endif
 
-    //Individual bits. Again, a do/while loop is slightly faster, it actually makes a difference here
-    //over a for loop
+    //These four variables are needed as part of the loop unrolling system
+    uint16_t bofs;
+    uint8_t texByte;
+    uint16_t texData = readTextureStrip16(tilesheet, tile, texX);
+    uint8_t thisWallByte = (((yStart >> 1) >> 1) >> 1);
+
+    uint8_t startByte = thisWallByte; //The byte within which we start, always inclusive
+    uint8_t endByte = (((yEnd >> 1) >> 1) >> 1);  //The byte to end the unrolled loop on. Could be inclusive or exclusive
+
+    //Pull wall byte, save location
+    #define _WALLREADBYTE() bofs = thisWallByte * WIDTH + x; texByte = arduboy.sBuffer[bofs];
+    //Write previously read wall byte, go to next byte
+    #define _WALLWRITENEXT() arduboy.sBuffer[bofs] = texByte; thisWallByte++;
+    //Work for setting bits of wall byte
+    #define _WALLBITUNROLL(bm,nbm) if((shade & (bm)) && (texData & fastlshift16(texPos.getInteger()))) texByte |= (bm); else texByte &= (nbm); texPos += step;
+
+    _WALLREADBYTE();
+
+    #ifdef CRITICALLOOPUNROLLING
+
+    //First and last bytes are tricky
+    if(yStart & 7)
+    {
+        uint8_t endFirst = min((startByte + 1) * 8, yEnd);
+
+        for (uint8_t i = yStart; i < endFirst; i++)
+        {
+            uint8_t bm = fastlshift8(i & 7);
+            _WALLBITUNROLL(bm, (~bm));
+        }
+
+        //Move to next, like it never happened
+        _WALLWRITENEXT();
+        _WALLREADBYTE();
+    }
+
+    //Now the unrolled loop
+    while(thisWallByte < endByte)
+    {
+        _WALLBITUNROLL(0b00000001, 0b11111110);
+        _WALLBITUNROLL(0b00000010, 0b11111101);
+        _WALLBITUNROLL(0b00000100, 0b11111011);
+        _WALLBITUNROLL(0b00001000, 0b11110111);
+        _WALLBITUNROLL(0b00010000, 0b11101111);
+        _WALLBITUNROLL(0b00100000, 0b11011111);
+        _WALLBITUNROLL(0b01000000, 0b10111111);
+        _WALLBITUNROLL(0b10000000, 0b01111111);
+        _WALLWRITENEXT();
+        _WALLREADBYTE();
+    }
+
+    //Last byte, but only need to do it if we don't simply span one byte
+    if((yEnd & 7) && startByte != endByte)
+    {
+        for (uint8_t i = thisWallByte * 8; i < yEnd; i++)
+        {
+            uint8_t bm = fastlshift8(i & 7);
+            _WALLBITUNROLL(bm, (~bm));
+        }
+    }
+
+    #else // No loop unrolling
+
+    //Funny hack; code is written for loop unrolling first, so we have to kind of "fit in" to the macro system
+    if((yStart & 7) == 0) thisWallByte--;
+
     do
     {
         uint8_t bidx = yStart & 7;
@@ -304,24 +366,18 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
         // Every new byte, save the current (previous) byte and load the new byte from the screen. 
         // This might be wasteful, as only the first and last byte technically need to pull from the screen. 
         if(bidx == 0) {
-            arduboy.sBuffer[bofs] = texByte;
-            bofs = (yStart & 0b1111000) * BWIDTH + x;
-            texByte = arduboy.sBuffer[bofs];
+            _WALLWRITENEXT();
+            _WALLREADBYTE();
         }
 
         uint8_t bm = fastlshift8(bidx);
 
-        //Texture stuff goes here, after shade & bm (for shortcutting)
-        if ((shade & bm) && (texData & fastlshift16(texPos.getInteger())))
-            texByte |= bm;
-        else
-            texByte &= ~bm;
-
-        texPos += step;
+        _WALLBITUNROLL(bm, ~bm);
     }
     while(++yStart <= yEnd);
 
-    //Just in case, store the last one too
+    #endif
+
     #ifdef CORNERSHADOWS
     arduboy.sBuffer[bofs] = texByte & ~(fastlshift8(yEnd & 7));
     #else
@@ -329,6 +385,7 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
     #endif
     // ------- END CRITICAL SECTION -------------
 }
+
 
 void drawSprites()
 {
@@ -446,8 +503,6 @@ void drawSprites()
             if (transformY < distCache[x >> 1])
             {
                 uint8_t tx = texX.getInteger();
-                //uint16_t texData = readTextureStrip16(dualsheet, fr, tx);
-                //uint16_t texMask = readTextureStrip16(dualsheet_Mask, fr, tx);
                 uint16_t texData = readTextureStrip16(spritesheet, fr, tx);
                 uint16_t texMask = readTextureStrip16(spritesheet_Mask, fr, tx);
 
