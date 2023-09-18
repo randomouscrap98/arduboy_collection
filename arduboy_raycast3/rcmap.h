@@ -1,7 +1,8 @@
 #pragma once
 
+#include <Arduboy2.h>
+
 #include "utils.h"
-#include "Arduboy2.h"
 
 // A single raycast map
 struct RcMap {

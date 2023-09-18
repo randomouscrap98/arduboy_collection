@@ -61,13 +61,15 @@ void fastClear(Arduboy2Base * arduboy, uint8_t x, uint8_t y, uint8_t x2, uint8_t
 }
 
 // Left shift lookup table for 1 << N
-constexpr uint16_t shift1Lookup16[16] = { 
+constexpr uint16_t shift1Lookup16[17] = { 
     1, 2, 4, 8, 16, 32, 64, 128,
-    256, 512, 1024, 2048, 4096, 8192, 16384, 32768
+    256, 512, 1024, 2048, 4096, 8192, 16384, 32768,
+    32768 //Safety
 };
 
-constexpr uint8_t shift1Lookup8[8] = {
+constexpr uint8_t shift1Lookup8[9] = {
     1, 2, 4, 8, 16, 32, 64, 128,
+    128 //Safety
 };
 
 #define fastlshift8(x) shift1Lookup8[x]

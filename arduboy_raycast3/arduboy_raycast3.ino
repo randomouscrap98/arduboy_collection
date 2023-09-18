@@ -7,6 +7,7 @@
 // Libs (sort of; mostly just code organization)
 #include "utils.h"
 #include "rcmap.h"
+#include "rcsprite.h"
 #include "mazegen.h"
 #include "shading.h"
 
@@ -43,7 +44,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // #define LINEHEIGHTDEBUG      // Display information about lineheight (only draws a few lines)
 // #define NOWALLSHADING        // Wall shading actually reduces the cost... I must have a bug
 // #define NOSPRITES            // Remove all sprites
- #define ADDDEBUGSPRITES 4    // How many debug sprites to add at generation
+#define ADDDEBUGAREA     // Add a little debug area
 //  #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
 
 
@@ -93,34 +94,6 @@ uint16_t totalDistance = 0;
 // Position and facing direction
 uflot posX, posY;
 float dirX, dirY; //These HAVE TO be float, or something with a lot more precision
-
-// These are bitmasks to get data out of state
-constexpr uint8_t RSSTATEACTIVE = 0b00000001;
-constexpr uint8_t RSSTATESHRINK = 0b00000110;
-constexpr uint8_t RSTATEYOFFSET = 0b11111000;
-
-// Try to make this fit into as little space as possible
-struct RSprite {
-    muflot x; //Precision for x/y is low but doesn't really need to be high
-    muflot y;
-    uint8_t frame = 0;
-    uint8_t state = 0; // First bit is active, next 2 are how many times to /2 for size
-
-    //Note: if we sacrifice 2 bytes per sprite to store the distance (so 32 bytes currently), 
-    //you can potentially save computation by sorting the sprite list itself. Sorted lists 
-    //generally don't require as much computation. I don't know realistically how much is 
-    //being saved though, so I'm not using that. I think having the sort struct below is
-    //significantly more flexible and may actually end up being faster overall
-};
-
-// Sorted sprite. Needed to save memory in RSprite (distance). May add more data here
-// for precomputation
-struct SSprite {
-    RSprite * sprite; 
-    SFixed<11,4> dpx;   //Some precalc stuff to save compute (4 X NUMSPRITES extra bytes, here it's 128)
-    SFixed<11,4> dpy;
-    SFixed<11,4> distance;    //Unfortunately, distance kinda has to be large... 12 bits = 4096, should be more than enough
-};
 
 constexpr uint8_t MAZETYPECOUNT = 2;
 constexpr MazeType MAZETYPES[MAZETYPECOUNT] PROGMEM = {
@@ -439,6 +412,8 @@ void drawSprites()
         int16_t ssY = -(spriteHeight >> 1) + MIDSCREENY + yShift;
         int16_t ssYe = ssY + spriteHeight;
 
+        if(ssYe < 0 || ssY >= HEIGHT) continue;
+
         uint8_t drawStartY = ssY < 0 ? 0 : ssY; //Because of these checks, we can store them in 1 byte stuctures
         uint8_t drawEndY = ssYe >= HEIGHT ? HEIGHT - 1 : ssYe;
         uint8_t drawStartX = ssX < 0 ? 0 : ssX;
@@ -647,7 +622,7 @@ void resetSprites()
     memset(sprites, 0, sizeof(RSprite) * NUMSPRITES);
 }
 
-RSprite * addSprite(float x, float y, uint8_t frame, uint8_t shrinkLevel, int8_t heightAdjust)
+uint8_t addSprite(float x, float y, uint8_t frame, uint8_t shrinkLevel, int8_t heightAdjust)
 {
     for(uint8_t i = 0; i < NUMSPRITES; i++)
     {
@@ -657,12 +632,18 @@ RSprite * addSprite(float x, float y, uint8_t frame, uint8_t shrinkLevel, int8_t
             sprites[i].y = muflot(y);
             sprites[i].frame = frame;
             sprites[i].state = 1 | ((shrinkLevel << 1) & RSSTATESHRINK) | (heightAdjust < 0 ? 16 : 0) | ((abs(heightAdjust) << 3) & RSTATEYOFFSET);
-            return &sprites[i];
+            return i;
+            //return &sprites[i];
         }
     }
 
     return NULL;
 }
+
+#ifdef ADDDEBUGAREA
+uint8_t MONSTERSPRITE = NUMSPRITES - 1;
+uint8_t LEVERSPRITE = NUMSPRITES - 1;
+#endif
 
 // Generate a new maze and reset the game to an initial playable state
 void generateMaze()
@@ -689,22 +670,16 @@ void generateMaze()
     curWidth = mzs.width;
     curHeight = mzs.height;
 
-    #ifdef ADDDEBUGSPRITES
+    #ifdef ADDDEBUGAREA
     setMapCell(&worldMap, 5, 0, TILEDOOR);
     addSprite(4.5, 1.4, SPRITEBARREL, 1, 8);
     addSprite(6.5, 1.4, SPRITEBARREL, 1, 8);
     addSprite(7, 5, SPRITECHEST, 1, 8);
-    //sprites[0].x = muflot(3.5);
-    //sprites[0].y = muflot(1.2);
-    //sprites[0].frame = SPRITEMONSTER;
-    //sprites[0].state = 1 | (i << 1) | ((i * 4) << 3); //active + shrink
-    //for(uint8_t i = 0; i < ADDDEBUGSPRITES; i++)
-    //{
-    //    sprites[i].x = muflot((flot)posX + dirX * (1 + i));
-    //    sprites[i].y = muflot((flot)posY + dirY * (1 + i));
-    //    sprites[i].frame = SPRITEMONSTER;
-    //    sprites[i].state = 1 | (i << 1) | ((i * 4) << 3); //active + shrink
-    //}
+    MONSTERSPRITE = addSprite(4, 3, SPRITEMONSTER, 1, 0);
+    LEVERSPRITE = addSprite(6, 3, SPRITELEVER, 1, 8);
+    for(uint8_t y = 1; y < 8; y++)
+        for(uint8_t x = 3; x < 8; x++)
+            setMapCell(&worldMap, x, y, TILEEMPTY);
     #endif
 }
 
@@ -755,6 +730,14 @@ void loop()
         raycastFoundation();
         #else
         clearRaycast();
+        #endif
+
+        #ifdef ADDDEBUGAREA
+        sprites[MONSTERSPRITE].x = 4 + cos((float)arduboy.frameCount / 4) / 2;
+        sprites[MONSTERSPRITE].y = 3 + sin((float)arduboy.frameCount / 4) / 2;
+        sprites[MONSTERSPRITE].state = (sprites[MONSTERSPRITE].state & ~(RSTATEYOFFSET)) | ((16 | uint8_t(15 * abs(sin((float)arduboy.frameCount / 11)))) << 3);
+        //((arduboy.frameCount | 128) & RSTATEYOFFSET);
+        sprites[LEVERSPRITE].frame = SPRITELEVER + ((arduboy.frameCount >> 4) & 1);
         #endif
 
         raycast();

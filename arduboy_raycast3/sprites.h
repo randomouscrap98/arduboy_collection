@@ -5,6 +5,7 @@
 
 constexpr uint8_t SPRITEMONSTER = 4;
 constexpr uint8_t SPRITELEVER = 5;
+constexpr uint8_t SPRITELEVERALT = 6;
 constexpr uint8_t SPRITEBARREL = 10;
 constexpr uint8_t SPRITECHEST = 11;
 
