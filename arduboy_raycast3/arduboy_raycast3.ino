@@ -23,30 +23,19 @@ Arduboy2Base arduboy;
 Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
 
 
-// Corner shadows are slightly more expensive, but help visually 
-// separate the darker walls (North/South) from the floor and gives a nice effect
-#define CORNERSHADOWS
+//Visualization flags (barely impacts performance)
+#define CORNERSHADOWS       // Shadows at the bottom of walls help differentiate walls from floor
+#define DRAWFOUNDATION      // You probably want the floor + whatever else that aren't walls
+#define WALLSHADING         // Disable smooth lighting, essentially. "LIGHTINTENSITY" still affects draw distance regardless
 
-// You probably want the floor + whatever else that aren't walls
-#define DRAWFOUNDATION
-
-// Texture precision. 0 is lowest, 2 is highest. Each level down saves
-// enough frames to matter
-#define TEXPRECISION 2
-
-// Sprite precision. Only options are 2 and 0 (all else are 0). Note: I haven't 
-// been able to see a difference, so I set it to 0
-#define SPRITEPRECISION 0
-
-// This adds a large (~1.5kb) amount of code but significantly speeds
-// up execution. If possible, try to use this
-#define CRITICALLOOPUNROLLING
-
+//Optimization flags (greatly impacts performance)
+#define TEXPRECISION 2          // Texture precision. 0 is lowest, 2 is highest. Lower = more performance but worse textures
+#define SPRITEPRECISION 0       // Sprite precision. Only options are 2 and 0. Lower = more performance, and I can't tell the difference
+#define CRITICALLOOPUNROLLING   // This adds a large (~1.5kb) amount of code but significantly increases performance, especially sprites
 
 // And now some debug stuff
 // #define DRAWMAPDEBUG         // Display map (will take up portion of screen)
 // #define LINEHEIGHTDEBUG      // Display information about lineheight (only draws a few lines)
-// #define NOWALLSHADING        // Wall shading actually reduces the cost... I must have a bug
 // #define NOSPRITES            // Remove all sprites
 #define ADDDEBUGAREA     // Add a little debug area
 //  #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
@@ -236,12 +225,12 @@ void raycast()
         {
             distCache[x >> 1] = perpWallDist;
 
-            #ifdef NOWALLSHADING
-            shade = (side & x) ? 0 : 0xFF;
-            #else
+            #ifdef WALLSHADING
             //NOTE: multiplication is WAY FASTER than division, hence "darkness" value instead of light
             uint8_t dither = floorFixed(perpWallDist * DARKNESS * perpWallDist).getInteger();
             shade = (dither >= BAYERGRADIENTS) ? 0 : pgm_read_byte(b_shading + (dither * 4) + (x & 3));
+            #else
+            shade = (side & x) ? 0 : 0xFF;
             #endif
         }
 
@@ -714,9 +703,12 @@ void drawMenu(bool showHint)
 
     //Sprites::drawOverwrite(VIEWWIDTH, 0, menu, 0);
 
-    //arduboy.fillRect(VIEWWIDTH, 0, WIDTH - VIEWWIDTH, HEIGHT, BLACK);
     fastClear(&arduboy, VIEWWIDTH, 0, WIDTH,HEIGHT);
     FASTRECT(arduboy, VIEWWIDTH + 1, 0, WIDTH - 1, HEIGHT - 1, WHITE);
+    arduboy.drawPixel(VIEWWIDTH + 3, 2, WHITE);
+    arduboy.drawPixel(WIDTH - 3, 2, WHITE);
+    arduboy.drawPixel(VIEWWIDTH + 3, HEIGHT - 3, WHITE);
+    arduboy.drawPixel(WIDTH - 3, HEIGHT - 3, WHITE);
 
     tinyfont.setCursor(109, 4);
     tinyfont.print(F("3D"));
@@ -743,12 +735,6 @@ void drawMenu(bool showHint)
     if(showHint)
     {
         FASTRECT(arduboy, MENUX + 5, HEIGHT - 15, MENUX + 14, HEIGHT - 6, WHITE);
-        //arduboy.drawFastVLine(MENUX + 5, HEIGHT - 15, 10, WHITE);
-        //arduboy.drawFastVLine(MENUX + 14, HEIGHT - 15, 10, WHITE);
-        //arduboy.drawFastHLine(MENUX + 5, HEIGHT - 15, 10, WHITE);
-        //arduboy.drawFastHLine(MENUX + 5, HEIGHT - 6, 10, WHITE);
-        //arduboy.drawRect(MENUX + 5, HEIGHT - 15, 10, 10, WHITE);
-        //fastRect(&arduboy, MENUX + 5, HEIGHT - 15, MENUX + 15, HEIGHT - 5, WHITE);
         arduboy.drawPixel(MENUX + 14, HEIGHT - 14, BLACK);
         arduboy.drawPixel(MENUX + 6 + (int)(posX / curWidth * 8), HEIGHT - 7 - (int)(posY / curHeight * 8), arduboy.frameCount & 0b10000 ? WHITE : BLACK);
     }
@@ -827,7 +813,6 @@ void setup()
     arduboy.boot();
     arduboy.flashlight();
     arduboy.initRandomSeed();
-    //arduboy.clear();
     arduboy.setFrameRate(FRAMERATE);
     generateMaze();
     drawMenu(false);
