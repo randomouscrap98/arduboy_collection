@@ -2,3 +2,4 @@
 build/
 ardens/
 imgui.ini
+*.exe
