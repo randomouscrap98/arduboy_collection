@@ -12,10 +12,10 @@
 #include "shading.h"
 
 // Graphics
-#include "resources/menu.h"
+// #include "resources/menu.h"
 #include "resources/raycastbg.h"
-#include "sprites.h"
-#include "tiles.h"
+#include "spritesheet.h"
+#include "tilesheet.h"
 
 //ARDUBOY_NO_USB
 
