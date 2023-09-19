@@ -21,16 +21,12 @@ constexpr uflot NEARZEROFIXED = 1.0f / 128; // Prefer accuracy (fixed decimal ex
 // Make value odd by subtracting 1 if necessary
 #define oddify(v) if((v & 1) == 0) v -= 1
 
-inline const uint8_t * textureOffset16(const uint8_t * tex, uint8_t tile, uint8_t strip)
-{
-    return tex + tile * 32 + strip;
-}
-
 // Only works for 16x16 textures
 inline uint16_t readTextureStrip16(const uint8_t * tex, uint8_t tile, uint8_t strip)
 {
     //32 is a constant: 16x16 textures take up 32 bytes
-    const uint8_t * tofs = textureOffset16(tex, tile, strip);
+    const uint8_t * tofs = tex + tile * 32 + strip;
+    //textureOffset16(tex, tile, strip);
     return pgm_read_byte(tofs) + 256 * pgm_read_byte(tofs + 16);
 }
 
@@ -50,8 +46,24 @@ void fastClear(Arduboy2Base * arduboy, uint8_t x, uint8_t y, uint8_t x2, uint8_t
     uint8_t yEnd = (y2 >> 3) + (y2 & 7 ? 1 : 0);
     //Arduboy2 fillrect is absurdly slow; I have the luxury of doing this instead
     for(uint8_t i = y >> 3; i < yEnd; ++i)
-        memset(arduboy->sBuffer + (i << 7) + x, 0, x2 - x);
+        memset(arduboy->sBuffer + (i * 128) + x, 0, x2 - x);
 }
+
+//For SOME REASON, it's less generated code to call these four things than to call any 
+//rectangle function, or to even make this a proper function. Oh well
+#define FASTRECT(a,x,y,x2,y2,c) \
+    a.drawFastVLine(x,  y,  (y2) - (y), c); \
+    a.drawFastVLine(x2, y,  (y2) - (y), c); \
+    a.drawFastHLine(x,  y,  (x2) - (x), c); \
+    a.drawFastHLine(x,  y2, (x2) - (x), c);
+
+//void fastRect(Arduboy2Base * arduboy, uint8_t x, uint8_t y, uint8_t x2, uint8_t y2, uint8_t color)
+//{
+//    arduboy->drawFastVLine(x, y, y2 - y, color); //VIEWWIDTH + 1, 0, HEIGHT, WHITE);
+//    arduboy->drawFastVLine(x2, y, y2- y, color);
+//    arduboy->drawFastHLine(x, y, x2 - x, color);
+//    arduboy->drawFastHLine(x, y2, x2 - x, color);
+//}
 
 // Left shift lookup table for 1 << N
 constexpr uint16_t shift1Lookup16[17] = { 
@@ -69,29 +81,6 @@ constexpr uint8_t shift1Lookup8[9] = {
 #define fastlshift16(x) shift1Lookup16[x]
 //#define fastlshift8(x) pgm_read_byte(shift1Lookup8 + (x))
 //#define fastlshift16(x) pgm_read_word(shift1Lookup16 + (x))
-//#define fastlshift16(x) shift1Lookup16[x]
-
-//Just wanted to see
-//inline uint16_t fastlshift16(uint16_t x) {
-//    switch (x) {
-//        case 0: return 1; 
-//        case 1: return 2; 
-//        case 2: return 4; 
-//        case 3: return 8; 
-//        case 4: return 16; 
-//        case 5: return 32; 
-//        case 6: return 64; 
-//        case 7: return 128; 
-//        case 8: return 256; 
-//        case 9: return 512; 
-//        case 10: return 1024; 
-//        case 11: return 2048;
-//        case 12: return 4096;
-//        case 13: return 8192;
-//        case 14: return 16384;
-//        case 15: return 32768;
-//    }
-//}
 
 // Taken from https://github.com/tiberiusbrown/arduboy_minigolf/blob/master/div.cpp
 constexpr uint16_t DIVISORS[256] PROGMEM =
@@ -160,61 +149,4 @@ flot fReciprocalNearUnitNoSign(flot x)
         return flot::fromInternal(pgm_read_word(DIVISORS + ((x * 0.5).getInternal() & 0xFF))) * 0.5;
     else
         return flot::fromInternal(pgm_read_word(DIVISORS + (x.getInternal() & 0xFF)));
-}
-
-// Taken from https://github.com/tiberiusbrown/arduboy_minigolf/blob/master/mul.cpp
-uint16_t mul_f8_u16(uint16_t a, uint8_t b)
-{
-#ifdef ARDUINO_ARCH_AVR
-    /*
-               A1 A0
-                  B0
-            ========
-               A0*B0
-            A1*B0
-         ===========
-            R1 R0
-    */
-    uint16_t r;
-    asm volatile(
-        "mul  %B[a], %A[b]      \n\t"
-        "movw %A[r], r0         \n\t" // r = A1*B0
-        "mul  %A[a], %A[b]      \n\t"
-        "add  %A[r], r1         \n\t" // R0 += hi(A0*B0)
-        "clr  r1                \n\t"
-        "adc  %B[r], r1         \n\t" // R1 += C
-        : [r] "=&r" (r)
-        : [a] "r"   (a),
-          [b] "r"   (b)
-        :
-    );
-    return r;
-#else
-    return uint16_t((u24(a) * b) >> 8);
-#endif
-}
-
-
-uint16_t inv16(uint16_t x)
-{
-    // initial guess
-    uint16_t const* p = &DIVISORS[x >> 8];
-    uint16_t y = pgm_read_word(p);
-    {
-        // refine initial guess by linear interpolation
-        uint16_t ty = pgm_read_word(p + 1);
-        uint8_t t1 = uint8_t(x);
-        uint8_t t0 = 255 - t1;
-        y = mul_f8_u16(y, t0) + mul_f8_u16(ty, t1) + (y >> 8);
-    }
-    // one iter of newton raphson to refine further
-    //for(uint8_t i = 0; i < 1; ++i)
-    {
-        uint32_t xy = (uint32_t(y) * x) >> 8;
-        // 2 - x * y
-        uint32_t t = 0x20000 - xy;
-        // y' = y * (2 - x * y)
-        y = uint16_t((t * y) >> 16);
-    }
-    return y;
 }

@@ -17,6 +17,7 @@
 #include "sprites.h"
 #include "tiles.h"
 
+//ARDUBOY_NO_USB
 
 Arduboy2Base arduboy;
 Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
@@ -711,7 +712,12 @@ void drawMenu(bool showHint)
     constexpr uint8_t MENUY = 22;
     constexpr uint8_t MENUSPACING = 6;
 
-    Sprites::drawOverwrite(VIEWWIDTH, 0, menu, 0);
+    //Sprites::drawOverwrite(VIEWWIDTH, 0, menu, 0);
+
+    //arduboy.fillRect(VIEWWIDTH, 0, WIDTH - VIEWWIDTH, HEIGHT, BLACK);
+    fastClear(&arduboy, VIEWWIDTH, 0, WIDTH,HEIGHT);
+    FASTRECT(arduboy, VIEWWIDTH + 1, 0, WIDTH - 1, HEIGHT - 1, WHITE);
+
     tinyfont.setCursor(109, 4);
     tinyfont.print(F("3D"));
     tinyfont.setCursor(105, 9);
@@ -736,7 +742,13 @@ void drawMenu(bool showHint)
 
     if(showHint)
     {
-        arduboy.drawRect(MENUX + 5, HEIGHT - 15, 10, 10, WHITE);
+        FASTRECT(arduboy, MENUX + 5, HEIGHT - 15, MENUX + 14, HEIGHT - 6, WHITE);
+        //arduboy.drawFastVLine(MENUX + 5, HEIGHT - 15, 10, WHITE);
+        //arduboy.drawFastVLine(MENUX + 14, HEIGHT - 15, 10, WHITE);
+        //arduboy.drawFastHLine(MENUX + 5, HEIGHT - 15, 10, WHITE);
+        //arduboy.drawFastHLine(MENUX + 5, HEIGHT - 6, 10, WHITE);
+        //arduboy.drawRect(MENUX + 5, HEIGHT - 15, 10, 10, WHITE);
+        //fastRect(&arduboy, MENUX + 5, HEIGHT - 15, MENUX + 15, HEIGHT - 5, WHITE);
         arduboy.drawPixel(MENUX + 14, HEIGHT - 14, BLACK);
         arduboy.drawPixel(MENUX + 6 + (int)(posX / curWidth * 8), HEIGHT - 7 - (int)(posY / curHeight * 8), arduboy.frameCount & 0b10000 ? WHITE : BLACK);
     }
@@ -815,7 +827,7 @@ void setup()
     arduboy.boot();
     arduboy.flashlight();
     arduboy.initRandomSeed();
-    arduboy.clear();
+    //arduboy.clear();
     arduboy.setFrameRate(FRAMERATE);
     generateMaze();
     drawMenu(false);
