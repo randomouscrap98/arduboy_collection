@@ -39,14 +39,14 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 // This adds a large (~1.5kb) amount of code but significantly speeds
 // up execution. If possible, try to use this
-// #define CRITICALLOOPUNROLLING
+#define CRITICALLOOPUNROLLING
 
 
 // And now some debug stuff
 // #define DRAWMAPDEBUG         // Display map (will take up portion of screen)
 // #define LINEHEIGHTDEBUG      // Display information about lineheight (only draws a few lines)
 // #define NOWALLSHADING        // Wall shading actually reduces the cost... I must have a bug
- #define NOSPRITES            // Remove all sprites
+// #define NOSPRITES            // Remove all sprites
 #define ADDDEBUGAREA     // Add a little debug area
 //  #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
 
@@ -279,7 +279,7 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
     // ------- BEGIN CRITICAL SECTION -------------
     int16_t halfLine = lineHeight >> 1;
     uint8_t yStart = max(0, MIDSCREENY - halfLine);
-    uint8_t yEnd = min(HEIGHT, MIDSCREENY + halfLine);
+    uint8_t yEnd = min(HEIGHT, MIDSCREENY + halfLine); //EXCLUSIVE
 
     #if TEXPRECISION == 2
     UFixed<16,16> step = (float)TILESIZE / lineHeight;
@@ -352,6 +352,14 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
             uint8_t bm = fastlshift8(i & 7);
             _WALLBITUNROLL(bm, (~bm));
         }
+
+        //"Don't repeat yourself": that ship has sailed. Anyway, only write the last byte if we need to, otherwise
+        //we could legitimately write outside the bounds of the screen.
+        #ifdef CORNERSHADOWS
+        arduboy.sBuffer[bofs] = texByte & ~(fastlshift8(yEnd & 7));
+        #else
+        arduboy.sBuffer[bofs] = texByte;
+        #endif
     }
 
     #else // No loop unrolling
@@ -375,13 +383,17 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
     }
     while(++yStart < yEnd);
 
-    #endif
-
+    //The above loop specifically can't end where bidx = 0 and thus placing us outside the writable area. 
+    //Note that corner shadows are SLIGHTLY different between loop unrolled and not: we MUST move yEnd up,
+    //but the previous does not, giving perhaps a better effect
     #ifdef CORNERSHADOWS
-    arduboy.sBuffer[bofs] = texByte & ~(fastlshift8(yEnd & 7));
+    arduboy.sBuffer[bofs] = texByte & ~(fastlshift8((yEnd - 1) & 7));
     #else
     arduboy.sBuffer[bofs] = texByte;
     #endif
+
+    #endif
+
     // ------- END CRITICAL SECTION -------------
 }
 
@@ -455,10 +467,10 @@ void drawSprites()
         // calculate lowest and highest pixel to fill. Sprite screen/start X and Sprite screen/start Y
         // Because we have 1 fewer bit to store things, we unfortunately need an int16
         int16_t ssX = -(spriteWidth >> 1) + spriteScreenX;   //Offsets go here, but modified by distance or something?
-        int16_t ssXe = ssX + spriteWidth;
+        int16_t ssXe = ssX + spriteWidth; //EXCLUSIVE
 
         // Get out if sprite is completely outside view
-        if(ssXe < 0 || ssX >= VIEWWIDTH) continue;
+        if(ssXe < 0 || ssX > VIEWWIDTH) continue;
 
         //Calculate vMove from top 5 bits of state
         uint8_t yShiftBits = sprite.state >> 3;
@@ -466,14 +478,14 @@ void drawSprites()
         //The above didn't work without float math, didn't feel like figuring out the ridiculous type casting
 
         int16_t ssY = -(spriteHeight >> 1) + MIDSCREENY + yShift;
-        int16_t ssYe = ssY + spriteHeight;
+        int16_t ssYe = ssY + spriteHeight; //EXCLUSIVE
 
-        if(ssYe < 0 || ssY >= HEIGHT) continue;
+        if(ssYe < 0 || ssY > HEIGHT) continue;
 
         uint8_t drawStartY = ssY < 0 ? 0 : ssY; //Because of these checks, we can store them in 1 byte stuctures
-        uint8_t drawEndY = ssYe >= HEIGHT ? HEIGHT - 1 : ssYe;
+        uint8_t drawEndY = ssYe > HEIGHT ? HEIGHT : ssYe;
         uint8_t drawStartX = ssX < 0 ? 0 : ssX;
-        uint8_t drawEndX = ssXe >= VIEWWIDTH ? VIEWWIDTH - 1 : ssXe;
+        uint8_t drawEndX = ssXe > VIEWWIDTH ? VIEWWIDTH : ssXe;
 
         //Setup stepping to avoid costly mult (and div) in critical loops
         //These float divisions happen just once per sprite, hopefully that's not too bad
@@ -557,7 +569,7 @@ void drawSprites()
                     _SPRITEREADSCRBYTE();
                 }
 
-                //Last byte, but only need to do it if we don't simply span one byte
+                //Last byte, but only need to do it if we end in the middle of a byte and don't simply span one byte
                 if((drawEndY & 7) && startByte != endByte)
                 {
                     for (uint8_t i = thisWallByte * 8; i < drawEndY; i++)
@@ -565,6 +577,9 @@ void drawSprites()
                         uint8_t bm = fastlshift8(i & 7);
                         _SPRITEBITUNROLL(bm, (~bm));
                     }
+
+                    //Only need to set the last byte if we're drawing in it of course
+                    arduboy.sBuffer[bofs] = texByte;
                 }
 
                 #else // No loop unrolling
@@ -588,17 +603,20 @@ void drawSprites()
                     uint8_t bm = fastlshift8(bidx);
                     _SPRITEBITUNROLL(bm, ~bm);
                 }
-                while(++y <= drawEndY);
+                while(++y < drawEndY); //EXCLUSIVE
+
+                //The above loop specifically CAN'T reach the last byte, so although it's wasteful in the case of a 
+                //sprite ending at the bottom of the screen, it's still better than always incurring an if statement... maybe.
+                arduboy.sBuffer[bofs] = texByte;
 
                 #endif
 
-                arduboy.sBuffer[bofs] = texByte;
             }
 
             //This ONE step is why there has to be a big if statement up there. 
             texX += stepX;
         }
-        while(++x < drawEndX);
+        while(++x < drawEndX); //EXCLUSIVE
         // ------- END CRITICAL SECTION -------------
 
         #ifdef PRINTSPRITEDATA
