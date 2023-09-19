@@ -394,13 +394,13 @@ struct MazeType
 MazeSize getMazeSize(const MazeSize * sizes, uint8_t index) 
 {
     MazeSize result;
-    memcpy_P(&result, sizes + index, sizeof(MazeSize));
+    memcpy_P(&result, &sizes[index], sizeof(MazeSize));
     return result;
 }
 
 MazeType getMazeType(const MazeType * types, uint8_t index) 
 {
     MazeType result;
-    memcpy_P(&result, types + index, sizeof(MazeType));
+    memcpy_P(&result, &types[index], sizeof(MazeType));
     return result;
 }

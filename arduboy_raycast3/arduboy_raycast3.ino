@@ -39,14 +39,14 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 // This adds a large (~1.5kb) amount of code but significantly speeds
 // up execution. If possible, try to use this
-#define CRITICALLOOPUNROLLING
+// #define CRITICALLOOPUNROLLING
 
 
 // And now some debug stuff
 // #define DRAWMAPDEBUG         // Display map (will take up portion of screen)
 // #define LINEHEIGHTDEBUG      // Display information about lineheight (only draws a few lines)
 // #define NOWALLSHADING        // Wall shading actually reduces the cost... I must have a bug
-// #define NOSPRITES            // Remove all sprites
+ #define NOSPRITES            // Remove all sprites
 #define ADDDEBUGAREA     // Add a little debug area
 //  #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
 
@@ -373,7 +373,7 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
         uint8_t bm = fastlshift8(bidx);
         _WALLBITUNROLL(bm, ~bm);
     }
-    while(++yStart <= yEnd);
+    while(++yStart < yEnd);
 
     #endif
 
