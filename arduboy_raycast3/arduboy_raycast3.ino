@@ -28,7 +28,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 #define DRAWFOUNDATION      // You probably want the floor + whatever else that aren't walls
 #define WALLSHADING         // Disable smooth lighting, essentially. "LIGHTINTENSITY" still affects draw distance regardless
 
-//Optimization flags (greatly impacts performance)
+////Optimization flags (greatly impacts performance... I think?)
 #define TEXPRECISION 2          // Texture precision. 0 is lowest, 2 is highest. Lower = more performance but worse textures
 #define SPRITEPRECISION 0       // Sprite precision. Only options are 2 and 0. Lower = more performance, and I can't tell the difference
 #define CRITICALLOOPUNROLLING   // This adds a large (~1.5kb) amount of code but significantly increases performance, especially sprites
@@ -505,7 +505,7 @@ void drawSprites()
             {
                 uint8_t tx = texX.getInteger();
 
-                uflot texY = texYInit;
+                texY = texYInit;
 
                 //These five variables are needed as part of the loop unrolling system
                 uint16_t bofs;
