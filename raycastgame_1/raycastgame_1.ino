@@ -58,7 +58,7 @@ const uflot DARKNESS = 1 / LIGHTINTENSITY;
 constexpr uint8_t VIEWWIDTH = 100;
 constexpr uint8_t MIDSCREENY = HEIGHT / 2;
 constexpr uint8_t MIDSCREENX = VIEWWIDTH / 2;
-constexpr float INVWIDTH = 1.0 / VIEWWIDTH;
+constexpr flot INVWIDTH = 1.0 / VIEWWIDTH;
 constexpr flot INVHEIGHT = 1.0 / HEIGHT;
 constexpr uint8_t BWIDTH = WIDTH >> 3;
 
@@ -129,8 +129,8 @@ void clearRaycast()
 void raycastFoundation()
 {
     // Actually changed it to a full bg
-    //Sprites::drawOverwrite(0, 0, raycastBg, 0);
-    raycastFloor();
+    Sprites::drawOverwrite(0, 0, raycastBg, 0);
+    //raycastFloor();
 }
 
 // The full function for raycasting. 
@@ -399,7 +399,7 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
 }
 
 constexpr uint8_t FLOORSTART = MIDSCREENY + 1;
-constexpr float FLOORDIST[HEIGHT - FLOORSTART] = {
+constexpr flot FLOORDIST[HEIGHT - FLOORSTART] = {
     //-32.0/32, -31.0/32, -30.0/32, -29.0/32, -28.0/32, -27.0/32, -26.0/32, -25.0/32,
     //-24.0/32, -23.0/32, -22.0/32, -21.0/32, -20.0/32, -19.0/32, -18.0/32, -17.0/32,
     //-16.0/32, -15.0/32, -14.0/32, -13.0/32, -12.0/32, -11.0/32, -10.0/32, -9.0/32,
@@ -414,56 +414,6 @@ constexpr float FLOORDIST[HEIGHT - FLOORSTART] = {
     //-24.0/32, -25.0/32, -26.0/32, -27.0/32, -28.0/32, -29.0/32, //-22.0/32, -23.0/32,
 };
 
-void raycastFloor()
-{
-    clearRaycast();
-    //flot planeX = dY * (flot)FAKEFOV, planeY = - dX * (flot)FAKEFOV; // Camera vector or something, simple -90 degree rotate from dir
-    float planeX = dirY;
-    float planeY = -dirX;
-    float rayDirX0 = dirX - planeX;//- planeX;
-    float rayDirY0 = dirY - planeY;//- planeY;
-    float rayDirX1 = dirX + planeX;//+ planeX;
-    float rayDirY1 = dirY + planeY;//+ planeY;
-    //flot rayDirX0 = dirX - dirY;//- planeX;
-    //flot rayDirY0 = dirY + dirX;//- planeY;
-    //flot rayDirX1 = dirX + dirY;//+ planeX;
-    //flot rayDirY1 = dirY - dirX;//+ planeY;
-    float rayDirXDiff = rayDirX1 - rayDirX0;
-    float rayDirYDiff = rayDirY1 - rayDirY0;
-    //uflot rayDirXDiff = uflot(abs(rayDirX1 - rayDirX0))
-    float fpx = (float)posX, fpy = (float)posY;
-
-    uint16_t texture[TILESIZE];
-    for(uint8_t i = 0; i < TILESIZE; i++)
-        texture[i] = readTextureStrip16(tilesheet, 1, i);
-
-    for(uint8_t y = FLOORSTART; y < HEIGHT; y++)
-    {
-        //flot rowDistance = pgm_read_word(FLOORDIST + (y - FLOORSTART)); //FLOORDIST[y - FLOORSTART];
-        float rowDistance = FLOORDIST[y - FLOORSTART];
-        float floorStepX = rowDistance * rayDirXDiff * INVWIDTH;
-        float floorStepY = rowDistance * rayDirYDiff * INVWIDTH;
-
-        float floorX = fpx + rowDistance * rayDirX0;
-        float floorY = fpy + rowDistance * rayDirY0;
-
-        for(int x = 0; x < VIEWWIDTH; ++x)
-        {
-            // the cell coord is simply got from the integer parts of floorX and floorY
-            uint8_t cellX = floor(floorX); //.getInteger();
-            uint8_t cellY = floor(floorY); //.getInteger();
-
-            // get the texture coordinate from the fractional part
-            uint8_t tx = (uint8_t)(TILESIZE * (floorX - cellX)) & (TILESIZE - 1);
-            uint8_t ty = (uint8_t)(TILESIZE * (floorY - cellY)) & (TILESIZE - 1);
-
-            floorX += floorStepX;
-            floorY += floorStepY;
-
-            arduboy.drawPixel(x,y, (texture[tx] & fastlshift16(ty)) ? WHITE : BLACK);
-        }
-    }
-}
 
 
 void drawSprites()
