@@ -1,4 +1,7 @@
+#define SMALLENCODER_STANDARDENV
+
 #include "SmallEncoder.h"
+#include "WriteHeaders.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -41,6 +44,8 @@ char megatext[] = "And so it has come to pass, that the age of magic is gone"
     "insatiable greed! And so, without magic, the creatures of the world wither and decay into "
     "baser imitations of once great beings, and man dominates a banal world.";
 
+char lessertext[] = "Here is some text. I'm really hoping it has some small amount of compression. I'm doubtful.";
+
 int main()
 {
     //Try to encode some text.
@@ -49,12 +54,19 @@ int main()
         printf("Char is wrong size: %d\n", sizeof(char));
     }
 
-    runtest("This sure is some text, yessir. It would be a shame if it were to compress poorly.");
-    runtest("bacon bacon bacon bacon eggs eggs eggs eggs bacon bacon bacon bacon yeah");
-    runtest("You have come to the right place. I will teach you");
-    runtest("OK so let's try this with a lot of text\nYou see, there will often be a lot of text next to each other\nI'm hoping the dang system will give SOME level of compression\nEven though I know more complex compression schemes would produce significantly better results\nOh well");
-    runtest("GRAB THE SWORD\nYOU WIN!\nENTER NAME:\nTHIS GAME SUCKS\nYOU HAVE FOUND THE SECRET AREA\nHUFFMAN ENCODING IS BETTER\nBUFFMAN ENCODING");
-    runtest(megatext);
+    uint32_t textlen = strlen(lessertext);
+    uint8_t buffer[MAXBUFFERLENGTH] = {0};
+
+    int32_t length = encode_text_lz77((uint8_t *)lessertext, textlen, buffer, MAXBUFFERLENGTH);
+
+    write_blob("somevar.h", "somevar", buffer, length);
+
+    //runtest("This sure is some text, yessir. It would be a shame if it were to compress poorly.");
+    //runtest("bacon bacon bacon bacon eggs eggs eggs eggs bacon bacon bacon bacon yeah");
+    //runtest("You have come to the right place. I will teach you");
+    //runtest("OK so let's try this with a lot of text\nYou see, there will often be a lot of text next to each other\nI'm hoping the dang system will give SOME level of compression\nEven though I know more complex compression schemes would produce significantly better results\nOh well");
+    //runtest("GRAB THE SWORD\nYOU WIN!\nENTER NAME:\nTHIS GAME SUCKS\nYOU HAVE FOUND THE SECRET AREA\nHUFFMAN ENCODING IS BETTER\nBUFFMAN ENCODING");
+    //runtest(megatext);
 
     printf("Done\n");
 }

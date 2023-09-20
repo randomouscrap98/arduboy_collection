@@ -3,6 +3,12 @@
 #include <stdint.h>
 #include <algorithm>
 
+#ifdef SMALLENCODER_STANDARDENV
+#define SMALLENCODER_DIRECTREAD
+#else
+#include <Arduboy2.h>
+#endif
+
 //"ETX": end of text. Fitting I think. Why not 0? You can't read a compressed string as 
 //a string anyway, so that convention doesn't matter
 constexpr uint8_t DEFAULTDELIMITER = 0x03; //You CAN'T change this, it's part of the super simple encoder!
@@ -77,7 +83,12 @@ int32_t decode_text_lz77(uint8_t * compressed, int32_t length, uint8_t * outbuf,
 
     for(uint32_t i = 0; i < length; i++)
     {
-        uint8_t c = compressed[i];
+        uint8_t c;
+        #ifdef SMALLENCODER_DIRECTREAD
+        c = compressed[i];
+        #else
+        c = pgm_read_byte(compressed + i);
+        #endif
 
         //This is an encoded byte.
         if(c & 0x80)
