@@ -26,9 +26,9 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 //Visualization flags (barely impacts performance)
 #define CORNERSHADOWS       // Shadows at the bottom of walls help differentiate walls from floor
 #define DRAWFOUNDATION      // You probably want the floor + whatever else that aren't walls
-#define WALLSHADING         // Disable smooth lighting, essentially. "LIGHTINTENSITY" still affects draw distance regardless
+#define WALLSHADING 1       // Unset = no wall shading, 1 = shading, 2 = half resolution shading. "LIGHTINTENSITY" still affects draw distance regardless
 
-////Optimization flags (greatly impacts performance... I think?)
+//Optimization flags (greatly impacts performance... I think?)
 #define TEXPRECISION 2          // Texture precision. 0 is lowest, 2 is highest. Lower = more performance but worse textures
 #define SPRITEPRECISION 0       // Sprite precision. Only options are 2 and 0. Lower = more performance, and I can't tell the difference
 #define CRITICALLOOPUNROLLING   // This adds a large (~1.5kb) amount of code but significantly increases performance, especially sprites
@@ -42,7 +42,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 
 // Gameplay constants
-constexpr uint8_t FRAMERATE = 35;
+constexpr uint8_t FRAMERATE = 30;
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 constexpr uflot LIGHTINTENSITY = 1.5;
@@ -58,6 +58,8 @@ const uflot DARKNESS = 1 / LIGHTINTENSITY;
 constexpr uint8_t VIEWWIDTH = 100;
 constexpr uint8_t MIDSCREENY = HEIGHT / 2;
 constexpr uint8_t MIDSCREENX = VIEWWIDTH / 2;
+constexpr float INVWIDTH = 1.0 / VIEWWIDTH;
+constexpr flot INVHEIGHT = 1.0 / HEIGHT;
 constexpr uint8_t BWIDTH = WIDTH >> 3;
 
 //Distance-based stuff
@@ -127,7 +129,8 @@ void clearRaycast()
 void raycastFoundation()
 {
     // Actually changed it to a full bg
-    Sprites::drawOverwrite(0, 0, raycastBg, 0);
+    //Sprites::drawOverwrite(0, 0, raycastBg, 0);
+    raycastFloor();
 }
 
 // The full function for raycasting. 
@@ -225,14 +228,22 @@ void raycast()
         {
             distCache[x >> 1] = perpWallDist;
 
+            //This is a very complicated way of saying "put the shading code inside or outside this if statement"
             #ifdef WALLSHADING
+            #if WALLSHADING == 1
+        }
+            #endif
             //NOTE: multiplication is WAY FASTER than division, hence "darkness" value instead of light
             uint8_t dither = floorFixed(perpWallDist * DARKNESS * perpWallDist).getInteger();
             shade = (dither >= BAYERGRADIENTS) ? 0 : pgm_read_byte(b_shading + (dither * 4) + (x & 3));
-            #else
-            shade = (side & x) ? 0 : 0xFF;
-            #endif
+            #if WALLSHADING == 2
         }
+            #endif
+            #else
+        }
+        shade = 0xFF;
+            #endif
+
 
         if(side & x) shade = 0;
 
@@ -385,6 +396,73 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
     #endif
 
     // ------- END CRITICAL SECTION -------------
+}
+
+constexpr uint8_t FLOORSTART = MIDSCREENY + 1;
+constexpr float FLOORDIST[HEIGHT - FLOORSTART] = {
+    //-32.0/32, -31.0/32, -30.0/32, -29.0/32, -28.0/32, -27.0/32, -26.0/32, -25.0/32,
+    //-24.0/32, -23.0/32, -22.0/32, -21.0/32, -20.0/32, -19.0/32, -18.0/32, -17.0/32,
+    //-16.0/32, -15.0/32, -14.0/32, -13.0/32, -12.0/32, -11.0/32, -10.0/32, -9.0/32,
+    //-8.0/32,  -7.0/32,  -6.0/32,  -5.0/32,  -4.0/32,  -3.0/32,  -2.0/32,  -1.0/22
+    32.0/1, 32.0/2, 32.0/3, 32.0/4, 32.0/5, 32.0/6, 32.0/7, 32.0/8,
+    32.0/9, 32.0/10, 32.0/11, 32.0/12, 32.0/13, 32.0/14, 32.0/15, 32.0/16,
+    32.0/17, 32.0/18, 32.0/19, 32.0/20, 32.0/21, 32.0/22, 32.0/23, 32.0/24,
+    32.0/25, 32.0/26, 32.0/27, 32.0/28, 32.0/29, 32.0/30, 32.0/31, //32.0/32,
+    //0, -1.0/32, -2.0/32, -3.0/32, -4.0/32, -5.0/32, -6.0/32, -7.0/32,
+    //-8.0/32, -9.0/32, -10.0/32, -11.0/32, -12.0/32, -13.0/32, -14.0/32, -15.0/32,
+    //-16.0/32, -17.0/32, -18.0/32, -19.0/32, -20.0/32, -21.0/32, -22.0/32, -23.0/32,
+    //-24.0/32, -25.0/32, -26.0/32, -27.0/32, -28.0/32, -29.0/32, //-22.0/32, -23.0/32,
+};
+
+void raycastFloor()
+{
+    clearRaycast();
+    //flot planeX = dY * (flot)FAKEFOV, planeY = - dX * (flot)FAKEFOV; // Camera vector or something, simple -90 degree rotate from dir
+    float planeX = dirY;
+    float planeY = -dirX;
+    float rayDirX0 = dirX - planeX;//- planeX;
+    float rayDirY0 = dirY - planeY;//- planeY;
+    float rayDirX1 = dirX + planeX;//+ planeX;
+    float rayDirY1 = dirY + planeY;//+ planeY;
+    //flot rayDirX0 = dirX - dirY;//- planeX;
+    //flot rayDirY0 = dirY + dirX;//- planeY;
+    //flot rayDirX1 = dirX + dirY;//+ planeX;
+    //flot rayDirY1 = dirY - dirX;//+ planeY;
+    float rayDirXDiff = rayDirX1 - rayDirX0;
+    float rayDirYDiff = rayDirY1 - rayDirY0;
+    //uflot rayDirXDiff = uflot(abs(rayDirX1 - rayDirX0))
+    float fpx = (float)posX, fpy = (float)posY;
+
+    uint16_t texture[TILESIZE];
+    for(uint8_t i = 0; i < TILESIZE; i++)
+        texture[i] = readTextureStrip16(tilesheet, 1, i);
+
+    for(uint8_t y = FLOORSTART; y < HEIGHT; y++)
+    {
+        //flot rowDistance = pgm_read_word(FLOORDIST + (y - FLOORSTART)); //FLOORDIST[y - FLOORSTART];
+        float rowDistance = FLOORDIST[y - FLOORSTART];
+        float floorStepX = rowDistance * rayDirXDiff * INVWIDTH;
+        float floorStepY = rowDistance * rayDirYDiff * INVWIDTH;
+
+        float floorX = fpx + rowDistance * rayDirX0;
+        float floorY = fpy + rowDistance * rayDirY0;
+
+        for(int x = 0; x < VIEWWIDTH; ++x)
+        {
+            // the cell coord is simply got from the integer parts of floorX and floorY
+            uint8_t cellX = floor(floorX); //.getInteger();
+            uint8_t cellY = floor(floorY); //.getInteger();
+
+            // get the texture coordinate from the fractional part
+            uint8_t tx = (uint8_t)(TILESIZE * (floorX - cellX)) & (TILESIZE - 1);
+            uint8_t ty = (uint8_t)(TILESIZE * (floorY - cellY)) & (TILESIZE - 1);
+
+            floorX += floorStepX;
+            floorY += floorStepY;
+
+            arduboy.drawPixel(x,y, (texture[tx] & fastlshift16(ty)) ? WHITE : BLACK);
+        }
+    }
 }
 
 
