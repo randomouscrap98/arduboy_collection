@@ -16,17 +16,6 @@ constexpr uint8_t MAXMATCHLENGTH = 5;
 // 7 bits for length, 8 bits for back fill? then window is 256
 // 5 bits for back, 2 bits for length, length is 2 + length for up to 5
 
-// Window must be significantly larger. Hm...
-// hello, what are you doing here?
-// i'm here to avenge my mother
-// no you're not, go back to sleep
-// no, you don't understand. i must avenge her
-
-//// Find the real index into a circular window buffer
-//uint8_t windex(uint8_t x)
-//{
-//    return x & (WINDOWLENGTH - 1);
-//}
 
 // Encode text. You generally don't do this on device but figured might as well have it
 int32_t encode_text(uint8_t * text, int32_t length, uint8_t * outbuf, int32_t buflength)
@@ -40,17 +29,15 @@ int32_t encode_text(uint8_t * text, int32_t length, uint8_t * outbuf, int32_t bu
         uint8_t findlen = 0;
         int32_t findpos = 0;
 
-        //Scan window, which just means scan backwards in text
+        //Scan window, which just means scan backwards in text. wp is direct index into 'window' (text)
         for(int8_t wp = tp - 1; wp >= std::max<int32_t>(0, tp - WINDOWLENGTH); wp--)
         {
             uint8_t thisfindlen = 0;
 
             //Scan forward for the max match, break when nothing found
-            for(uint8_t sp = wp; sp < tp; sp++)
-            {
-                if(text[tp + thisfindlen] != text[sp] || thisfindlen > MAXMATCHLENGTH) break;
-                thisfindlen++;
-            }
+            for(thisfindlen; thisfindlen < MAXMATCHLENGTH; thisfindlen++)
+                if(wp + thisfindlen >= length || text[wp + thisfindlen] != text[tp + thisfindlen]) 
+                    break;
 
             //If we found a greater match, store the parameters
             if(thisfindlen > findlen)
@@ -63,8 +50,6 @@ int32_t encode_text(uint8_t * text, int32_t length, uint8_t * outbuf, int32_t bu
             if(findlen == MAXMATCHLENGTH)
                 break;
         }
-
-        int32_t otp = tp;
 
         //We scanned the window, only store 'compressed value' if enough found
         if(findlen >= MINMATCHLENGTH)
@@ -102,10 +87,10 @@ int32_t decode_text(uint8_t * compressed, int32_t length, uint8_t * outbuf, int3
             uint8_t len = MINMATCHLENGTH + (c & 0b11);
             uint8_t back = ((c >> 2) & 0b11111) + 1;
 
-            for(uint8_t wp = 0; wp < len; wp++)
+            for(len; len > 0; len--)
             {
                 outbuf[textlen] = outbuf[textlen - back];
-                if(++textlen == buflength && wp != len - 1) return -1;
+                if(++textlen == buflength && len != 1) return -1;
             }
         }
         else
