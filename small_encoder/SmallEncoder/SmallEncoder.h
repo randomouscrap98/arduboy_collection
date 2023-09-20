@@ -146,7 +146,8 @@ int16_t decode_partial_text_lz77(uint8_t * compressed, uint16_t length, uint8_t 
         }
         else
         {
-            window[wp++] = c;
+            window[wp & LZ77WINDOWMASK] = c;
+            wp++;
             if(c == SMALLENCODER_DEFAULTDELIMITER) pos--;
         }
 
@@ -155,7 +156,7 @@ int16_t decode_partial_text_lz77(uint8_t * compressed, uint16_t length, uint8_t 
             for(owp; owp < wp; owp++)
             {
                 if(textlen >= buflength) return -1;
-                outbuf[textlen++] = window[owp];
+                outbuf[textlen++] = window[owp & LZ77WINDOWMASK];
             }
         }
         else if (pos < 0)

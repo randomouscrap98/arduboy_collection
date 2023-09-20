@@ -9,7 +9,7 @@
 
 constexpr int16_t MAXBUFFERLENGTH = 1000;
 
-//#define SHOWTEXT
+// #define SHOWTEXT
 
 #define ENCODEFUNC(t,tl,b,bl) encode_text_lz77(t,tl,b,bl)
 #define DECODEFUNC(b,bl,t,tl) decode_partial_text_lz77(b,bl,t,tl,0)
@@ -25,15 +25,15 @@ void runtest(const char * text)
     uint32_t decodedlen = DECODEFUNC(buffer, encodedlen, (uint8_t *)outtext, MAXBUFFERLENGTH);
     printf("Original text length: %d, encoded: %d, decoded: %d\n", textlen, encodedlen, decodedlen);
 
-    if(strncmp(text, outtext, textlen)) {
-        printf("Decoded string does not match encoded\n");
-        exit(1);
-    }
-
     #ifdef SHOWTEXT
     printf(" > %s\n", text);
     printf(" < %s\n", outtext);
     #endif
+
+    if(strncmp(text, outtext, textlen)) {
+        printf("Decoded string does not match encoded\n");
+        exit(1);
+    }
 }
 
 char megatext[] = "And so it has come to pass, that the age of magic is gone"
