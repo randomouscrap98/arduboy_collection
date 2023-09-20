@@ -50,6 +50,15 @@ char megatext[] = "And so it has come to pass, that the age of magic is gone"
     "insatiable greed! And so, without magic, the creatures of the world wither and decay into "
     "baser imitations of once great beings, and man dominates a banal world.";
 
+char megatext2[] = "I needed to do things for every bit in a byte, but iterate over a large number of bits. "
+    "Some badness here comes from the if statement, which must be executed every bit, the calculation of yStart "
+    "& 7 (and a variable to hold it, registers are limited ofc) and the fastlshift8, which is a lookup table. "
+    "Lookup tables are very fast but they still take time, I have to index into the array and read from program memory, "
+    "which is a bit slow, maybe 7 cycles. This has significant benefits. It removes the need to check if bidx is 0, "
+    "because that's just the start of the loop. So I can do it directly within the new loop. The new loop iterates 8 "
+    "TIMES fewer, so that's a huge savings from not doing compares and increments. And finally, I don't have to do a "
+    "lookup table anymore, because I just pass in the constant that came from the table (8 times).";
+
 char lessertext[] = "Here is some text. I'm really hoping it has some small amount of compression. I'm doubtful.";
 
 int main()
@@ -67,6 +76,7 @@ int main()
     runtest("GRAB THE SWORD\nYOU WIN!\nENTER NAME:\nTHIS GAME SUCKS\nYOU HAVE FOUND THE SECRET AREA\nHUFFMAN ENCODING IS BETTER\nBUFFMAN ENCODING");
     runtest("ok so here's the deal. i need you to go find some mushrooms. they're red and whatever. you know, the smelly kind, like in zelda. you know zelda, right?");
     runtest(megatext);
+    runtest(megatext2);
 
     printf("Total savings: %d / %d = %f\n", total_saved, total_bytes, (float)total_saved / total_bytes * 100);
 
