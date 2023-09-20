@@ -5,7 +5,7 @@
 //"ETX": end of text. Fitting I think. Why not 0? You can't read a compressed string as 
 //a string anyway, so that convention doesn't matter
 constexpr uint8_t DEFAULTDELIMITER = 0x03; //You CAN'T change this, it's part of the super simple encoder!
-constexpr uint8_t WINDOWLENGTH = 8;    //You CAN'T change this; it's part of the super simple encoder
+constexpr uint8_t WINDOWLENGTH = 4;    //You CAN'T change this; it's part of the super simple encoder
 constexpr uint8_t MINMATCHLENGTH = 2;
 constexpr uint8_t MAXMATCHLENGTH = 5;
 
@@ -71,7 +71,7 @@ int32_t encode_text(uint8_t * text, uint32_t length, uint8_t * outbuf, uint32_t 
         if(findlen >= MINMATCHLENGTH)
         {
             //high bit for "encoded", 5 bits for scanback, 2 bits for len
-            outbuf[outlength] = 0x80 | (findpos << 2) | (findlen - 2);
+            outbuf[outlength] = 0x80 | (findpos << 2) | (findlen - MINMATCHLENGTH);
             tp += findlen;
         }
         else
@@ -101,7 +101,6 @@ int32_t decode_text(uint8_t * compressed, uint32_t length, uint8_t * outbuf, uin
     for(uint32_t i = 0; i < length; i++)
     {
         uint8_t c = compressed[i];
-
         uint8_t ocw = curwin;
 
         //This is an encoded byte.
@@ -111,7 +110,11 @@ int32_t decode_text(uint8_t * compressed, uint32_t length, uint8_t * outbuf, uin
             uint8_t pos = (c >> 2) & 0b11111;
 
             for(uint8_t wp = 0; wp < len; wp++)
-                window[windex(curwin++)] = window[windex(pos + wp)];
+            {
+                outbuf[textlen++] = window[windex(ocw)];
+                if(textlen > buflength) return -1;
+            }
+                //window[windex(curwin++)] = window[windex(pos + wp)];
         }
         else
         {
