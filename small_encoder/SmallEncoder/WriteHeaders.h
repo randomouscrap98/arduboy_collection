@@ -9,7 +9,7 @@
 #define BYTESPERLINE 16
 #endif
 
-void write_blob(char * filename, char * varname, uint8_t * blob, int32_t length)
+void write_blob(const char * filename, const char * varname, uint8_t * blob, int32_t length)
 {
     std::ofstream myfile;
     myfile.open (filename);

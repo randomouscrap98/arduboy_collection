@@ -7,12 +7,12 @@
 #include <string.h>
 #include <stdlib.h>
 
-constexpr int MAXBUFFERLENGTH = 1000;
+constexpr int16_t MAXBUFFERLENGTH = 1000;
 
 //#define SHOWTEXT
 
-#define ENCODEFUNC encode_text_lz77
-#define DECODEFUNC decode_text_lz77
+#define ENCODEFUNC(t,tl,b,bl) encode_text_lz77(t,tl,b,bl)
+#define DECODEFUNC(b,bl,t,tl) decode_partial_text_lz77(b,bl,t,tl,0)
 
 void runtest(const char * text)
 {
@@ -54,19 +54,17 @@ int main()
         printf("Char is wrong size: %d\n", sizeof(char));
     }
 
+    runtest("This sure is some text, yessir. It would be a shame if it were to compress poorly.");
+    runtest("bacon bacon bacon bacon eggs eggs eggs eggs bacon bacon bacon bacon yeah");
+    runtest("You have come to the right place. I will teach you");
+    runtest("OK so let's try this with a lot of text\nYou see, there will often be a lot of text next to each other\nI'm hoping the dang system will give SOME level of compression\nEven though I know more complex compression schemes would produce significantly better results\nOh well");
+    runtest("GRAB THE SWORD\nYOU WIN!\nENTER NAME:\nTHIS GAME SUCKS\nYOU HAVE FOUND THE SECRET AREA\nHUFFMAN ENCODING IS BETTER\nBUFFMAN ENCODING");
+    runtest(megatext);
+
     uint32_t textlen = strlen(lessertext);
     uint8_t buffer[MAXBUFFERLENGTH] = {0};
-
     int32_t length = encode_text_lz77((uint8_t *)lessertext, textlen, buffer, MAXBUFFERLENGTH);
-
     write_blob("somevar.h", "somevar", buffer, length);
-
-    //runtest("This sure is some text, yessir. It would be a shame if it were to compress poorly.");
-    //runtest("bacon bacon bacon bacon eggs eggs eggs eggs bacon bacon bacon bacon yeah");
-    //runtest("You have come to the right place. I will teach you");
-    //runtest("OK so let's try this with a lot of text\nYou see, there will often be a lot of text next to each other\nI'm hoping the dang system will give SOME level of compression\nEven though I know more complex compression schemes would produce significantly better results\nOh well");
-    //runtest("GRAB THE SWORD\nYOU WIN!\nENTER NAME:\nTHIS GAME SUCKS\nYOU HAVE FOUND THE SECRET AREA\nHUFFMAN ENCODING IS BETTER\nBUFFMAN ENCODING");
-    //runtest(megatext);
 
     printf("Done\n");
 }
