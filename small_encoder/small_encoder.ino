@@ -20,7 +20,7 @@ void loop()
     arduboy.clear();
 
     char text[150];
-    decode_text_lz77((uint8_t *)somevar, somevar_length, (uint8_t *)text, 150);
+    decode_partial_text_lz77((uint8_t *)somevar, somevar_length, (uint8_t *)text, 150, 0);
     arduboy.print(strlen(text));
 
     arduboy.display();

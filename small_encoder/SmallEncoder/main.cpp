@@ -14,6 +14,9 @@ constexpr int16_t MAXBUFFERLENGTH = 1000;
 #define ENCODEFUNC(t,tl,b,bl) encode_text_lz77(t,tl,b,bl)
 #define DECODEFUNC(b,bl,t,tl) decode_partial_text_lz77(b,bl,t,tl,0)
 
+int total_saved = 0;
+int total_bytes = 0;
+
 void runtest(const char * text)
 {
     uint32_t textlen = strlen(text);
@@ -24,6 +27,9 @@ void runtest(const char * text)
     uint32_t encodedlen = ENCODEFUNC((uint8_t *)text, textlen, buffer, MAXBUFFERLENGTH);
     uint32_t decodedlen = DECODEFUNC(buffer, encodedlen, (uint8_t *)outtext, MAXBUFFERLENGTH);
     printf("Original text length: %d, encoded: %d, decoded: %d\n", textlen, encodedlen, decodedlen);
+
+    total_saved += (textlen - encodedlen);
+    total_bytes += textlen;
 
     #ifdef SHOWTEXT
     printf(" > %s\n", text);
@@ -59,7 +65,10 @@ int main()
     runtest("You have come to the right place. I will teach you");
     runtest("OK so let's try this with a lot of text\nYou see, there will often be a lot of text next to each other\nI'm hoping the dang system will give SOME level of compression\nEven though I know more complex compression schemes would produce significantly better results\nOh well");
     runtest("GRAB THE SWORD\nYOU WIN!\nENTER NAME:\nTHIS GAME SUCKS\nYOU HAVE FOUND THE SECRET AREA\nHUFFMAN ENCODING IS BETTER\nBUFFMAN ENCODING");
+    runtest("ok so here's the deal. i need you to go find some mushrooms. they're red and whatever. you know, the smelly kind, like in zelda. you know zelda, right?");
     runtest(megatext);
+
+    printf("Total savings: %d / %d = %f\n", total_saved, total_bytes, (float)total_saved / total_bytes * 100);
 
     uint32_t textlen = strlen(lessertext);
     uint8_t buffer[MAXBUFFERLENGTH] = {0};
