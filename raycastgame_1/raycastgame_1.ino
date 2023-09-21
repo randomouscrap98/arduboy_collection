@@ -12,7 +12,6 @@
 #include "shading.h"
 
 // Graphics
-// #include "resources/menu.h"
 #include "resources/raycastbg.h"
 #include "spritesheet.h"
 #include "tilesheet.h"
@@ -27,6 +26,8 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 #define CORNERSHADOWS       // Shadows at the bottom of walls help differentiate walls from floor
 #define DRAWFOUNDATION      // You probably want the floor + whatever else that aren't walls
 #define WALLSHADING 1       // Unset = no wall shading, 1 = shading, 2 = half resolution shading. "LIGHTINTENSITY" still affects draw distance regardless
+#define ALTWALLSHADING      // Make perpendicular walls half-shaded to increase readability
+//#define WHITEFOG            // Make distance shading white instead of black
 
 //Optimization flags (greatly impacts performance... I think?)
 #define TEXPRECISION 2          // Texture precision. 0 is lowest, 2 is highest. Lower = more performance but worse textures
@@ -224,28 +225,30 @@ void raycast()
         }
         while (perpWallDist < VIEWDISTANCE && tile == TILEEMPTY);
 
+        //Only calc distance for every other point to save a lot of memory (100 bytes)
         if((x & 1) == 0)
         {
             distCache[x >> 1] = perpWallDist;
 
-            //This is a very complicated way of saying "put the shading code inside or outside this if statement"
-            #ifdef WALLSHADING
-            #if WALLSHADING == 1
-        }
-            #endif
-            //NOTE: multiplication is WAY FASTER than division, hence "darkness" value instead of light
-            uint8_t dither = floorFixed(perpWallDist * DARKNESS * perpWallDist).getInteger();
-            shade = (dither >= BAYERGRADIENTS) ? 0 : pgm_read_byte(b_shading + (dither * 4) + (x & 3));
             #if WALLSHADING == 2
-        }
+            //Since we're in here anyway, do the half-res shading too (if requested)
+            shade = calcShading(perpWallDist, x, DARKNESS);
             #endif
-            #else
         }
+
+        #if WALLSHADING == 1
+        //Full res shading happens every frame of course
+        shade = calcShading(perpWallDist, x, DARKNESS);
+        #endif
+        #ifndef WALLSHADING
+        //If you're not having any wall shading, it's always fully set
         shade = 0xFF;
-            #endif
+        #endif
 
-
+        #ifdef ALTWALLSHADING
+        //Every other row of alt walls get no shading to make them easier to read
         if(side & x) shade = 0;
+        #endif
 
         // If the above loop was exited without finding a tile, there's nothing to draw
         if(tile == TILEEMPTY) continue;
@@ -305,7 +308,11 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
     //Write previously read wall byte, go to next byte
     #define _WALLWRITENEXT() arduboy.sBuffer[bofs] = texByte; thisWallByte++;
     //Work for setting bits of wall byte
+    #ifdef WHITEFOG
+    #define _WALLBITUNROLL(bm,nbm) if(!(shade & (bm)) || (texData & fastlshift16(texPos.getInteger()))) texByte |= (bm); else texByte &= (nbm); texPos += step;
+    #else
     #define _WALLBITUNROLL(bm,nbm) if((shade & (bm)) && (texData & fastlshift16(texPos.getInteger()))) texByte |= (bm); else texByte &= (nbm); texPos += step;
+    #endif
 
     _WALLREADBYTE();
 

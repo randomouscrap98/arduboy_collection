@@ -1,5 +1,8 @@
 #pragma once
 
+#include "utils.h"
+#include <FixedPoints.h>
+
 constexpr uint8_t BAYERGRADIENTS = 16;
 
 // Bayer gradients, not including the 0 fill (useless?).
@@ -22,3 +25,10 @@ constexpr uint8_t b_shading[] PROGMEM = {
     0x44, 0x00, 0x22, 0x00,
     0x44, 0x00, 0x00, 0x00, // 14
 };
+
+// Compute the shading byte for the given distance and x value
+inline uint8_t calcShading(uflot perpWallDist, uint8_t x, const uflot DARKNESS)
+{
+    uint8_t dither = floorFixed(perpWallDist * DARKNESS * perpWallDist).getInteger();
+    return (dither >= BAYERGRADIENTS) ? 0 : pgm_read_byte(b_shading + (dither * 4) + (x & 3));
+}
