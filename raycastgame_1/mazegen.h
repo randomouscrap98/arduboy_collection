@@ -23,7 +23,7 @@ constexpr uint8_t SPARSEFILLRATE = 8; //Actually 1 / N
 // are generated width and height; we don't use the width/height provided by map
 void genMazeType(RcMap * map, uint8_t width, uint8_t height, uflot * posX, uflot * posY, float * dirX, float * dirY)
 {
-    fillMap(map, TILEWALL);
+    map->fillMap(TILEWALL);
 
     //They MUST be odd
     oddify(width);
@@ -45,12 +45,12 @@ void genMazeType(RcMap * map, uint8_t width, uint8_t height, uflot * posX, uflot
         // row set tracker
         for(uint8_t x = xStart; x <= xEnd; x += 2)
         {
-            setMapCell(map, x, y, TILEEMPTY);
+            map->setCell(x, y, TILEEMPTY);
 
             // This works no matter which row we're on because the top row has a 
             // full ceiling, and thus will "initialize" the row sets to all individual
             // sets. Otherwise, the row retains the set from the previous row.
-            if(getMapCell(map, x, y - 1) == TILEWALL)
+            if(map->getCell(x, y - 1) == TILEWALL)
                 row[x >> 1] = ++setId;
         }
         
@@ -71,7 +71,7 @@ void genMazeType(RcMap * map, uint8_t width, uint8_t height, uflot * posX, uflot
                         break;
                     row[i] = flood; //min(row[xrow - 1], row[xrow]);
                 }
-                setMapCell(map, x - 1, y, TILEEMPTY);
+                map->setCell(x - 1, y, TILEEMPTY);
             }
         }
 
@@ -102,7 +102,7 @@ void genMazeType(RcMap * map, uint8_t width, uint8_t height, uflot * posX, uflot
                     //connect to the next row
                     for(uint8_t i = xStart; i <= xEnd; i += 2)
                     {
-                        if(row[(x >> 1)] == row[(i >> 1)] && getMapCell(map, i, y + 1) == TILEEMPTY)
+                        if(row[(x >> 1)] == row[(i >> 1)] && map->getCell(i, y + 1) == TILEEMPTY)
                         {
                             mustConnect = 0;
                             break;
@@ -113,17 +113,17 @@ void genMazeType(RcMap * map, uint8_t width, uint8_t height, uflot * posX, uflot
                 if(mustConnect || random(ELLERVTCHANCE) == 0)
                 {
                     // DON'T need to set the row, we scan for walls in the next iteration
-                    setMapCell(map, x, y + 1, TILEEMPTY);
+                    map->setCell(x, y + 1, TILEEMPTY);
                 }
             }
         }
     } 
 
-    setMapCell(map, xEnd + 1, yEnd, TILEEXIT);
+    map->setCell(xEnd + 1, yEnd, TILEEXIT);
 
     * posX = 1.6; *posY = 1.6;
 
-    if(getMapCell(map, xStart + 1, yStart) == TILEEMPTY) {
+    if(map->getCell(xStart + 1, yStart) == TILEEMPTY) {
         * dirX = 1;
         * dirY = 0;
     }
@@ -135,7 +135,7 @@ void genMazeType(RcMap * map, uint8_t width, uint8_t height, uflot * posX, uflot
 
 void genSparseRandom(RcMap * map, uint8_t width, uint8_t height, uflot * posX, uflot * posY, float * dirX, float * dirY)
 {
-    fillMap(map, TILEWALL);
+    map->fillMap(TILEWALL);
 
     uint8_t xStart = 1;
     uint8_t yStart = 1;
@@ -144,7 +144,7 @@ void genSparseRandom(RcMap * map, uint8_t width, uint8_t height, uflot * posX, u
 
     for(uint8_t y = yStart; y <= yEnd; ++y)
         for(uint8_t x = xStart; x <= xEnd; ++x)
-            setMapCell(map, x, y, TILEEMPTY);
+            map->setCell(x, y, TILEEMPTY);
 
     //Generate an amount of random dots proportional to filling 1/8 of the total inner area. Don't place any
     //on the edges
@@ -152,10 +152,10 @@ void genSparseRandom(RcMap * map, uint8_t width, uint8_t height, uflot * posX, u
     uint8_t inHeight = height - 4;
     for(uint8_t i = 0; i < inWidth * inHeight / SPARSEFILLRATE; ++i)
     {
-        setMapCell(map, xStart + 1 + random(inWidth), yStart + 1 + random(inHeight), TILEWALL);
+        map->setCell(xStart + 1 + random(inWidth), yStart + 1 + random(inHeight), TILEWALL);
     }
 
-    setMapCell(map, xEnd + 1, yEnd, TILEEXIT);
+    map->setCell(xEnd + 1, yEnd, TILEEXIT);
 
     * posX = 1.6; *posY = 1.6;
     * dirX = 1;

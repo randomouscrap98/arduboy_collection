@@ -1,7 +1,5 @@
 #pragma once
 
-#include <ArduboyRaycast.h>
-
 //All tiles should be 8 bytes I think
 constexpr uint8_t TILEEMPTY = 0x00;
 constexpr uint8_t TILEWALL = 0x01;
@@ -9,11 +7,6 @@ constexpr uint8_t TILEEXIT = 0x02;
 constexpr uint8_t TILEDOOR = 0x03;
 
 constexpr uint8_t TILESIZE = 16;
-
-inline bool isCellSolid(RcMap * map, uint8_t x, uint8_t y)
-{
-  return getMapCell(map, x, y) & 1;
-}
 
 
 constexpr uint8_t tilesheet[] PROGMEM

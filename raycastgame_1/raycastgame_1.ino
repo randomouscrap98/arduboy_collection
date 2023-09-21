@@ -6,6 +6,7 @@
 
 // Libs for raycasting
 #include <ArduboyRaycast.h>
+#include <ArduboyRaycast_Map.h>
 #include <ArduboyRaycast_Extra.h>
 
 #include "mazegen.h"
@@ -61,19 +62,21 @@ constexpr MazeSize MAZESIZES[MAZESIZECOUNT] PROGMEM = {
 };
 
 
+RcPlayer player;
+RaycastInstance instance;
+
 //Big data!
 uint8_t mapBuffer[MAPHEIGHT * MAPWIDTH];
+RcSprite spritesBuffer[NUMSPRITES];
+RcBounds boundsBuffer[NUMBOUNDS];
+SSprite tempcontainer[NUMSPRITES];
+
 RcMap worldMap {
     mapBuffer,
     MAPWIDTH,
     MAPHEIGHT
 };
 
-RcPlayer player { };
-
-RcSprite spritesBuffer[NUMSPRITES];
-RcBounds boundsBuffer[NUMBOUNDS];
-SSprite tempcontainer[NUMSPRITES];
 RcSpriteGroup sprites {
     spritesBuffer,
     tempcontainer,
@@ -82,19 +85,36 @@ RcSpriteGroup sprites {
     NUMBOUNDS
 };
 
-RcVisualConfig vconfig;
+
+
+//setLightIntensity(&rcstate, (uflot)1.5);
+
+//RaycastState rcstate {};
+//setLightIntensity(&rcstate, (uflot)1.5);
+//setLightIntensity(&rcstate, 1.5);
+
+//rcstate.tilesheet = tilesheet;
+//rcstate.spritesheet = spritesheet;
+//rcstate.spritesheet_mask = spritesheet_Mask;
 
 
 //Draw the floor underneath the raycast walls (ultra simple for now to save cycles)
 void raycastFoundation()
 {
     // Actually changed it to a full bg
-    Sprites::drawOverwrite(0, 0, raycastBg, 0);
+    //Sprites::drawOverwrite(0, 0, raycastBg, 0);
     //raycastFloor();
 }
 
 //Simple redirection for movement attempt
-bool solidChecker(uint8_t x, uint8_t y) { return isCellSolid(&worldMap, x, y); }
+bool solidChecker(uint8_t x, uint8_t y) { 
+    return worldMap.getCell(x, y) & 1; 
+}
+
+bool inExit() { 
+    return worldMap.getCell((int)player.posX, (int)player.posY) == TILEEXIT; 
+}
+
 
 // Perform ONLY player movement updates! No drawing!
 void movement()
@@ -115,8 +135,6 @@ void movement()
 
     tryMovement(&player, &sprites, movement, rotation, &solidChecker);
 }
-
-inline bool inExit() { return getMapCell(&worldMap, (int)player.posX, (int)player.posY) == TILEEXIT; }
 
 //Menu functionality, move the cursor, select things (redraws automatically)
 void doMenu()
@@ -186,7 +204,7 @@ void drawMenu(bool showHint)
 void generateMaze()
 {
     clearRaycast(&arduboy);
-    resetGroup(&sprites);
+    sprites.resetAll();
     tinyfont.setCursor(12, 28);
     tinyfont.print(F("Generating maze"));
     arduboy.display();
@@ -200,17 +218,17 @@ void generateMaze()
     curHeight = mzs.height;
 
     #ifdef ADDDEBUGAREA
-    setMapCell(&worldMap, 5, 0, TILEDOOR);
-    addSprite(&sprites, 4.5, 1.4, SPRITEBARREL, 1, 8, NULL);
-    addSprite(&sprites, 6.5, 1.4, SPRITEBARREL, 1, 8, NULL);
-    addSprite(&sprites, 7, 5, SPRITECHEST, 1, 8, NULL);
-    addSprite(&sprites, 4, 3, SPRITEMONSTER, 1, 0, behavior_bat);
-    RcSprite * sp = addSprite(&sprites, 6, 3, SPRITELEVER, 1, 8, behavior_animate_16);
+    worldMap.setCell(5, 0, TILEDOOR);
+    sprites.addSprite(4.5, 1.4, SPRITEBARREL, 1, 8, NULL);
+    sprites.addSprite(6.5, 1.4, SPRITEBARREL, 1, 8, NULL);
+    sprites.addSprite(7, 5, SPRITECHEST, 1, 8, NULL);
+    sprites.addSprite(4, 3, SPRITEMONSTER, 1, 0, behavior_bat);
+    RcSprite * sp = sprites.addSprite(6, 3, SPRITELEVER, 1, 8, behavior_animate_16);
     sp->intstate[0] = SPRITELEVER;
     sp->intstate[1] = 2;
     for(uint8_t y = 1; y < 8; y++)
         for(uint8_t x = 3; x < 8; x++)
-            setMapCell(&worldMap, x, y, TILEEMPTY);
+            worldMap.setCell(x, y, TILEEMPTY);
     #endif
 }
 
@@ -222,6 +240,10 @@ void setup()
     arduboy.flashlight();
     arduboy.initRandomSeed();
     arduboy.setFrameRate(FRAMERATE);
+    instance.setLightIntensity(1.5);
+    instance.tilesheet = tilesheet;
+    instance.spritesheet = spritesheet;
+    instance.spritesheet_mask = spritesheet_Mask;
     generateMaze();
     drawMenu(false);
 }
@@ -254,10 +276,10 @@ void loop()
         raycastFoundation();
         #endif
 
-        raycastWalls(&player, &worldMap, &arduboy, tilesheet, &vconfig);
+        instance.raycastWalls(&player, &worldMap, &arduboy);
         #ifndef NOSPRITES
-        runSprites(&sprites, &arduboy);
-        drawSprites(&player, &sprites, &arduboy, spritesheet, spritesheet_Mask);
+        sprites.runSprites(&arduboy);
+        instance.drawSprites(&player, &sprites, &arduboy); //spritesheet, spritesheet_Mask);
         #endif
         movement();
 
