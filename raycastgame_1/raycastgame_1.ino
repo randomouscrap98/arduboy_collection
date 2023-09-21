@@ -2,20 +2,14 @@
 #include <FixedPoints.h>
 #include <Arduboy2.h>
 
-#include <math.h>
-
 // Libs (sort of; mostly just code organization)
 #include "utils.h"
 #include "rcmap.h"
 #include "mazegen.h"
-#include "shading.h"
-
-#define RSPRITEINTSTATE 2
 #include "rcsprite.h"
 #include "behaviors.h"
 
 #include "raycast.h"
-
 
 // Graphics
 #include "resources/raycastbg.h"
@@ -27,24 +21,16 @@
 Arduboy2Base arduboy;
 Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
 
-
 // And now some debug stuff
 // #define DRAWMAPDEBUG         // Display map (will take up portion of screen)
 // #define NOSPRITES            // Remove all sprites
  #define ADDDEBUGAREA     // Add a little debug area
 //  #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
 
-
 // Gameplay constants
 constexpr uint8_t FRAMERATE = 30;
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
-
-//These are calculated constants based off your light intensity. The view 
-//distance is an optimization; increase light intensity to increase view distance.
-//We calculate "darkness" to avoid 100 divisions per frame (huuuge savings)
-
-//Screen calc constants (no need to do it at runtime)
 
 //Distance-based stuff
 constexpr float MINSPRITEDISTANCE = 0.2;
@@ -84,18 +70,10 @@ RcMap worldMap {
     MAPWIDTH,
     MAPHEIGHT
 };
-RcPlayer player {
-
-};
+RcPlayer player { };
 RSprite sprites[NUMSPRITES];
 RBounds bounds[NUMBOUNDS];
 
-
-// Full clear the raycast area. Not always used
-void clearRaycast() 
-{
-    fastClear(&arduboy, 0, 0, VIEWWIDTH, HEIGHT);
-}
 
 //Draw the floor underneath the raycast walls (ultra simple for now to save cycles)
 void raycastFoundation()
@@ -108,8 +86,8 @@ void raycastFoundation()
 
 void drawSprites()
 {
-    SFixed<11,4> fposx = (SFixed<11,4>)posX;
-    SFixed<11,4> fposy = (SFixed<11,4>)posY;
+    SFixed<11,4> fposx = (SFixed<11,4>)player.posX;
+    SFixed<11,4> fposy = (SFixed<11,4>)player.posY;
 
     //Make a temp sort array on stack
     uint8_t usedSprites = 0;
@@ -141,8 +119,8 @@ void drawSprites()
         usedSprites++;
     }
 
-    float planeX = dirY, planeY = -dirX;
-    float invDet = 1.0 / (planeX * dirY - planeY * dirX); // required for correct matrix multiplication
+    float planeX = player.dirY, planeY = -player.dirX;
+    float invDet = 1.0 / (planeX * player.dirY - planeY * player.dirX); // required for correct matrix multiplication
 
     // after sorting the sprites, do the projection and draw them. We know all sprites in the array are active,
     // since we're looping against the sorted array.
@@ -161,7 +139,7 @@ void drawSprites()
         // Nice quick shortcut to get out for sprites behind us (and ones that are too close)
         if(transformYT < MINSPRITEDISTANCE) continue;
 
-        float transformXT = invDet * (dirY * spriteX - dirX * spriteY);
+        float transformXT = invDet * (player.dirY * spriteX - player.dirX * spriteY);
 
         //int16 because easy overflow! if x is much larger than y, then you're effectively multiplying 50 by map width.
         // NOTE: this is the CENTER of the sprite, not the edge (thankfully)
@@ -409,9 +387,9 @@ void doMenu()
     int8_t menuMod = 0;
     int8_t selectMod = 0;
 
-    if(arduboy.justPressed(UP_BUTTON))
+    if(arduboy.pressed(A_BUTTON) && arduboy.justPressed(UP_BUTTON))
         menuMod = -1;
-    if(arduboy.justPressed(DOWN_BUTTON))
+    if(arduboy.pressed(A_BUTTON) && arduboy.justPressed(DOWN_BUTTON))
         menuMod = 1;
 
     menumod(menuIndex, menuMod, MENUITEMS);
@@ -438,8 +416,6 @@ void drawMenu(bool showHint)
     constexpr uint8_t MENUX = 105;
     constexpr uint8_t MENUY = 22;
     constexpr uint8_t MENUSPACING = 6;
-
-    //Sprites::drawOverwrite(VIEWWIDTH, 0, menu, 0);
 
     fastClear(&arduboy, VIEWWIDTH, 0, WIDTH,HEIGHT);
     FASTRECT(arduboy, VIEWWIDTH + 1, 0, WIDTH - 1, HEIGHT - 1, WHITE);
@@ -495,7 +471,7 @@ uint8_t addSprite(float x, float y, uint8_t frame, uint8_t shrinkLevel, int8_t h
 // Generate a new maze and reset the game to an initial playable state
 void generateMaze()
 {
-    clearRaycast();
+    clearRaycast(&arduboy);
     resetSprites();
     tinyfont.setCursor(12, 28);
     tinyfont.print(F("Generating maze"));
@@ -547,7 +523,7 @@ void loop()
     // Funny game no state variable haha
     if(inExit()) 
     {
-        clearRaycast();
+        clearRaycast(&arduboy);
 
         constexpr uint8_t WINX = 22;
         constexpr uint8_t WINY = 32;
@@ -564,7 +540,7 @@ void loop()
         clearRaycast();
         #endif
 
-        raycastWalls(&player, &worldMap, &arduboy);
+        raycastWalls(&player, &worldMap, &arduboy, tilesheet);
         #ifndef NOSPRITES
         runSprites();
         drawSprites();

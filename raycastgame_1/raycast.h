@@ -44,155 +44,24 @@ constexpr uflot MINLDISTANCE = 1.0f / LDISTSAFE;
 constexpr uint16_t MAXLHEIGHT = VIEWHEIGHT * LDISTSAFE;
 // ------------------------------------------------------------------------------
 
+// Some assumptions (please try to follow these instead of changing them)
+constexpr uint8_t RCEMPTY = 0;
+constexpr uint8_t RCTILESIZE = 16;
+
 // Globals that are required for this to run (sorry)
 uflot distCache[VIEWWIDTH / 2]; // Half distance resolution means sprites will clip 1 pixel into walls sometimes but otherwise...
 
-
-// The full function for raycasting. 
-void raycastWalls(RcPlayer * p, RcMap * map, Arduboy2Base * arduboy)
+// Full clear specifically the raycast area. Note that if your view height is not aligned to a byte boundary,
+// this will overclear the raycast area.
+void clearRaycast(Arduboy2Base * arduboy) 
 {
-    //Waste ~20 bytes of stack to save numerous cycles on render (and on programmer. leaving posX + posY floats so...)
-    uint8_t pmapX = p->posX.getInteger();
-    uint8_t pmapY = p->posY.getInteger();
-    uflot pmapofsX = p->posX - pmapX;
-    uflot pmapofsY = p->posY - pmapY;
-    flot fposX = (flot)p->posX, fposY = (flot)p->posY;
-    flot dX = p->dirX, dY = p->dirY;
-    flot planeX = dY * (flot)FAKEFOV, planeY = - dX * (flot)FAKEFOV; // Camera vector or something, simple -90 degree rotate from dir
-    constexpr flot INVWIDTH = 2.0f / VIEWWIDTH;
-
-    uint8_t shade = 0;
-
-    for (uint8_t x = 0; x < VIEWWIDTH; x++)
-    {
-        flot cameraX = x * INVWIDTH - 1; // x-coordinate in camera space
-
-        // The camera plane is a simple -90 degree rotation on the player direction (as required for this algorithm).
-        flot rayDirX = dX + planeX * cameraX;
-        flot rayDirY = dY + planeY * cameraX;
-
-        // length of ray from one x or y-side to next x or y-side. But we prefill it with
-        // some initial data which has to be massaged later.
-        uflot deltaDistX = (uflot)abs(rayDirX); //Temp value; may not be used
-        uflot deltaDistY = (uflot)abs(rayDirY); //same
-
-        // length of ray from current position to next x or y-side
-        uflot sideDistX = MAXFIXED;
-        uflot sideDistY = MAXFIXED;
-
-        // what direction to step in x or y-direction (either +1 or -1)
-        int8_t stepX = 0;
-        int8_t stepY = 0;
-
-        // With this DDA stepping algorithm, have to be careful about making too-large values
-        // with our tiny fixed point numbers. Make some arbitrarily small cutoff point for
-        // even trying to deal with steps in that direction. As long as the map size is 
-        // never larger than 1 / NEARZEROFIXED on any side, it will be fine (that means
-        // map has to be < 100 on a side with this)
-        if(deltaDistX > NEARZEROFIXED) {
-            deltaDistX = uReciprocalNearUnit(deltaDistX); 
-            if (rayDirX < 0) {
-                stepX = -1;
-                sideDistX = pmapofsX * deltaDistX;
-            }
-            else {
-                stepX = 1;
-                sideDistX = (1 - pmapofsX) * deltaDistX;
-            }
-        }
-        if(deltaDistY > NEARZEROFIXED) {
-            deltaDistY = uReciprocalNearUnit(deltaDistY); 
-            if (rayDirY < 0) {
-                stepY = -1;
-                sideDistY = pmapofsY * deltaDistY;
-            }
-            else {
-                stepY = 1;
-                sideDistY = (1 - pmapofsY) * deltaDistY;
-            }
-        }
-
-        uint8_t side;           // was a NS or a EW wall hit?
-        uint8_t mapX = pmapX;   // which box of the map the ray collision is in
-        uint8_t mapY = pmapY;
-        uflot perpWallDist = 0;     // perpendicular distance (not real distance)
-        uint8_t tile = TILEEMPTY;   // tile that was hit by ray
-
-        // perform DDA. A do/while loop is ever-so-slightly faster it seems?
-        do
-        {
-            // jump to next map square, either in x-direction, or in y-direction
-            if (sideDistX < sideDistY) {
-                perpWallDist = sideDistX; // Remember that sideDist is actual distance and not distance only in 1 direction
-                sideDistX += deltaDistX;
-                mapX += stepX;
-                side = 0; //0 = xside hit
-            }
-            else {
-                perpWallDist = sideDistY;
-                sideDistY += deltaDistY;
-                mapY += stepY;
-                side = 1; //1 = yside hit
-            }
-            // Check if ray has hit a wall
-            tile = getMapCell(map, mapX, mapY);
-        }
-        while (perpWallDist < VIEWDISTANCE && tile == TILEEMPTY);
-
-        //Only calc distance for every other point to save a lot of memory (100 bytes)
-        if((x & 1) == 0)
-        {
-            distCache[x >> 1] = perpWallDist;
-
-            #if WALLSHADING == 2
-            //Since we're in here anyway, do the half-res shading too (if requested)
-            shade = calcShading(perpWallDist, x, DARKNESS);
-            #endif
-        }
-
-        #if WALLSHADING == 1
-        //Full res shading happens every frame of course
-        shade = calcShading(perpWallDist, x, DARKNESS);
-        #endif
-        #ifndef WALLSHADING
-        //If you're not having any wall shading, it's always fully set
-        shade = 0xFF;
-        #endif
-
-        #ifdef ALTWALLSHADING
-        //Every other row of alt walls get no shading to make them easier to read
-        if(side & x) shade = 0;
-        #endif
-
-        // If the above loop was exited without finding a tile, there's nothing to draw
-        if(tile == TILEEMPTY) continue;
-
-        //NOTE: wallX technically can only be positive, but I'm using flot to save a tiny amount from casting
-        flot wallX = side ? fposX + (flot)perpWallDist * rayDirX : fposY + (flot)perpWallDist * rayDirY;
-        wallX -= floorFixed(wallX); //.getFraction isn't working!
-        uint8_t texX = uint8_t(wallX * TILESIZE);
-        if((side == 0 && rayDirX > 0) || (side == 1 && rayDirY < 0)) texX = TILESIZE - 1 - texX;
-
-        // Calculate half height of line to draw on screen. We already know the distance to the wall.
-        // We can truncate the total height if too close to the wall right here and now and avoid future checks.
-        uint16_t lineHeight = (perpWallDist <= MINLDISTANCE) ? MAXLHEIGHT : (VIEWHEIGHT / (float)perpWallDist);
-
-        #ifdef LINEHEIGHTDEBUG
-        tinyfont.setCursor(16, x * 16);
-        tinyfont.println(lineHeight);
-        tinyfont.setCursor(16, x * 16 + 8);
-        tinyfont.println((float)perpWallDist);
-        if(x > 2) break;
-        #endif
-
-        //ending should be exclusive
-        drawWallLine(x, lineHeight, shade, side, tile, texX, arduboy);
-    }
+    fastClear(arduboy, 0, 0, VIEWWIDTH, VIEWHEIGHT);
 }
+
 
 //Draw a single raycast wall line. Will only draw specifically the wall line and will clip out all the rest
 //(so you can predraw a ceiling and floor before calling raycast)
-void drawWallLine(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side, uint8_t tile, uint8_t texX, Arduboy2Base * arduboy) 
+void drawWallLine(uint8_t x, uint16_t lineHeight, uint8_t shade, uint16_t texData, Arduboy2Base * arduboy) 
 {
     // ------- BEGIN CRITICAL SECTION -------------
     int16_t halfLine = lineHeight >> 1;
@@ -200,13 +69,12 @@ void drawWallLine(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side, u
     uint8_t yEnd = min(VIEWHEIGHT, MIDSCREENY + halfLine); //EXCLUSIVE
 
     //Everyone prefers the high precision tiles (and for some reason, it's now faster? so confusing...)
-    UFixed<16,16> step = (float)TILESIZE / lineHeight;
+    UFixed<16,16> step = (float)RCTILESIZE / lineHeight;
     UFixed<16,16> texPos = (yStart + halfLine - MIDSCREENY) * step;
 
     //These four variables are needed as part of the loop unrolling system
     uint16_t bofs;
     uint8_t texByte;
-    uint16_t texData = readTextureStrip16(tilesheet, tile, texX);
     uint8_t thisWallByte = (((yStart >> 1) >> 1) >> 1);
     uint8_t * sbuffer = arduboy->sBuffer;
 
@@ -311,3 +179,159 @@ void drawWallLine(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side, u
 
     // ------- END CRITICAL SECTION -------------
 }
+
+// The full function for raycasting. 
+void raycastWalls(RcPlayer * p, RcMap * map, Arduboy2Base * arduboy, const uint8_t * tilesheet)
+{
+    //Waste ~20 bytes of stack to save numerous cycles on render (and on programmer. leaving posX + posY floats so...)
+    uint8_t pmapX = p->posX.getInteger();
+    uint8_t pmapY = p->posY.getInteger();
+    uflot pmapofsX = p->posX - pmapX;
+    uflot pmapofsY = p->posY - pmapY;
+    flot fposX = (flot)p->posX, fposY = (flot)p->posY;
+    flot dX = p->dirX, dY = p->dirY;
+    flot planeX = dY * (flot)FAKEFOV, planeY = - dX * (flot)FAKEFOV; // Camera vector or something, simple -90 degree rotate from dir
+    constexpr flot INVWIDTH = 2.0f / VIEWWIDTH;
+
+    uint8_t shade = 0;
+    uint8_t texX = 0;
+    uint16_t texData = 0;
+
+    uint8_t lastTile = RCEMPTY;
+    uint8_t lastTexX = 0;
+
+    for (uint8_t x = 0; x < VIEWWIDTH; x++)
+    {
+        flot cameraX = x * INVWIDTH - 1; // x-coordinate in camera space
+
+        // The camera plane is a simple -90 degree rotation on the player direction (as required for this algorithm).
+        flot rayDirX = dX + planeX * cameraX;
+        flot rayDirY = dY + planeY * cameraX;
+
+        // length of ray from one x or y-side to next x or y-side. But we prefill it with
+        // some initial data which has to be massaged later.
+        uflot deltaDistX = (uflot)abs(rayDirX); //Temp value; may not be used
+        uflot deltaDistY = (uflot)abs(rayDirY); //same
+
+        // length of ray from current position to next x or y-side
+        uflot sideDistX = MAXFIXED;
+        uflot sideDistY = MAXFIXED;
+
+        // what direction to step in x or y-direction (either +1 or -1)
+        int8_t stepX = 0;
+        int8_t stepY = 0;
+
+        // With this DDA stepping algorithm, have to be careful about making too-large values
+        // with our tiny fixed point numbers. Make some arbitrarily small cutoff point for
+        // even trying to deal with steps in that direction. As long as the map size is 
+        // never larger than 1 / NEARZEROFIXED on any side, it will be fine (that means
+        // map has to be < 100 on a side with this)
+        if(deltaDistX > NEARZEROFIXED) {
+            deltaDistX = uReciprocalNearUnit(deltaDistX); 
+            if (rayDirX < 0) {
+                stepX = -1;
+                sideDistX = pmapofsX * deltaDistX;
+            }
+            else {
+                stepX = 1;
+                sideDistX = (1 - pmapofsX) * deltaDistX;
+            }
+        }
+        if(deltaDistY > NEARZEROFIXED) {
+            deltaDistY = uReciprocalNearUnit(deltaDistY); 
+            if (rayDirY < 0) {
+                stepY = -1;
+                sideDistY = pmapofsY * deltaDistY;
+            }
+            else {
+                stepY = 1;
+                sideDistY = (1 - pmapofsY) * deltaDistY;
+            }
+        }
+
+        uint8_t side;           // was a NS or a EW wall hit?
+        uint8_t mapX = pmapX;   // which box of the map the ray collision is in
+        uint8_t mapY = pmapY;
+        uflot perpWallDist = 0;   // perpendicular distance (not real distance)
+        uint8_t tile = RCEMPTY;   // tile that was hit by ray
+
+        // perform DDA. A do/while loop is ever-so-slightly faster it seems?
+        do
+        {
+            // jump to next map square, either in x-direction, or in y-direction
+            if (sideDistX < sideDistY) {
+                perpWallDist = sideDistX; // Remember that sideDist is actual distance and not distance only in 1 direction
+                sideDistX += deltaDistX;
+                mapX += stepX;
+                side = 0; //0 = xside hit
+            }
+            else {
+                perpWallDist = sideDistY;
+                sideDistY += deltaDistY;
+                mapY += stepY;
+                side = 1; //1 = yside hit
+            }
+            // Check if ray has hit a wall
+            tile = getMapCell(map, mapX, mapY);
+        }
+        while (perpWallDist < VIEWDISTANCE && tile == RCEMPTY);
+
+        //Only calc distance for every other point to save a lot of memory (100 bytes)
+        if((x & 1) == 0)
+        {
+            distCache[x >> 1] = perpWallDist;
+
+            #if WALLSHADING == 2
+            //Since we're in here anyway, do the half-res shading too (if requested)
+            shade = calcShading(perpWallDist, x, DARKNESS);
+            #endif
+        }
+
+        #if WALLSHADING == 1
+        //Full res shading happens every frame of course
+        shade = calcShading(perpWallDist, x, DARKNESS);
+        #endif
+        #ifndef WALLSHADING
+        //If you're not having any wall shading, it's always fully set
+        shade = 0xFF;
+        #endif
+
+        #ifdef ALTWALLSHADING
+        //Every other row of alt walls get no shading to make them easier to read
+        if(side & x) shade = 0;
+        #endif
+
+        // If the above loop was exited without finding a tile, there's nothing to draw
+        if(tile == RCEMPTY) continue;
+
+        //NOTE: wallX technically can only be positive, but I'm using flot to save a tiny amount from casting
+        flot wallX = side ? fposX + (flot)perpWallDist * rayDirX : fposY + (flot)perpWallDist * rayDirY;
+        wallX -= floorFixed(wallX); //.getFraction isn't working!
+        texX = uint8_t(wallX * RCTILESIZE);
+        if((side == 0 && rayDirX > 0) || (side == 1 && rayDirY < 0)) texX = RCTILESIZE - 1 - texX;
+
+        //Loading the texture is more expensive than this if statement
+        if(tile != lastTile || texX != lastTexX)
+        {
+            texData = readTextureStrip16(tilesheet, tile, texX);
+            lastTile = tile;
+            lastTexX = texX;
+        }
+
+        // Calculate half height of line to draw on screen. We already know the distance to the wall.
+        // We can truncate the total height if too close to the wall right here and now and avoid future checks.
+        uint16_t lineHeight = (perpWallDist <= MINLDISTANCE) ? MAXLHEIGHT : (VIEWHEIGHT / (float)perpWallDist);
+
+        #ifdef LINEHEIGHTDEBUG
+        tinyfont.setCursor(16, x * 16);
+        tinyfont.println(lineHeight);
+        tinyfont.setCursor(16, x * 16 + 8);
+        tinyfont.println((float)perpWallDist);
+        if(x > 2) break;
+        #endif
+
+        //ending should be exclusive
+        drawWallLine(x, lineHeight, shade, texData, arduboy);
+    }
+}
+

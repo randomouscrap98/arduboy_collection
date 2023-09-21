@@ -1,16 +1,18 @@
 #pragma once
 
-#include "utils.h"
 #include <FixedPoints.h>
+
+#include "utils.h"
+
+// As with raycast.h, I unfortunately require you to make changes to this file if you
+// want different results.
+constexpr uint8_t RSINTERNALSTATEBYTES = 2;
 
 // These are bitmasks to get data out of state
 constexpr uint8_t RSSTATEACTIVE = 0b00000001;
 constexpr uint8_t RSSTATESHRINK = 0b00000110;
 constexpr uint8_t RSTATEYOFFSET = 0b11111000;
 
-#ifndef RSPRITEINTSTATE
-#define RSPRITEINTSTATE 2
-#endif
 
 // Try to make this fit into as little space as possible
 struct RSprite {
@@ -20,9 +22,7 @@ struct RSprite {
     uint8_t state = 0; // First bit is active, next 2 are how many times to /2 for size
     void (* behavior)(RSprite*,Arduboy2Base*) = NULL;
 
-    //#ifdef RSPRITEINTSTATE
-    uint8_t intstate[RSPRITEINTSTATE];
-    //#endif
+    uint8_t intstate[RSINTERNALSTATEBYTES];
 
     //Note: if we sacrifice 2 bytes per sprite to store the distance (so 32 bytes currently), 
     //you can potentially save computation by sorting the sprite list itself. Sorted lists 
