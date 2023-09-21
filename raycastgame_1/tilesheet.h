@@ -1,6 +1,6 @@
 #pragma once
 
-#include "lib/rcmap.h"
+#include <ArduboyRaycast.h>
 
 //All tiles should be 8 bytes I think
 constexpr uint8_t TILEEMPTY = 0x00;

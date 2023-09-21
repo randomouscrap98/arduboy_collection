@@ -2,12 +2,11 @@
 #include <FixedPoints.h>
 #include <Arduboy2.h>
 
+#define RCVIEWWIDTH 100
+
 // Libs for raycasting
-#include "lib/utils.h"
-#include "lib/rcmap.h"
-#include "lib/rcsprite.h"
-#include "lib/raycast.h"
-#include "lib/rcextra.h"
+#include <ArduboyRaycast.h>
+#include <ArduboyRaycast_Extra.h>
 
 #include "mazegen.h"
 #include "behaviors.h"
@@ -25,6 +24,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // And now some debug stuff
 // #define DRAWMAPDEBUG         // Display map (will take up portion of screen)
 // #define NOSPRITES            // Remove all sprites
+// #define NOFLOOR
  #define ADDDEBUGAREA     // Add a little debug area
 //  #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
 
@@ -81,6 +81,8 @@ RcSpriteGroup sprites {
     boundsBuffer,
     NUMBOUNDS
 };
+
+RcVisualConfig vconfig;
 
 
 //Draw the floor underneath the raycast walls (ultra simple for now to save cycles)
@@ -246,13 +248,13 @@ void loop()
     }
     else
     {
-        #ifdef DRAWFOUNDATION
-        raycastFoundation();
-        #else
+        #ifdef NOFLOOR
         clearRaycast(&arduboy);
+        #else
+        raycastFoundation();
         #endif
 
-        raycastWalls(&player, &worldMap, &arduboy, tilesheet);
+        raycastWalls(&player, &worldMap, &arduboy, tilesheet, &vconfig);
         #ifndef NOSPRITES
         runSprites(&sprites, &arduboy);
         drawSprites(&player, &sprites, &arduboy, spritesheet, spritesheet_Mask);
