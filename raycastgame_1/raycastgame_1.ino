@@ -7,6 +7,7 @@
 #include "lib/rcmap.h"
 #include "lib/rcsprite.h"
 #include "lib/raycast.h"
+#include "lib/rcextra.h"
 
 #include "mazegen.h"
 #include "behaviors.h"
@@ -89,56 +90,27 @@ void raycastFoundation()
     //raycastFloor();
 }
 
-
+//Simple redirection for movement attempt
+bool solidChecker(uint8_t x, uint8_t y) { return isCellSolid(&worldMap, x, y); }
 
 // Perform ONLY player movement updates! No drawing!
 void movement()
 {
-    uflot newPosX = player.posX;
-    uflot newPosY = player.posY;
+    float movement = 0;
+    float rotation = 0;
 
     // move forward if no wall in front of you
     if (arduboy.pressed(UP_BUTTON))
-    {
-        newPosX += player.dirX * MOVESPEED;
-        newPosY += player.dirY * MOVESPEED;
-    }
+        movement = MOVESPEED;
     if (arduboy.pressed(DOWN_BUTTON))
-    {
-        newPosX -= player.dirX * MOVESPEED;
-        newPosY -= player.dirY * MOVESPEED;
-    }
-
-    if(isCellSolid(&worldMap, newPosX.getInteger(), player.posY.getInteger())) newPosX = player.posX;
-    if(isCellSolid(&worldMap, player.posX.getInteger(), newPosY.getInteger())) newPosY = player.posY;
-
-    for(uint8_t i = 0; i < NUMBOUNDS; i++)
-    {
-        if(!ISSPRITEACTIVE(boundsBuffer[i]))
-            continue;
-
-        if(newPosX > boundsBuffer[i].x1 && newPosX < boundsBuffer[i].x2 && player.posY > boundsBuffer[i].y1 && player.posY < boundsBuffer[i].y2)
-            newPosX = player.posX;
-        if(player.posX > boundsBuffer[i].x1 && player.posX < boundsBuffer[i].x2 && newPosY > boundsBuffer[i].y1 && newPosY < boundsBuffer[i].y2)
-            newPosY = player.posY;
-    }
-
-    player.posX = newPosX;
-    player.posY = newPosY;
-
-    float rotation = 0;
+        movement = -MOVESPEED;
 
     if (arduboy.pressed(RIGHT_BUTTON))
         rotation = -ROTSPEED;
     if (arduboy.pressed(LEFT_BUTTON))
         rotation = ROTSPEED;
 
-    if(rotation)
-    {
-        float oldDirX = player.dirX;
-        player.dirX = player.dirX * cos(rotation) - player.dirY * sin(rotation);
-        player.dirY = oldDirX * sin(rotation) + player.dirY * cos(rotation);
-    }
+    tryMovement(&player, &sprites, movement, rotation, &solidChecker);
 }
 
 inline bool inExit() { return getMapCell(&worldMap, (int)player.posX, (int)player.posY) == TILEEXIT; }
