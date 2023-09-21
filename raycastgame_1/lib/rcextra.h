@@ -19,17 +19,20 @@ void tryMovement(RcPlayer * player, RcSpriteGroup * sprites, float movement, flo
         if (solidChecker(posX.getInteger(), newPosY.getInteger()))
             newPosY = posY;
 
-        uint8_t numbounds = sprites->numbounds;
-        for (uint8_t i = 0; i < numbounds; i++)
+        if(sprites)
         {
-            RcBounds *bounds = &sprites->bounds[i];
-            if (!ISSPRITEACTIVE((*bounds)))
-                continue;
+            uint8_t numbounds = sprites->numbounds;
+            for (uint8_t i = 0; i < numbounds; i++)
+            {
+                RcBounds *bounds = &sprites->bounds[i];
+                if (!ISSPRITEACTIVE((*bounds)))
+                    continue;
 
-            if (newPosX > bounds->x1 && newPosX < bounds->x2 && posY > bounds->y1 && posY < bounds->y2)
-                newPosX = posX;
-            if (posX > bounds->x1 && posX < bounds->x2 && newPosY > bounds->y1 && newPosY < bounds->y2)
-                newPosY = posY;
+                if (newPosX > bounds->x1 && newPosX < bounds->x2 && posY > bounds->y1 && posY < bounds->y2)
+                    newPosX = posX;
+                if (posX > bounds->x1 && posX < bounds->x2 && newPosY > bounds->y1 && newPosY < bounds->y2)
+                    newPosY = posY;
+            }
         }
 
         player->posX = newPosX;
