@@ -7,9 +7,15 @@
 // Libs (sort of; mostly just code organization)
 #include "utils.h"
 #include "rcmap.h"
-#include "rcsprite.h"
 #include "mazegen.h"
 #include "shading.h"
+
+#define RSPRITEINTSTATE 2
+#include "rcsprite.h"
+#include "behaviors.h"
+
+#include "raycast.h"
+
 
 // Graphics
 #include "resources/raycastbg.h"
@@ -22,19 +28,8 @@ Arduboy2Base arduboy;
 Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
 
 
-//Visualization flags (barely impacts performance)
-#define CORNERSHADOWS       // Shadows at the bottom of walls help differentiate walls from floor
-#define DRAWFOUNDATION      // You probably want the floor + whatever else that aren't walls
-#define WALLSHADING 1       // Unset = no wall shading, 1 = shading, 2 = half resolution shading. "LIGHTINTENSITY" still affects draw distance regardless
-#define ALTWALLSHADING      // Make perpendicular walls half-shaded to increase readability
-//#define WHITEFOG            // Make distance shading white instead of black
-
-//Optimization flags (greatly impacts performance... I think?)
-#define CRITICALLOOPUNROLLING   // This adds a large (~1.5kb) amount of code but significantly increases performance, especially sprites
-
 // And now some debug stuff
 // #define DRAWMAPDEBUG         // Display map (will take up portion of screen)
-// #define LINEHEIGHTDEBUG      // Display information about lineheight (only draws a few lines)
 // #define NOSPRITES            // Remove all sprites
  #define ADDDEBUGAREA     // Add a little debug area
 //  #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
@@ -44,31 +39,19 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 constexpr uint8_t FRAMERATE = 30;
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
-constexpr uflot LIGHTINTENSITY = 1.5;
-constexpr uflot FAKEFOV = 1.0;      // Not that useful, may break. 1 = 90, higher = more than 90
 
 //These are calculated constants based off your light intensity. The view 
 //distance is an optimization; increase light intensity to increase view distance.
 //We calculate "darkness" to avoid 100 divisions per frame (huuuge savings)
-const uflot VIEWDISTANCE = sqrt(BAYERGRADIENTS * (float)LIGHTINTENSITY);
-const uflot DARKNESS = 1 / LIGHTINTENSITY;
 
 //Screen calc constants (no need to do it at runtime)
-constexpr uint8_t VIEWWIDTH = 100;
-constexpr uint8_t MIDSCREENY = HEIGHT / 2;
-constexpr uint8_t MIDSCREENX = VIEWWIDTH / 2;
-constexpr flot INVWIDTH = 1.0 / VIEWWIDTH;
-constexpr flot INVHEIGHT = 1.0 / HEIGHT;
-constexpr uint8_t BWIDTH = WIDTH >> 3;
 
 //Distance-based stuff
-constexpr uint8_t LDISTSAFE = 16;
-constexpr uflot MINLDISTANCE = 1.0f / LDISTSAFE;
-constexpr uint16_t MAXLHEIGHT = HEIGHT * LDISTSAFE;
 constexpr float MINSPRITEDISTANCE = 0.2;
 
 // Size limit for data structures
 constexpr uint8_t NUMSPRITES = 32;
+constexpr uint8_t NUMBOUNDS = 16;
 constexpr uint8_t MAPWIDTH = 16;
 constexpr uint8_t MAPHEIGHT = 16;
 
@@ -81,29 +64,16 @@ uint8_t mazeType = 0;
 uint8_t curWidth = 0;
 uint8_t curHeight = 0;
 
-uint8_t totalWins = 1; //lol
-float thisDistance = 0;
-uint16_t totalDistance = 0;
-
-// Position and facing direction
-uflot posX, posY;
-float dirX, dirY; //These HAVE TO be float, or something with a lot more precision
-
 constexpr uint8_t MAZETYPECOUNT = 2;
 constexpr MazeType MAZETYPES[MAZETYPECOUNT] PROGMEM = {
     { "MAZ", &genMazeType },
     { "EPT", &genSparseRandom },
-    //{ "BKR", &genRoomsType }, // I may add more later? (2023-09-14 for the lols)
-    //{ "CEL", &genCellType }
 };
 
 constexpr uint8_t MAZESIZECOUNT = 2;
 constexpr MazeSize MAZESIZES[MAZESIZECOUNT] PROGMEM = {
     { "SML", 11, 11 },  //NOTE: must always be 2N + 1
     { "MED", 15, 15 },
-    //{ "LRG", 15, 15},
-    //{ "XL ", 47, 47 },
-    // { "XXL", 60, 60 } //Only if we have room (we don't)
 };
 
 
@@ -114,8 +84,11 @@ RcMap worldMap {
     MAPWIDTH,
     MAPHEIGHT
 };
-uflot distCache[VIEWWIDTH / 2]; // Half distance resolution means sprites will clip 1 pixel into walls sometimes but otherwise...
+RcPlayer player {
+
+};
 RSprite sprites[NUMSPRITES];
+RBounds bounds[NUMBOUNDS];
 
 
 // Full clear the raycast area. Not always used
@@ -130,269 +103,6 @@ void raycastFoundation()
     // Actually changed it to a full bg
     Sprites::drawOverwrite(0, 0, raycastBg, 0);
     //raycastFloor();
-}
-
-// The full function for raycasting. 
-void raycast()
-{
-    //Waste ~20 bytes of stack to save numerous cycles on render (and on programmer. leaving posX + posY floats so...)
-    uint8_t pmapX = posX.getInteger();
-    uint8_t pmapY = posY.getInteger();
-    uflot pmapofsX = posX - pmapX;
-    uflot pmapofsY = posY - pmapY;
-    flot fposX = (flot)posX, fposY = (flot)posY;
-    flot dX = dirX, dY = dirY;
-    flot planeX = dY * (flot)FAKEFOV, planeY = - dX * (flot)FAKEFOV; // Camera vector or something, simple -90 degree rotate from dir
-    constexpr flot INVWIDTH = 2.0f / VIEWWIDTH;
-
-    uint8_t shade = 0;
-
-    for (uint8_t x = 0; x < VIEWWIDTH; x++)
-    {
-        flot cameraX = x * INVWIDTH - 1; // x-coordinate in camera space
-
-        // The camera plane is a simple -90 degree rotation on the player direction (as required for this algorithm).
-        flot rayDirX = dX + planeX * cameraX;
-        flot rayDirY = dY + planeY * cameraX;
-
-        // length of ray from one x or y-side to next x or y-side. But we prefill it with
-        // some initial data which has to be massaged later.
-        uflot deltaDistX = (uflot)abs(rayDirX); //Temp value; may not be used
-        uflot deltaDistY = (uflot)abs(rayDirY); //same
-
-        // length of ray from current position to next x or y-side
-        uflot sideDistX = MAXFIXED;
-        uflot sideDistY = MAXFIXED;
-
-        // what direction to step in x or y-direction (either +1 or -1)
-        int8_t stepX = 0;
-        int8_t stepY = 0;
-
-        // With this DDA stepping algorithm, have to be careful about making too-large values
-        // with our tiny fixed point numbers. Make some arbitrarily small cutoff point for
-        // even trying to deal with steps in that direction. As long as the map size is 
-        // never larger than 1 / NEARZEROFIXED on any side, it will be fine (that means
-        // map has to be < 100 on a side with this)
-        if(deltaDistX > NEARZEROFIXED) {
-            deltaDistX = uReciprocalNearUnit(deltaDistX); 
-            if (rayDirX < 0) {
-                stepX = -1;
-                sideDistX = pmapofsX * deltaDistX;
-            }
-            else {
-                stepX = 1;
-                sideDistX = (1 - pmapofsX) * deltaDistX;
-            }
-        }
-        if(deltaDistY > NEARZEROFIXED) {
-            deltaDistY = uReciprocalNearUnit(deltaDistY); 
-            if (rayDirY < 0) {
-                stepY = -1;
-                sideDistY = pmapofsY * deltaDistY;
-            }
-            else {
-                stepY = 1;
-                sideDistY = (1 - pmapofsY) * deltaDistY;
-            }
-        }
-
-        uint8_t side;           // was a NS or a EW wall hit?
-        uint8_t mapX = pmapX;   // which box of the map the ray collision is in
-        uint8_t mapY = pmapY;
-        uflot perpWallDist = 0;     // perpendicular distance (not real distance)
-        uint8_t tile = TILEEMPTY;   // tile that was hit by ray
-
-        // perform DDA. A do/while loop is ever-so-slightly faster it seems?
-        do
-        {
-            // jump to next map square, either in x-direction, or in y-direction
-            if (sideDistX < sideDistY) {
-                perpWallDist = sideDistX; // Remember that sideDist is actual distance and not distance only in 1 direction
-                sideDistX += deltaDistX;
-                mapX += stepX;
-                side = 0; //0 = xside hit
-            }
-            else {
-                perpWallDist = sideDistY;
-                sideDistY += deltaDistY;
-                mapY += stepY;
-                side = 1; //1 = yside hit
-            }
-            // Check if ray has hit a wall
-            tile = getMapCell(&worldMap, mapX, mapY);
-        }
-        while (perpWallDist < VIEWDISTANCE && tile == TILEEMPTY);
-
-        //Only calc distance for every other point to save a lot of memory (100 bytes)
-        if((x & 1) == 0)
-        {
-            distCache[x >> 1] = perpWallDist;
-
-            #if WALLSHADING == 2
-            //Since we're in here anyway, do the half-res shading too (if requested)
-            shade = calcShading(perpWallDist, x, DARKNESS);
-            #endif
-        }
-
-        #if WALLSHADING == 1
-        //Full res shading happens every frame of course
-        shade = calcShading(perpWallDist, x, DARKNESS);
-        #endif
-        #ifndef WALLSHADING
-        //If you're not having any wall shading, it's always fully set
-        shade = 0xFF;
-        #endif
-
-        #ifdef ALTWALLSHADING
-        //Every other row of alt walls get no shading to make them easier to read
-        if(side & x) shade = 0;
-        #endif
-
-        // If the above loop was exited without finding a tile, there's nothing to draw
-        if(tile == TILEEMPTY) continue;
-
-        //NOTE: wallX technically can only be positive, but I'm using flot to save a tiny amount from casting
-        flot wallX = side ? fposX + (flot)perpWallDist * rayDirX : fposY + (flot)perpWallDist * rayDirY;
-        wallX -= floorFixed(wallX); //.getFraction isn't working!
-        uint8_t texX = uint8_t(wallX * TILESIZE);
-        if((side == 0 && rayDirX > 0) || (side == 1 && rayDirY < 0)) texX = TILESIZE - 1 - texX;
-
-        // Calculate half height of line to draw on screen. We already know the distance to the wall.
-        // We can truncate the total height if too close to the wall right here and now and avoid future checks.
-        uint16_t lineHeight = (perpWallDist <= MINLDISTANCE) ? MAXLHEIGHT : (HEIGHT / (float)perpWallDist);
-
-        #ifdef LINEHEIGHTDEBUG
-        tinyfont.setCursor(16, x * 16);
-        tinyfont.println(lineHeight);
-        tinyfont.setCursor(16, x * 16 + 8);
-        tinyfont.println((float)perpWallDist);
-        if(x > 2) break;
-        #endif
-
-        //ending should be exclusive
-        drawWallLine(x, lineHeight, shade, side, tile, texX);
-    }
-}
-
-//Draw a single raycast wall line. Will only draw specifically the wall line and will clip out all the rest
-//(so you can predraw a ceiling and floor before calling raycast)
-void drawWallLine(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side, uint8_t tile, uint8_t texX) 
-{
-    // ------- BEGIN CRITICAL SECTION -------------
-    int16_t halfLine = lineHeight >> 1;
-    uint8_t yStart = max(0, MIDSCREENY - halfLine);
-    uint8_t yEnd = min(HEIGHT, MIDSCREENY + halfLine); //EXCLUSIVE
-
-    //Everyone prefers the high precision tiles (and for some reason, it's now faster? so confusing...)
-    UFixed<16,16> step = (float)TILESIZE / lineHeight;
-    UFixed<16,16> texPos = (yStart + halfLine - MIDSCREENY) * step;
-
-    //These four variables are needed as part of the loop unrolling system
-    uint16_t bofs;
-    uint8_t texByte;
-    uint16_t texData = readTextureStrip16(tilesheet, tile, texX);
-    uint8_t thisWallByte = (((yStart >> 1) >> 1) >> 1);
-
-    //Pull wall byte, save location
-    #define _WALLREADBYTE() bofs = thisWallByte * WIDTH + x; texByte = arduboy.sBuffer[bofs];
-    //Write previously read wall byte, go to next byte
-    #define _WALLWRITENEXT() arduboy.sBuffer[bofs] = texByte; thisWallByte++;
-    //Work for setting bits of wall byte
-    #ifdef WHITEFOG
-    #define _WALLBITUNROLL(bm,nbm) if(!(shade & (bm)) || (texData & fastlshift16(texPos.getInteger()))) texByte |= (bm); else texByte &= (nbm); texPos += step;
-    #else
-    #define _WALLBITUNROLL(bm,nbm) if((shade & (bm)) && (texData & fastlshift16(texPos.getInteger()))) texByte |= (bm); else texByte &= (nbm); texPos += step;
-    #endif
-
-    _WALLREADBYTE();
-
-    #ifdef CRITICALLOOPUNROLLING
-
-    uint8_t startByte = thisWallByte; //The byte within which we start, always inclusive
-    uint8_t endByte = (((yEnd >> 1) >> 1) >> 1);  //The byte to end the unrolled loop on. Could be inclusive or exclusive
-
-    //First and last bytes are tricky
-    if(yStart & 7)
-    {
-        uint8_t endFirst = min((startByte + 1) * 8, yEnd);
-
-        for (uint8_t i = yStart; i < endFirst; i++)
-        {
-            uint8_t bm = fastlshift8(i & 7);
-            _WALLBITUNROLL(bm, (~bm));
-        }
-
-        //Move to next, like it never happened
-        _WALLWRITENEXT();
-        _WALLREADBYTE();
-    }
-
-    //Now the unrolled loop
-    while(thisWallByte < endByte)
-    {
-        _WALLBITUNROLL(0b00000001, 0b11111110);
-        _WALLBITUNROLL(0b00000010, 0b11111101);
-        _WALLBITUNROLL(0b00000100, 0b11111011);
-        _WALLBITUNROLL(0b00001000, 0b11110111);
-        _WALLBITUNROLL(0b00010000, 0b11101111);
-        _WALLBITUNROLL(0b00100000, 0b11011111);
-        _WALLBITUNROLL(0b01000000, 0b10111111);
-        _WALLBITUNROLL(0b10000000, 0b01111111);
-        _WALLWRITENEXT();
-        _WALLREADBYTE();
-    }
-
-    //Last byte, but only need to do it if we don't simply span one byte
-    if((yEnd & 7) && startByte != endByte)
-    {
-        for (uint8_t i = thisWallByte * 8; i < yEnd; i++)
-        {
-            uint8_t bm = fastlshift8(i & 7);
-            _WALLBITUNROLL(bm, (~bm));
-        }
-
-        //"Don't repeat yourself": that ship has sailed. Anyway, only write the last byte if we need to, otherwise
-        //we could legitimately write outside the bounds of the screen.
-        #ifdef CORNERSHADOWS
-        arduboy.sBuffer[bofs] = texByte & ~(fastlshift8(yEnd & 7));
-        #else
-        arduboy.sBuffer[bofs] = texByte;
-        #endif
-    }
-
-    #else // No loop unrolling
-
-    //Funny hack; code is written for loop unrolling first, so we have to kind of "fit in" to the macro system
-    if((yStart & 7) == 0) thisWallByte--;
-
-    do
-    {
-        uint8_t bidx = yStart & 7;
-
-        // Every new byte, save the current (previous) byte and load the new byte from the screen. 
-        // This might be wasteful, as only the first and last byte technically need to pull from the screen. 
-        if(bidx == 0) {
-            _WALLWRITENEXT();
-            _WALLREADBYTE();
-        }
-
-        uint8_t bm = fastlshift8(bidx);
-        _WALLBITUNROLL(bm, ~bm);
-    }
-    while(++yStart < yEnd);
-
-    //The above loop specifically can't end where bidx = 0 and thus placing us outside the writable area. 
-    //Note that corner shadows are SLIGHTLY different between loop unrolled and not: we MUST move yEnd up,
-    //but the previous does not, giving perhaps a better effect
-    #ifdef CORNERSHADOWS
-    arduboy.sBuffer[bofs] = texByte & ~(fastlshift8((yEnd - 1) & 7));
-    #else
-    arduboy.sBuffer[bofs] = texByte;
-    #endif
-
-    #endif
-
-    // ------- END CRITICAL SECTION -------------
 }
 
 
@@ -631,44 +341,71 @@ void drawSprites()
 // Perform ONLY player movement updates! No drawing!
 void movement()
 {
+    uflot newPosX = player.posX;
+    uflot newPosY = player.posY;
+
     // move forward if no wall in front of you
-    if (arduboy.pressed(A_BUTTON))
+    if (arduboy.pressed(UP_BUTTON))
     {
-        float movX = dirX * MOVESPEED;
-        float movY = dirY * MOVESPEED;
-
-        if(isCellSolid(&worldMap, ((flot)posX + movX).getInteger(), posY.getInteger())) movX = 0;
-        if(isCellSolid(&worldMap, posX.getInteger(), (int)((flot)posY + movY))) movY = 0;
-
-        thisDistance += sqrt((movX * movX + movY * movY));
-
-        posX = uflot((flot)posX + movX);
-        posY = uflot((flot)posY + movY);
+        newPosX += player.dirX * MOVESPEED;
+        newPosY += player.dirY * MOVESPEED;
     }
-    // rotate to the right
+    if (arduboy.pressed(DOWN_BUTTON))
+    {
+        newPosX -= player.dirX * MOVESPEED;
+        newPosY -= player.dirY * MOVESPEED;
+    }
+
+    if(isCellSolid(&worldMap, newPosX.getInteger(), player.posY.getInteger())) newPosX = player.posX;
+    if(isCellSolid(&worldMap, player.posX.getInteger(), newPosY.getInteger())) newPosY = player.posY;
+
+    for(uint8_t i = 0; i < NUMBOUNDS; i++)
+    {
+        if(!(bounds[i].state & RSSTATEACTIVE))
+            continue;
+
+        if(newPosX > bounds[i].x1 && newPosX < bounds[i].x2 && player.posY > bounds[i].y1 && player.posY < bounds[i].y2)
+            newPosX = player.posX;
+        if(player.posX > bounds[i].x1 && player.posX < bounds[i].x2 && newPosY > bounds[i].y1 && newPosY < bounds[i].y2)
+            newPosY = player.posY;
+    }
+
+    player.posX = newPosX;
+    player.posY = newPosY;
+
+    float rotation = 0;
+
     if (arduboy.pressed(RIGHT_BUTTON))
-    {
-        // both camera direction and camera plane must be rotated
-        float oldDirX = dirX;
-        dirX = dirX * cos(-ROTSPEED) - dirY * sin(-ROTSPEED);
-        dirY = oldDirX * sin(-ROTSPEED) + dirY * cos(-ROTSPEED);
-    }
-    // rotate to the left
+        rotation = -ROTSPEED;
     if (arduboy.pressed(LEFT_BUTTON))
+        rotation = ROTSPEED;
+
+    if(rotation)
     {
-        // both camera direction and camera plane must be rotated
-        float oldDirX = dirX;
-        dirX = dirX * cos(ROTSPEED) - dirY * sin(ROTSPEED);
-        dirY = oldDirX * sin(ROTSPEED) + dirY * cos(ROTSPEED);
+        float oldDirX = player.dirX;
+        player.dirX = player.dirX * cos(rotation) - player.dirY * sin(rotation);
+        player.dirY = oldDirX * sin(rotation) + player.dirY * cos(rotation);
     }
 }
 
-inline bool inExit() { return getMapCell(&worldMap, (int)posX, (int)posY) == TILEEXIT; }
+void runSprites()
+{
+    for(uint8_t i = 0; i < NUMSPRITES; i++)
+    {
+        if(!(sprites[i].state & RSSTATEACTIVE))
+            continue;
+        
+        if(sprites[i].behavior)
+            sprites[i].behavior(&sprites[i], &arduboy);
+    }
+}
+
+inline bool inExit() { return getMapCell(&worldMap, (int)player.posX, (int)player.posY) == TILEEXIT; }
 
 //Menu functionality, move the cursor, select things (redraws automatically)
 void doMenu()
 {
-    constexpr uint8_t MENUITEMS = 4;
+    constexpr uint8_t MENUITEMS = 3;
     int8_t menuMod = 0;
     int8_t selectMod = 0;
 
@@ -727,18 +464,8 @@ void drawMenu(bool showHint)
     tinyfont.setCursor(MENUX + 4, MENUY + MENUSPACING * 2);
     tinyfont.print(F("NEW"));
 
-    tinyfont.setCursor(MENUX + 4, MENUY + MENUSPACING * 3);
-    tinyfont.print(F("HNT"));
-
     tinyfont.setCursor(MENUX, MENUY + menuIndex * MENUSPACING);
     tinyfont.print("o");
-
-    if(showHint)
-    {
-        FASTRECT(arduboy, MENUX + 5, HEIGHT - 15, MENUX + 14, HEIGHT - 6, WHITE);
-        arduboy.drawPixel(MENUX + 14, HEIGHT - 14, BLACK);
-        arduboy.drawPixel(MENUX + 6 + (int)(posX / curWidth * 8), HEIGHT - 7 - (int)(posY / curHeight * 8), arduboy.frameCount & 0b10000 ? WHITE : BLACK);
-    }
 }
 
 void resetSprites()
@@ -746,7 +473,7 @@ void resetSprites()
     memset(sprites, 0, sizeof(RSprite) * NUMSPRITES);
 }
 
-uint8_t addSprite(float x, float y, uint8_t frame, uint8_t shrinkLevel, int8_t heightAdjust)
+uint8_t addSprite(float x, float y, uint8_t frame, uint8_t shrinkLevel, int8_t heightAdjust, behavior_func func)
 {
     for(uint8_t i = 0; i < NUMSPRITES; i++)
     {
@@ -756,6 +483,7 @@ uint8_t addSprite(float x, float y, uint8_t frame, uint8_t shrinkLevel, int8_t h
             sprites[i].y = muflot(y);
             sprites[i].frame = frame;
             sprites[i].state = 1 | ((shrinkLevel << 1) & RSSTATESHRINK) | (heightAdjust < 0 ? 16 : 0) | ((abs(heightAdjust) << 3) & RSTATEYOFFSET);
+            sprites[i].behavior = func;
             return i;
             //return &sprites[i];
         }
@@ -763,11 +491,6 @@ uint8_t addSprite(float x, float y, uint8_t frame, uint8_t shrinkLevel, int8_t h
 
     return NULL;
 }
-
-#ifdef ADDDEBUGAREA
-uint8_t MONSTERSPRITE = NUMSPRITES - 1;
-uint8_t LEVERSPRITE = NUMSPRITES - 1;
-#endif
 
 // Generate a new maze and reset the game to an initial playable state
 void generateMaze()
@@ -778,29 +501,23 @@ void generateMaze()
     tinyfont.print(F("Generating maze"));
     arduboy.display();
 
-    //Why am I doing this? It's mostly a meme I guess; don't write code like this!
-    if(inExit())
-        totalWins += 1;
-
-    //Regardless if you win or not, put distance away
-    totalDistance += thisDistance;
-    thisDistance = 0;
-
     MazeSize mzs = getMazeSize(MAZESIZES, mazeSize);
     MazeType mzt = getMazeType(MAZETYPES, mazeType); 
 
     //Call the generator function chosen by the menu
-    mzt.func(&worldMap, mzs.width, mzs.height, &posX, &posY, &dirX, &dirY);
+    mzt.func(&worldMap, mzs.width, mzs.height, &player.posX, &player.posY, &player.dirX, &player.dirY);
     curWidth = mzs.width;
     curHeight = mzs.height;
 
     #ifdef ADDDEBUGAREA
     setMapCell(&worldMap, 5, 0, TILEDOOR);
-    addSprite(4.5, 1.4, SPRITEBARREL, 1, 8);
-    addSprite(6.5, 1.4, SPRITEBARREL, 1, 8);
-    addSprite(7, 5, SPRITECHEST, 1, 8);
-    MONSTERSPRITE = addSprite(4, 3, SPRITEMONSTER, 1, 0);
-    LEVERSPRITE = addSprite(6, 3, SPRITELEVER, 1, 8);
+    addSprite(4.5, 1.4, SPRITEBARREL, 1, 8, NULL);
+    addSprite(6.5, 1.4, SPRITEBARREL, 1, 8, NULL);
+    addSprite(7, 5, SPRITECHEST, 1, 8, NULL);
+    addSprite(4, 3, SPRITEMONSTER, 1, 0, behavior_bat);
+    uint8_t sp = addSprite(6, 3, SPRITELEVER, 1, 8, behavior_animate_16);
+    sprites[sp].intstate[0] = SPRITELEVER;
+    sprites[sp].intstate[1] = 2;
     for(uint8_t y = 1; y < 8; y++)
         for(uint8_t x = 3; x < 8; x++)
             setMapCell(&worldMap, x, y, TILEEMPTY);
@@ -838,14 +555,6 @@ void loop()
         tinyfont.setCursor(WINX, 24);
         tinyfont.print(F("COMPLETE!"));
         tinyfont.setCursor(WINX + 8, WINY);
-        tinyfont.print(F("WINS: "));
-        tinyfont.print(totalWins);
-        tinyfont.setCursor(WINX + 8, WINY + 5);
-        tinyfont.print("DIST: ");
-        tinyfont.print((int)thisDistance);
-        tinyfont.setCursor(WINX + 3, WINY + 10);
-        tinyfont.print("TDIST: ");
-        tinyfont.print((int)(totalDistance + thisDistance));
     }
     else
     {
@@ -855,16 +564,9 @@ void loop()
         clearRaycast();
         #endif
 
-        #ifdef ADDDEBUGAREA
-        sprites[MONSTERSPRITE].x = 4 + cos((float)arduboy.frameCount / 4) / 2;
-        sprites[MONSTERSPRITE].y = 3 + sin((float)arduboy.frameCount / 4) / 2;
-        sprites[MONSTERSPRITE].state = (sprites[MONSTERSPRITE].state & ~(RSTATEYOFFSET)) | ((16 | uint8_t(15 * abs(sin((float)arduboy.frameCount / 11)))) << 3);
-        //((arduboy.frameCount | 128) & RSTATEYOFFSET);
-        sprites[LEVERSPRITE].frame = SPRITELEVER + ((arduboy.frameCount >> 4) & 1);
-        #endif
-
-        raycast();
+        raycastWalls(&player, &worldMap, &arduboy);
         #ifndef NOSPRITES
+        runSprites();
         drawSprites();
         #endif
         movement();

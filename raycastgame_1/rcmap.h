@@ -11,6 +11,12 @@ struct RcMap {
     const uint8_t height;
 };
 
+// Representation of the player in an rcmap
+struct RcPlayer {
+    uflot posX, posY;
+    float dirX, dirY; //These HAVE TO be float, or something with a lot more precision
+};
+
 //Does what it says; it's a macro because I don't trust the compiler
 //#define isCellSolid(maze, x, y) (getMazeCell(maze, x, y) & 1)
 
