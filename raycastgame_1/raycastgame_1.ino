@@ -36,7 +36,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // #define DRAWMAPDEBUG         // Display map (will take up portion of screen)
 // #define LINEHEIGHTDEBUG      // Display information about lineheight (only draws a few lines)
 // #define NOSPRITES            // Remove all sprites
-#define ADDDEBUGAREA     // Add a little debug area
+ #define ADDDEBUGAREA     // Add a little debug area
 //  #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
 
 
@@ -270,13 +270,13 @@ void raycast()
         #endif
 
         //ending should be exclusive
-        draw_wall_line(x, lineHeight, shade, side, tile, texX);
+        drawWallLine(x, lineHeight, shade, side, tile, texX);
     }
 }
 
 //Draw a single raycast wall line. Will only draw specifically the wall line and will clip out all the rest
 //(so you can predraw a ceiling and floor before calling raycast)
-void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side, uint8_t tile, uint8_t texX) 
+void drawWallLine(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side, uint8_t tile, uint8_t texX) 
 {
     // ------- BEGIN CRITICAL SECTION -------------
     int16_t halfLine = lineHeight >> 1;
