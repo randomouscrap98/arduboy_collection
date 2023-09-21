@@ -207,25 +207,6 @@ void drawMenu(bool showHint)
     tinyfont.print("o");
 }
 
-uint8_t addSprite(float x, float y, uint8_t frame, uint8_t shrinkLevel, int8_t heightAdjust, behavior_func func)
-{
-    for(uint8_t i = 0; i < NUMSPRITES; i++)
-    {
-        if((spritesBuffer[i].state & 1) == 0)
-        {
-            spritesBuffer[i].x = muflot(x);
-            spritesBuffer[i].y = muflot(y);
-            spritesBuffer[i].frame = frame;
-            spritesBuffer[i].state = 1 | ((shrinkLevel << 1) & RSSTATESHRINK) | (heightAdjust < 0 ? 16 : 0) | ((abs(heightAdjust) << 3) & RSTATEYOFFSET);
-            spritesBuffer[i].behavior = func;
-            return i;
-            //return &sprites[i];
-        }
-    }
-
-    return NULL;
-}
-
 // Generate a new maze and reset the game to an initial playable state
 void generateMaze()
 {
@@ -245,13 +226,13 @@ void generateMaze()
 
     #ifdef ADDDEBUGAREA
     setMapCell(&worldMap, 5, 0, TILEDOOR);
-    addSprite(4.5, 1.4, SPRITEBARREL, 1, 8, NULL);
-    addSprite(6.5, 1.4, SPRITEBARREL, 1, 8, NULL);
-    addSprite(7, 5, SPRITECHEST, 1, 8, NULL);
-    addSprite(4, 3, SPRITEMONSTER, 1, 0, behavior_bat);
-    uint8_t sp = addSprite(6, 3, SPRITELEVER, 1, 8, behavior_animate_16);
-    spritesBuffer[sp].intstate[0] = SPRITELEVER;
-    spritesBuffer[sp].intstate[1] = 2;
+    addSprite(&sprites, 4.5, 1.4, SPRITEBARREL, 1, 8, NULL);
+    addSprite(&sprites, 6.5, 1.4, SPRITEBARREL, 1, 8, NULL);
+    addSprite(&sprites, 7, 5, SPRITECHEST, 1, 8, NULL);
+    addSprite(&sprites, 4, 3, SPRITEMONSTER, 1, 0, behavior_bat);
+    RcSprite * sp = addSprite(&sprites, 6, 3, SPRITELEVER, 1, 8, behavior_animate_16);
+    sp->intstate[0] = SPRITELEVER;
+    sp->intstate[1] = 2;
     for(uint8_t y = 1; y < 8; y++)
         for(uint8_t x = 3; x < 8; x++)
             setMapCell(&worldMap, x, y, TILEEMPTY);

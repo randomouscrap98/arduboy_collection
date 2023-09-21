@@ -7,6 +7,7 @@
 #include "rcmap.h"
 #include "rcsprite.h"
 
+
 // For the time being, I expect you to modify these constants to suit your needs. Later I may
 // have some way to configure it outside the file.
 
@@ -29,7 +30,7 @@ constexpr uflot LIGHTINTENSITY = 1.5;
 // Debug flags 
 // #define LINEHEIGHTDEBUG      // Display information about lineheight (only draws a few lines)
 
-// -------------- CALCULATED CONSTANTS, TRY NOT TO TOUCH ------------------------
+// -------------- CALCULATED / ASSUMED CONSTANTS, TRY NOT TO TOUCH ------------------------
 // Screen
 constexpr uint8_t MIDSCREENY = VIEWHEIGHT / 2;
 constexpr uint8_t MIDSCREENX = VIEWWIDTH / 2;
@@ -44,14 +45,15 @@ constexpr uint8_t LDISTSAFE = 16;
 constexpr uflot MINLDISTANCE = 1.0f / LDISTSAFE;
 constexpr uint16_t MAXLHEIGHT = VIEWHEIGHT * LDISTSAFE;
 constexpr float MINSPRITEDISTANCE = 0.2;
-// ------------------------------------------------------------------------------
-
 // Some assumptions (please try to follow these instead of changing them)
 constexpr uint8_t RCEMPTY = 0;
 constexpr uint8_t RCTILESIZE = 16;
+// ------------------------------------------------------------------------------
+
 
 // Globals that are required for this to run (sorry)
 uflot distCache[VIEWWIDTH / 2]; // Half distance resolution means sprites will clip 1 pixel into walls sometimes but otherwise...
+
 
 // Full clear specifically the raycast area. Note that if your view height is not aligned to a byte boundary,
 // this will overclear the raycast area.
@@ -59,7 +61,6 @@ void clearRaycast(Arduboy2Base * arduboy)
 {
     fastClear(arduboy, 0, 0, VIEWWIDTH, VIEWHEIGHT);
 }
-
 
 //Draw a single raycast wall line. Will only draw specifically the wall line and will clip out all the rest
 //(so you can predraw a ceiling and floor before calling raycast)

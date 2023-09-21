@@ -124,3 +124,23 @@ uint8_t sortSprites(RcPlayer * player, RcSpriteGroup * group)
 
     return usedSprites;
 }
+
+RcSprite * addSprite(RcSpriteGroup * group, float x, float y, uint8_t frame, uint8_t shrinkLevel, int8_t heightAdjust, behavior_func func)
+{
+    uint8_t numsprites = group->numsprites;
+    for(uint8_t i = 0; i < numsprites; i++)
+    {
+        RcSprite * sprite = &group->sprites[i];
+        if(!ISSPRITEACTIVE((*sprite)))
+        {
+            sprite->x = muflot(x);
+            sprite->y = muflot(y);
+            sprite->frame = frame;
+            sprite->state = 1 | ((shrinkLevel << 1) & RSSTATESHRINK) | (heightAdjust < 0 ? 16 : 0) | ((abs(heightAdjust) << 3) & RSTATEYOFFSET);
+            sprite->behavior = func;
+            return sprite;
+        }
+    }
+
+    return NULL;
+}
