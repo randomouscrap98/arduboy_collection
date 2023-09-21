@@ -68,6 +68,7 @@ RcMap worldMap {
     MAPWIDTH,
     MAPHEIGHT
 };
+
 RcPlayer player { };
 
 RcSprite spritesBuffer[NUMSPRITES];

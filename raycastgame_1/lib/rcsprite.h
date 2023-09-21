@@ -1,9 +1,9 @@
 #pragma once
 
+#include <Arduboy2.h>
 #include <FixedPoints.h>
 
 #include "utils.h"
-#include "rcmap.h"
 
 // As with raycast.h, I unfortunately require you to make changes to this file if you
 // want different results.
@@ -84,10 +84,10 @@ void runSprites(RcSpriteGroup * group, Arduboy2Base * arduboy)
 }
 
 //Sort sprites within the sprite contiainer (only affects the sorted list). returns number of active sprites
-uint8_t sortSprites(RcPlayer * player, RcSpriteGroup * group)
+uint8_t sortSprites(uflot playerX, uflot playerY, RcSpriteGroup * group)
 {
-    SFixed<11,4> fposx = (SFixed<11,4>)player->posX;
-    SFixed<11,4> fposy = (SFixed<11,4>)player->posY;
+    SFixed<11,4> fposx = (SFixed<11,4>)playerX;
+    SFixed<11,4> fposy = (SFixed<11,4>)playerY;
 
     //Make a temp sort array on stack
     uint8_t numsprites = group->numsprites;

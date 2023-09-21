@@ -341,7 +341,7 @@ void raycastWalls(RcPlayer * p, RcMap * map, Arduboy2Base * arduboy, const uint8
 
 void drawSprites(RcPlayer * player, RcSpriteGroup * group, Arduboy2Base * arduboy, const uint8_t * spritesheet, const uint8_t * spritesheet_Mask)
 {
-    uint8_t usedSprites = sortSprites(player, group);
+    uint8_t usedSprites = sortSprites(player->posX, player->posY, group);
 
     float fposX = (float)player->posX, fposY = (float)player->posY;
     float planeX = player->dirY, planeY = -player->dirX;

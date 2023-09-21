@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduboy2.h>
+#include <FixedPoints.h>
 
 #include "utils.h"
 
@@ -13,12 +14,11 @@ struct RcMap {
 
 // Representation of the player in an rcmap
 struct RcPlayer {
-    uflot posX, posY;
-    float dirX, dirY; //These HAVE TO be float, or something with a lot more precision
+    uflot posX;
+    uflot posY;
+    float dirX; //These HAVE TO be float, or something with a lot more precision
+    float dirY; 
 };
-
-//Does what it says; it's a macro because I don't trust the compiler
-//#define isCellSolid(maze, x, y) (getMazeCell(maze, x, y) & 1)
 
 inline uint8_t mapIndex(RcMap * map, uint8_t x, uint8_t y) {
     return y * map->width + x;
