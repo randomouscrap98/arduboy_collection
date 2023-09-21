@@ -30,8 +30,6 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 //#define WHITEFOG            // Make distance shading white instead of black
 
 //Optimization flags (greatly impacts performance... I think?)
-#define TEXPRECISION 2          // Texture precision. 0 is lowest, 2 is highest. Lower = more performance but worse textures
-#define SPRITEPRECISION 0       // Sprite precision. Only options are 2 and 0. Lower = more performance, and I can't tell the difference
 #define CRITICALLOOPUNROLLING   // This adds a large (~1.5kb) amount of code but significantly increases performance, especially sprites
 
 // And now some debug stuff
@@ -285,17 +283,9 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
     uint8_t yStart = max(0, MIDSCREENY - halfLine);
     uint8_t yEnd = min(HEIGHT, MIDSCREENY + halfLine); //EXCLUSIVE
 
-    #if TEXPRECISION == 2
+    //Everyone prefers the high precision tiles (and for some reason, it's now faster? so confusing...)
     UFixed<16,16> step = (float)TILESIZE / lineHeight;
     UFixed<16,16> texPos = (yStart + halfLine - MIDSCREENY) * step;
-    #elif TEXPRECISION == 1
-    UFixed<4,12> step = (float)TILESIZE / lineHeight;
-    uflot tp1 = (yStart + halfLine - MIDSCREENY) * (uflot)step;
-    UFixed<4,12> texPos = (UFixed<4,12>)tp1;
-    #else
-    uflot step = (float)TILESIZE / lineHeight;
-    uflot texPos = (yStart + halfLine - MIDSCREENY) * step;
-    #endif
 
     //These four variables are needed as part of the loop unrolling system
     uint16_t bofs;
@@ -405,23 +395,6 @@ void draw_wall_line(uint8_t x, uint16_t lineHeight, uint8_t shade, uint8_t side,
     // ------- END CRITICAL SECTION -------------
 }
 
-constexpr uint8_t FLOORSTART = MIDSCREENY + 1;
-constexpr flot FLOORDIST[HEIGHT - FLOORSTART] = {
-    //-32.0/32, -31.0/32, -30.0/32, -29.0/32, -28.0/32, -27.0/32, -26.0/32, -25.0/32,
-    //-24.0/32, -23.0/32, -22.0/32, -21.0/32, -20.0/32, -19.0/32, -18.0/32, -17.0/32,
-    //-16.0/32, -15.0/32, -14.0/32, -13.0/32, -12.0/32, -11.0/32, -10.0/32, -9.0/32,
-    //-8.0/32,  -7.0/32,  -6.0/32,  -5.0/32,  -4.0/32,  -3.0/32,  -2.0/32,  -1.0/22
-    32.0/1, 32.0/2, 32.0/3, 32.0/4, 32.0/5, 32.0/6, 32.0/7, 32.0/8,
-    32.0/9, 32.0/10, 32.0/11, 32.0/12, 32.0/13, 32.0/14, 32.0/15, 32.0/16,
-    32.0/17, 32.0/18, 32.0/19, 32.0/20, 32.0/21, 32.0/22, 32.0/23, 32.0/24,
-    32.0/25, 32.0/26, 32.0/27, 32.0/28, 32.0/29, 32.0/30, 32.0/31, //32.0/32,
-    //0, -1.0/32, -2.0/32, -3.0/32, -4.0/32, -5.0/32, -6.0/32, -7.0/32,
-    //-8.0/32, -9.0/32, -10.0/32, -11.0/32, -12.0/32, -13.0/32, -14.0/32, -15.0/32,
-    //-16.0/32, -17.0/32, -18.0/32, -19.0/32, -20.0/32, -21.0/32, -22.0/32, -23.0/32,
-    //-24.0/32, -25.0/32, -26.0/32, -27.0/32, -28.0/32, -29.0/32, //-22.0/32, -23.0/32,
-};
-
-
 
 void drawSprites()
 {
@@ -513,20 +486,13 @@ void drawSprites()
         uint8_t drawEndX = ssXe > VIEWWIDTH ? VIEWWIDTH : ssXe;
 
         //Setup stepping to avoid costly mult (and div) in critical loops
-        //These float divisions happen just once per sprite, hopefully that's not too bad
-        #if SPRITEPRECISION == 2
-        UFixed<16,16> stepX = (float)TILESIZE / spriteWidth;
-        UFixed<16,16> stepY = (float)TILESIZE / spriteHeight;
-        UFixed<16,16> texX = (drawStartX - ssX) * stepX;
-        UFixed<16,16> texYInit = (drawStartY - ssY) * stepY;
-        UFixed<16,16> texY = texYInit;
-        #else
+        //These float divisions happen just once per sprite, hopefully that's not too bad.
+        //There used to be an option to set the precision of sprites but it didn't seem to make any difference
         uflot stepX = (float)TILESIZE / spriteWidth;
         uflot stepY = (float)TILESIZE / spriteHeight;
         uflot texX = (drawStartX - ssX) * stepX;
         uflot texYInit = (drawStartY - ssY) * stepY;
         uflot texY = texYInit;
-        #endif
 
         uflot transformY = (uflot)transformYT; //Need this as uflot for critical loop
         uint8_t fr = sprite.frame;
