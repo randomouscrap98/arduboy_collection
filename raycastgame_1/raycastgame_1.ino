@@ -28,15 +28,12 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 //  #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
 
 // Gameplay constants
-constexpr uint8_t FRAMERATE = 30;
+constexpr uint8_t FRAMERATE = 35;
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 
-//Distance-based stuff
-constexpr float MINSPRITEDISTANCE = 0.2;
-
 // Size limit for data structures
-constexpr uint8_t NUMSPRITES = 32;
+constexpr uint8_t NUMSPRITES = 20;
 constexpr uint8_t NUMBOUNDS = 16;
 constexpr uint8_t MAPWIDTH = 16;
 constexpr uint8_t MAPHEIGHT = 16;
@@ -71,8 +68,17 @@ RcMap worldMap {
     MAPHEIGHT
 };
 RcPlayer player { };
-RSprite sprites[NUMSPRITES];
-RBounds bounds[NUMBOUNDS];
+
+RSprite spritesBuffer[NUMSPRITES];
+RBounds boundsBuffer[NUMBOUNDS];
+SSprite tempcontainer[NUMSPRITES];
+RcSpriteGroup sprites {
+    spritesBuffer,
+    tempcontainer,
+    NUMSPRITES,
+    boundsBuffer,
+    NUMBOUNDS
+};
 
 
 //Draw the floor underneath the raycast walls (ultra simple for now to save cycles)
@@ -84,237 +90,6 @@ void raycastFoundation()
 }
 
 
-void drawSprites()
-{
-    SFixed<11,4> fposx = (SFixed<11,4>)player.posX;
-    SFixed<11,4> fposy = (SFixed<11,4>)player.posY;
-
-    //Make a temp sort array on stack
-    uint8_t usedSprites = 0;
-    SSprite sorted[NUMSPRITES];
-
-    // Calc distance. Also, sort elements (might as well, we're already here)
-    for (uint8_t i = 0; i < NUMSPRITES; ++i)
-    {
-        if (!(sprites[i].state & 1))
-            continue;
-
-        SSprite toSort;
-        toSort.dpx = (SFixed<11,4>)sprites[i].x - fposx;
-        toSort.dpy = (SFixed<11,4>)sprites[i].y - fposy;
-        toSort.distance = toSort.dpx * toSort.dpx + toSort.dpy * toSort.dpy; // sqrt not taken, unneeded
-        toSort.sprite = &sprites[i];
-
-        //Insertion sort (it's faster for small arrays; if you increase sprite count to some 
-        //absurd number, change this to something else).
-        int8_t insertPos = usedSprites - 1;
-
-        while(insertPos >= 0 && sorted[insertPos].distance < toSort.distance)
-        {
-            sorted[insertPos + 1] = sorted[insertPos];
-            insertPos--;
-        }
-
-        sorted[insertPos + 1] = toSort;
-        usedSprites++;
-    }
-
-    float planeX = player.dirY, planeY = -player.dirX;
-    float invDet = 1.0 / (planeX * player.dirY - planeY * player.dirX); // required for correct matrix multiplication
-
-    // after sorting the sprites, do the projection and draw them. We know all sprites in the array are active,
-    // since we're looping against the sorted array.
-    for (uint8_t i = 0; i < usedSprites; i++)
-    {
-        //Get the current sprite. Copy so we don't have to derefence a pointer a million times
-        RSprite sprite = * sorted[i].sprite;
-
-        //Already stored pos relative to camera earlier, but want extra precision, use floats
-        float spriteX = float(sorted[i].dpx);
-        float spriteY = float(sorted[i].dpy);
-
-        // X and Y will always be very small (map only 4 bit size), so these transforms will still fit within a 7 bit int part
-        float transformYT = invDet * (-planeY * spriteX + planeX * spriteY); // this is actually the depth inside the screen, that what Z is in 3D
-
-        // Nice quick shortcut to get out for sprites behind us (and ones that are too close)
-        if(transformYT < MINSPRITEDISTANCE) continue;
-
-        float transformXT = invDet * (player.dirY * spriteX - player.dirX * spriteY);
-
-        //int16 because easy overflow! if x is much larger than y, then you're effectively multiplying 50 by map width.
-        // NOTE: this is the CENTER of the sprite, not the edge (thankfully)
-        int16_t spriteScreenX = int16_t(MIDSCREENX * (1 + transformXT / transformYT));
-
-        // calculate the dimensions of the sprite on screen. All sprites are square. Size mods go here
-        // using 'transformY' instead of the real distance prevents fisheye
-        uint16_t spriteHeight = uint16_t(HEIGHT / transformYT) >> ((sprite.state & RSSTATESHRINK) >> 1); 
-        uint16_t spriteWidth = spriteHeight; 
-
-        // calculate lowest and highest pixel to fill. Sprite screen/start X and Sprite screen/start Y
-        // Because we have 1 fewer bit to store things, we unfortunately need an int16
-        int16_t ssX = -(spriteWidth >> 1) + spriteScreenX;   //Offsets go here, but modified by distance or something?
-        int16_t ssXe = ssX + spriteWidth; //EXCLUSIVE
-
-        // Get out if sprite is completely outside view
-        if(ssXe < 0 || ssX > VIEWWIDTH) continue;
-
-        //Calculate vMove from top 5 bits of state
-        uint8_t yShiftBits = sprite.state >> 3;
-        int8_t yShift = yShiftBits ? int8_t((yShiftBits & 16 ? -(yShiftBits & 15) : yShiftBits) * 2.0 / transformYT) : 0;
-        //The above didn't work without float math, didn't feel like figuring out the ridiculous type casting
-
-        int16_t ssY = -(spriteHeight >> 1) + MIDSCREENY + yShift;
-        int16_t ssYe = ssY + spriteHeight; //EXCLUSIVE
-
-        if(ssYe < 0 || ssY > HEIGHT) continue;
-
-        uint8_t drawStartY = ssY < 0 ? 0 : ssY; //Because of these checks, we can store them in 1 byte stuctures
-        uint8_t drawEndY = ssYe > HEIGHT ? HEIGHT : ssYe;
-        uint8_t drawStartX = ssX < 0 ? 0 : ssX;
-        uint8_t drawEndX = ssXe > VIEWWIDTH ? VIEWWIDTH : ssXe;
-
-        //Setup stepping to avoid costly mult (and div) in critical loops
-        //These float divisions happen just once per sprite, hopefully that's not too bad.
-        //There used to be an option to set the precision of sprites but it didn't seem to make any difference
-        uflot stepX = (float)TILESIZE / spriteWidth;
-        uflot stepY = (float)TILESIZE / spriteHeight;
-        uflot texX = (drawStartX - ssX) * stepX;
-        uflot texYInit = (drawStartY - ssY) * stepY;
-        uflot texY = texYInit;
-
-        uflot transformY = (uflot)transformYT; //Need this as uflot for critical loop
-        uint8_t fr = sprite.frame;
-        uint8_t x = drawStartX;
-
-        // ------- BEGIN CRITICAL SECTION -------------
-        do //For every strip (x)
-        {
-            //If the sprite is hidden, most processing disappears
-            if (transformY < distCache[x >> 1])
-            {
-                uint8_t tx = texX.getInteger();
-
-                texY = texYInit;
-
-                //These five variables are needed as part of the loop unrolling system
-                uint16_t bofs;
-                uint8_t texByte;
-                uint16_t texData = readTextureStrip16(spritesheet, fr, tx);
-                uint16_t texMask = readTextureStrip16(spritesheet_Mask, fr, tx);
-                uint8_t thisWallByte = (((drawStartY >> 1) >> 1) >> 1); //right shift 3 without loop
-
-                //Pull screen byte, save location
-                #define _SPRITEREADSCRBYTE() bofs = thisWallByte * WIDTH + x; texByte = arduboy.sBuffer[bofs];
-                //Write previously read screen byte, go to next byte
-                #define _SPRITEWRITESCRNEXT() arduboy.sBuffer[bofs] = texByte; thisWallByte++;
-                //Work for setting bits of screen byte
-                #define _SPRITEBITUNROLL(bm,nbm) { uint16_t btmask = fastlshift16(texY.getInteger()); if (texMask & btmask) { if (texData & btmask) texByte |= bm; else texByte &= nbm; } texY += stepY; }
-
-                _SPRITEREADSCRBYTE();
-
-                #ifdef CRITICALLOOPUNROLLING
-
-                uint8_t startByte = thisWallByte; //The byte within which we start, always inclusive
-                uint8_t endByte = (((drawEndY >> 1) >> 1) >> 1);  //The byte to end the unrolled loop on. Could be inclusive or exclusive
-
-                //First and last bytes are tricky
-                if(drawStartY & 7)
-                {
-                    uint8_t endFirst = min((startByte + 1) * 8, drawEndY);
-
-                    for (uint8_t i = drawStartY; i < endFirst; i++)
-                    {
-                        uint8_t bm = fastlshift8(i & 7);
-                        _SPRITEBITUNROLL(bm, (~bm));
-                    }
-
-                    //Move to next, like it never happened
-                    _SPRITEWRITESCRNEXT();
-                    _SPRITEREADSCRBYTE();
-                }
-
-                //Now the unrolled loop
-                while(thisWallByte < endByte)
-                {
-                    _SPRITEBITUNROLL(0b00000001, 0b11111110);
-                    _SPRITEBITUNROLL(0b00000010, 0b11111101);
-                    _SPRITEBITUNROLL(0b00000100, 0b11111011);
-                    _SPRITEBITUNROLL(0b00001000, 0b11110111);
-                    _SPRITEBITUNROLL(0b00010000, 0b11101111);
-                    _SPRITEBITUNROLL(0b00100000, 0b11011111);
-                    _SPRITEBITUNROLL(0b01000000, 0b10111111);
-                    _SPRITEBITUNROLL(0b10000000, 0b01111111);
-                    _SPRITEWRITESCRNEXT();
-                    _SPRITEREADSCRBYTE();
-                }
-
-                //Last byte, but only need to do it if we end in the middle of a byte and don't simply span one byte
-                if((drawEndY & 7) && startByte != endByte)
-                {
-                    for (uint8_t i = thisWallByte * 8; i < drawEndY; i++)
-                    {
-                        uint8_t bm = fastlshift8(i & 7);
-                        _SPRITEBITUNROLL(bm, (~bm));
-                    }
-
-                    //Only need to set the last byte if we're drawing in it of course
-                    arduboy.sBuffer[bofs] = texByte;
-                }
-
-                #else // No loop unrolling
-
-                uint8_t y = drawStartY;
-
-                //Funny hack; code is written for loop unrolling first, so we have to kind of "fit in" to the macro system
-                if((drawStartY & 7) == 0) thisWallByte--;
-
-                do
-                {
-                    uint8_t bidx = y & 7;
-
-                    // Every new byte, save the current (previous) byte and load the new byte from the screen. 
-                    // This might be wasteful, as only the first and last byte technically need to pull from the screen. 
-                    if(bidx == 0) {
-                        _SPRITEWRITESCRNEXT();
-                        _SPRITEREADSCRBYTE();
-                    }
-
-                    uint8_t bm = fastlshift8(bidx);
-                    _SPRITEBITUNROLL(bm, ~bm);
-                }
-                while(++y < drawEndY); //EXCLUSIVE
-
-                //The above loop specifically CAN'T reach the last byte, so although it's wasteful in the case of a 
-                //sprite ending at the bottom of the screen, it's still better than always incurring an if statement... maybe.
-                arduboy.sBuffer[bofs] = texByte;
-
-                #endif
-
-            }
-
-            //This ONE step is why there has to be a big if statement up there. 
-            texX += stepX;
-        }
-        while(++x < drawEndX); //EXCLUSIVE
-        // ------- END CRITICAL SECTION -------------
-
-        #ifdef PRINTSPRITEDATA
-        //Clear a section for us to use
-        constexpr uint8_t sdh = 10;
-        arduboy.fillRect(0, HEIGHT - sdh, VIEWWIDTH, sdh, BLACK);
-        //Print some junk
-        tinyfont.setCursor(0, HEIGHT - sdh);
-        tinyfont.print((float)transformXT, 4);
-        tinyfont.print(" X");
-        tinyfont.print(ssX);
-        tinyfont.setCursor(0, HEIGHT - sdh + 5);
-        tinyfont.print((float)transformYT, 4);
-        tinyfont.print(" W");
-        tinyfont.print(spriteWidth);
-        #endif
-
-    }
-}
 
 // Perform ONLY player movement updates! No drawing!
 void movement()
@@ -339,12 +114,12 @@ void movement()
 
     for(uint8_t i = 0; i < NUMBOUNDS; i++)
     {
-        if(!(bounds[i].state & RSSTATEACTIVE))
+        if(!ISSPRITEACTIVE(boundsBuffer[i]))
             continue;
 
-        if(newPosX > bounds[i].x1 && newPosX < bounds[i].x2 && player.posY > bounds[i].y1 && player.posY < bounds[i].y2)
+        if(newPosX > boundsBuffer[i].x1 && newPosX < boundsBuffer[i].x2 && player.posY > boundsBuffer[i].y1 && player.posY < boundsBuffer[i].y2)
             newPosX = player.posX;
-        if(player.posX > bounds[i].x1 && player.posX < bounds[i].x2 && newPosY > bounds[i].y1 && newPosY < bounds[i].y2)
+        if(player.posX > boundsBuffer[i].x1 && player.posX < boundsBuffer[i].x2 && newPosY > boundsBuffer[i].y1 && newPosY < boundsBuffer[i].y2)
             newPosY = player.posY;
     }
 
@@ -370,11 +145,11 @@ void runSprites()
 {
     for(uint8_t i = 0; i < NUMSPRITES; i++)
     {
-        if(!(sprites[i].state & RSSTATEACTIVE))
+        if(!ISSPRITEACTIVE(spritesBuffer[i]))
             continue;
         
-        if(sprites[i].behavior)
-            sprites[i].behavior(&sprites[i], &arduboy);
+        if(spritesBuffer[i].behavior)
+            spritesBuffer[i].behavior(&spritesBuffer[i], &arduboy);
     }
 }
 
@@ -446,20 +221,25 @@ void drawMenu(bool showHint)
 
 void resetSprites()
 {
-    memset(sprites, 0, sizeof(RSprite) * NUMSPRITES);
+    memset(spritesBuffer, 0, sizeof(RSprite) * NUMSPRITES);
+}
+
+void resetBounds()
+{
+    memset(boundsBuffer, 0, sizeof(RBounds) * NUMBOUNDS);
 }
 
 uint8_t addSprite(float x, float y, uint8_t frame, uint8_t shrinkLevel, int8_t heightAdjust, behavior_func func)
 {
     for(uint8_t i = 0; i < NUMSPRITES; i++)
     {
-        if((sprites[i].state & 1) == 0)
+        if((spritesBuffer[i].state & 1) == 0)
         {
-            sprites[i].x = muflot(x);
-            sprites[i].y = muflot(y);
-            sprites[i].frame = frame;
-            sprites[i].state = 1 | ((shrinkLevel << 1) & RSSTATESHRINK) | (heightAdjust < 0 ? 16 : 0) | ((abs(heightAdjust) << 3) & RSTATEYOFFSET);
-            sprites[i].behavior = func;
+            spritesBuffer[i].x = muflot(x);
+            spritesBuffer[i].y = muflot(y);
+            spritesBuffer[i].frame = frame;
+            spritesBuffer[i].state = 1 | ((shrinkLevel << 1) & RSSTATESHRINK) | (heightAdjust < 0 ? 16 : 0) | ((abs(heightAdjust) << 3) & RSTATEYOFFSET);
+            spritesBuffer[i].behavior = func;
             return i;
             //return &sprites[i];
         }
@@ -492,8 +272,8 @@ void generateMaze()
     addSprite(7, 5, SPRITECHEST, 1, 8, NULL);
     addSprite(4, 3, SPRITEMONSTER, 1, 0, behavior_bat);
     uint8_t sp = addSprite(6, 3, SPRITELEVER, 1, 8, behavior_animate_16);
-    sprites[sp].intstate[0] = SPRITELEVER;
-    sprites[sp].intstate[1] = 2;
+    spritesBuffer[sp].intstate[0] = SPRITELEVER;
+    spritesBuffer[sp].intstate[1] = 2;
     for(uint8_t y = 1; y < 8; y++)
         for(uint8_t x = 3; x < 8; x++)
             setMapCell(&worldMap, x, y, TILEEMPTY);
@@ -537,13 +317,15 @@ void loop()
         #ifdef DRAWFOUNDATION
         raycastFoundation();
         #else
-        clearRaycast();
+        clearRaycast(&arduboy);
         #endif
 
         raycastWalls(&player, &worldMap, &arduboy, tilesheet);
         #ifndef NOSPRITES
         runSprites();
-        drawSprites();
+        //sprites.tempsorting = tempcontainer;
+        drawSprites(&player, &sprites, &arduboy, spritesheet, spritesheet_Mask);
+        //sprites.tempsorting = NULL;
         #endif
         movement();
 

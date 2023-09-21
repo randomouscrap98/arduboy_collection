@@ -50,3 +50,14 @@ struct RBounds {
     muflot y2;
     uint8_t state; //some of the same as RSprite, where & 1 = active
 };
+
+#define ISSPRITEACTIVE(s) (s.state & RSSTATEACTIVE)
+
+struct RcSpriteGroup
+{
+    RSprite * sprites;
+    SSprite * tempsorting;
+    const uint8_t numsprites;
+    RBounds * bounds;
+    const uint8_t numbounds;
+};
