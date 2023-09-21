@@ -69,8 +69,8 @@ RcMap worldMap {
 };
 RcPlayer player { };
 
-RSprite spritesBuffer[NUMSPRITES];
-RBounds boundsBuffer[NUMBOUNDS];
+RcSprite spritesBuffer[NUMSPRITES];
+RcBounds boundsBuffer[NUMBOUNDS];
 SSprite tempcontainer[NUMSPRITES];
 RcSpriteGroup sprites {
     spritesBuffer,
@@ -141,18 +141,6 @@ void movement()
     }
 }
 
-void runSprites()
-{
-    for(uint8_t i = 0; i < NUMSPRITES; i++)
-    {
-        if(!ISSPRITEACTIVE(spritesBuffer[i]))
-            continue;
-        
-        if(spritesBuffer[i].behavior)
-            spritesBuffer[i].behavior(&spritesBuffer[i], &arduboy);
-    }
-}
-
 inline bool inExit() { return getMapCell(&worldMap, (int)player.posX, (int)player.posY) == TILEEXIT; }
 
 //Menu functionality, move the cursor, select things (redraws automatically)
@@ -219,16 +207,6 @@ void drawMenu(bool showHint)
     tinyfont.print("o");
 }
 
-void resetSprites()
-{
-    memset(spritesBuffer, 0, sizeof(RSprite) * NUMSPRITES);
-}
-
-void resetBounds()
-{
-    memset(boundsBuffer, 0, sizeof(RBounds) * NUMBOUNDS);
-}
-
 uint8_t addSprite(float x, float y, uint8_t frame, uint8_t shrinkLevel, int8_t heightAdjust, behavior_func func)
 {
     for(uint8_t i = 0; i < NUMSPRITES; i++)
@@ -252,7 +230,7 @@ uint8_t addSprite(float x, float y, uint8_t frame, uint8_t shrinkLevel, int8_t h
 void generateMaze()
 {
     clearRaycast(&arduboy);
-    resetSprites();
+    resetGroup(&sprites);
     tinyfont.setCursor(12, 28);
     tinyfont.print(F("Generating maze"));
     arduboy.display();
@@ -322,10 +300,8 @@ void loop()
 
         raycastWalls(&player, &worldMap, &arduboy, tilesheet);
         #ifndef NOSPRITES
-        runSprites();
-        //sprites.tempsorting = tempcontainer;
+        runSprites(&sprites, &arduboy);
         drawSprites(&player, &sprites, &arduboy, spritesheet, spritesheet_Mask);
-        //sprites.tempsorting = NULL;
         #endif
         movement();
 

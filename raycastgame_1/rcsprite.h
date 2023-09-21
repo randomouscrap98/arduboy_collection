@@ -3,6 +3,7 @@
 #include <FixedPoints.h>
 
 #include "utils.h"
+#include "rcmap.h"
 
 // As with raycast.h, I unfortunately require you to make changes to this file if you
 // want different results.
@@ -15,35 +16,26 @@ constexpr uint8_t RSTATEYOFFSET = 0b11111000;
 
 
 // Try to make this fit into as little space as possible
-struct RSprite {
+struct RcSprite {
     muflot x; //Precision for x/y is low but doesn't really need to be high
     muflot y;
     uint8_t frame = 0;
     uint8_t state = 0; // First bit is active, next 2 are how many times to /2 for size
-    void (* behavior)(RSprite*,Arduboy2Base*) = NULL;
+    void (* behavior)(RcSprite*,Arduboy2Base*) = NULL;
 
     uint8_t intstate[RSINTERNALSTATEBYTES];
-
-    //Note: if we sacrifice 2 bytes per sprite to store the distance (so 32 bytes currently), 
-    //you can potentially save computation by sorting the sprite list itself. Sorted lists 
-    //generally don't require as much computation. I don't know realistically how much is 
-    //being saved though, so I'm not using that. I think having the sort struct below is
-    //significantly more flexible and may actually end up being faster overall
 };
 
-typedef void (* behavior_func)(RSprite *,Arduboy2Base *);
+typedef void (* behavior_func)(RcSprite *,Arduboy2Base *);
 
-// Sorted sprite. Needed to save memory in RSprite (distance). May add more data here
-// for precomputation
+// Sorted sprite. Useful to keep original sprite list index as sprite ids 
 struct SSprite {
-    RSprite * sprite; 
-    SFixed<11,4> dpx;   //Some precalc stuff to save compute (4 X NUMSPRITES extra bytes, here it's 128)
-    SFixed<11,4> dpy;
+    RcSprite * sprite; 
     SFixed<11,4> distance;    //Unfortunately, distance kinda has to be large... 12 bits = 4096, should be more than enough
 };
 
 // A box representing bounds that the player shouldn't be able to walk into. Not necessarily tied to a sprite
-struct RBounds {
+struct RcBounds {
     muflot x1;
     muflot y1;
     muflot x2;
@@ -55,9 +47,80 @@ struct RBounds {
 
 struct RcSpriteGroup
 {
-    RSprite * sprites;
+    RcSprite * sprites;
     SSprite * tempsorting;
     const uint8_t numsprites;
-    RBounds * bounds;
+    RcBounds * bounds;
     const uint8_t numbounds;
 };
+
+void resetSprites(RcSpriteGroup * group)
+{
+    memset(group->sprites, 0, sizeof(RcSprite) * group->numsprites);
+}
+
+void resetBounds(RcSpriteGroup * group)
+{
+    memset(group->bounds, 0, sizeof(RcBounds) * group->numbounds);
+}
+
+void resetGroup(RcSpriteGroup * group)
+{
+    resetBounds(group);
+    resetSprites(group);
+}
+
+void runSprites(RcSpriteGroup * group, Arduboy2Base * arduboy)
+{
+    uint8_t numsprites = group->numsprites;
+    for(uint8_t i = 0; i < numsprites; i++)
+    {
+        if(!ISSPRITEACTIVE(group->sprites[i]))
+            continue;
+        
+        if(group->sprites[i].behavior)
+            group->sprites[i].behavior(&group->sprites[i], arduboy);
+    }
+}
+
+//Sort sprites within the sprite contiainer (only affects the sorted list). returns number of active sprites
+uint8_t sortSprites(RcPlayer * player, RcSpriteGroup * group)
+{
+    SFixed<11,4> fposx = (SFixed<11,4>)player->posX;
+    SFixed<11,4> fposy = (SFixed<11,4>)player->posY;
+
+    //Make a temp sort array on stack
+    uint8_t numsprites = group->numsprites;
+    uint8_t usedSprites = 0;
+    SSprite * sorted = group->tempsorting;
+    
+    // Calc distance. Also, sort elements (might as well, we're already here)
+    for (uint8_t i = 0; i < numsprites; ++i)
+    {
+        RcSprite * sprite = &group->sprites[i];
+
+        if (!ISSPRITEACTIVE((*sprite)))
+            continue;
+
+        SSprite toSort;
+        SFixed<11,4> dpx = (SFixed<11,4>)sprite->x - fposx;
+        SFixed<11,4> dpy = (SFixed<11,4>)sprite->y - fposy;
+        toSort.distance = dpx * dpx + dpy * dpy; // sqrt not taken, unneeded
+        toSort.sprite = sprite;
+
+        //Insertion sort (it's faster for small arrays; if you increase sprite count to some 
+        //absurd number, change this to something else).
+        int8_t insertPos = usedSprites - 1;
+
+        while(insertPos >= 0 && sorted[insertPos].distance < toSort.distance)
+        {
+            sorted[insertPos + 1] = sorted[insertPos];
+            insertPos--;
+        }
+
+        sorted[insertPos + 1] = toSort;
+        usedSprites++;
+    }
+
+    return usedSprites;
+}

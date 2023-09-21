@@ -340,41 +340,9 @@ void raycastWalls(RcPlayer * p, RcMap * map, Arduboy2Base * arduboy, const uint8
 
 void drawSprites(RcPlayer * player, RcSpriteGroup * group, Arduboy2Base * arduboy, const uint8_t * spritesheet, const uint8_t * spritesheet_Mask)
 {
-    SFixed<11,4> fposx = (SFixed<11,4>)player->posX;
-    SFixed<11,4> fposy = (SFixed<11,4>)player->posY;
+    uint8_t usedSprites = sortSprites(player, group);
 
-    //Make a temp sort array on stack
-    uint8_t usedSprites = 0;
-    SSprite * sorted = group->tempsorting;
-    
-    // Calc distance. Also, sort elements (might as well, we're already here)
-    for (uint8_t i = 0; i < group->numsprites; ++i)
-    {
-        RSprite * sprite = &group->sprites[i];
-
-        if (!ISSPRITEACTIVE((*sprite)))
-            continue;
-
-        SSprite toSort;
-        toSort.dpx = (SFixed<11,4>)sprite->x - fposx;
-        toSort.dpy = (SFixed<11,4>)sprite->y - fposy;
-        toSort.distance = toSort.dpx * toSort.dpx + toSort.dpy * toSort.dpy; // sqrt not taken, unneeded
-        toSort.sprite = sprite;
-
-        //Insertion sort (it's faster for small arrays; if you increase sprite count to some 
-        //absurd number, change this to something else).
-        int8_t insertPos = usedSprites - 1;
-
-        while(insertPos >= 0 && sorted[insertPos].distance < toSort.distance)
-        {
-            sorted[insertPos + 1] = sorted[insertPos];
-            insertPos--;
-        }
-
-        sorted[insertPos + 1] = toSort;
-        usedSprites++;
-    }
-
+    float fposX = (float)player->posX, fposY = (float)player->posY;
     float planeX = player->dirY, planeY = -player->dirX;
     float invDet = 1.0 / (planeX * player->dirY - planeY * player->dirX); // required for correct matrix multiplication
     uint8_t * sbuffer = arduboy->sBuffer;
@@ -384,11 +352,11 @@ void drawSprites(RcPlayer * player, RcSpriteGroup * group, Arduboy2Base * ardubo
     for (uint8_t i = 0; i < usedSprites; i++)
     {
         //Get the current sprite. Copy so we don't have to derefence a pointer a million times
-        RSprite sprite = * sorted[i].sprite;
+        RcSprite sprite = * group->tempsorting[i].sprite;
 
         //Already stored pos relative to camera earlier, but want extra precision, use floats
-        float spriteX = float(sorted[i].dpx);
-        float spriteY = float(sorted[i].dpy);
+        float spriteX = (float)sprite.x - fposX;
+        float spriteY = (float)sprite.y - fposY;
 
         // X and Y will always be very small (map only 4 bit size), so these transforms will still fit within a 7 bit int part
         float transformYT = invDet * (-planeY * spriteX + planeX * spriteY); // this is actually the depth inside the screen, that what Z is in 3D
