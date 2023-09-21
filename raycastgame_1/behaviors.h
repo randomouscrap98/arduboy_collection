@@ -1,8 +1,7 @@
 #pragma once
 
 #include <Arduboy2.h>
-#include "rcsprite.h"
-#include "math.h"
+#include "lib/rcsprite.h"
 
 //#define NB_ANIMATE(name, baseframe, frames) void name(RSprite * s, Arduboy2Base * a) sprite->frame = sprite->intstate[0] + ((arduboy->frameCount >> ) & 1);
 

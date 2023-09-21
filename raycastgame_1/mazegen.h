@@ -1,7 +1,7 @@
 #pragma once
 
-#include "utils.h"
-#include "rcmap.h"
+#include "lib/utils.h"
+#include "lib/rcmap.h"
 #include "tilesheet.h"
 //#include "dualsheet.h"
 

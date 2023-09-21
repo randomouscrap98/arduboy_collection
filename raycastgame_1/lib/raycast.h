@@ -402,8 +402,8 @@ void drawSprites(RcPlayer * player, RcSpriteGroup * group, Arduboy2Base * ardubo
         //Setup stepping to avoid costly mult (and div) in critical loops
         //These float divisions happen just once per sprite, hopefully that's not too bad.
         //There used to be an option to set the precision of sprites but it didn't seem to make any difference
-        uflot stepX = (float)TILESIZE / spriteWidth;
-        uflot stepY = (float)TILESIZE / spriteHeight;
+        uflot stepX = (float)RCTILESIZE / spriteWidth;
+        uflot stepY = (float)RCTILESIZE / spriteHeight;
         uflot texX = (drawStartX - ssX) * stepX;
         uflot texYInit = (drawStartY - ssY) * stepY;
         uflot texY = texYInit;

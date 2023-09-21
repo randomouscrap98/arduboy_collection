@@ -1,5 +1,8 @@
 #pragma once
 
+#include <Arduboy2.h>
+#include <FixedPoints.h>
+
 // I modify these for testing, just nice to have it abstracted
 typedef SFixed<7,8> flot;
 typedef UFixed<8,8> uflot;

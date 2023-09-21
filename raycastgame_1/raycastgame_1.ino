@@ -2,14 +2,14 @@
 #include <FixedPoints.h>
 #include <Arduboy2.h>
 
-// Libs (sort of; mostly just code organization)
-#include "utils.h"
-#include "rcmap.h"
-#include "mazegen.h"
-#include "rcsprite.h"
-#include "behaviors.h"
+// Libs for raycasting
+#include "lib/utils.h"
+#include "lib/rcmap.h"
+#include "lib/rcsprite.h"
+#include "lib/raycast.h"
 
-#include "raycast.h"
+#include "mazegen.h"
+#include "behaviors.h"
 
 // Graphics
 #include "resources/raycastbg.h"
