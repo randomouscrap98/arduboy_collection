@@ -2,11 +2,8 @@
 #include <FixedPoints.h>
 #include <Arduboy2.h>
 
-#define RCVIEWWIDTH 100
-
 // Libs for raycasting
 #include <ArduboyRaycast.h>
-#include <ArduboyRaycast_Map.h>
 #include <ArduboyRaycast_Extra.h>
 
 #include "mazegen.h"
@@ -25,7 +22,7 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // And now some debug stuff
 // #define DRAWMAPDEBUG         // Display map (will take up portion of screen)
 // #define NOSPRITES            // Remove all sprites
-// #define NOFLOOR
+//#define NOFLOOR
  #define ADDDEBUGAREA     // Add a little debug area
 //  #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
 
@@ -63,13 +60,13 @@ constexpr MazeSize MAZESIZES[MAZESIZECOUNT] PROGMEM = {
 
 
 RcPlayer player;
-RaycastInstance instance;
+RcInstance<100,HEIGHT> instance;
 
 //Big data!
 uint8_t mapBuffer[MAPHEIGHT * MAPWIDTH];
 RcSprite spritesBuffer[NUMSPRITES];
+SSprite sortedSprites[NUMSPRITES];
 RcBounds boundsBuffer[NUMBOUNDS];
-SSprite tempcontainer[NUMSPRITES];
 
 RcMap worldMap {
     mapBuffer,
@@ -79,30 +76,17 @@ RcMap worldMap {
 
 RcSpriteGroup sprites {
     spritesBuffer,
-    tempcontainer,
+    sortedSprites,
     NUMSPRITES,
     boundsBuffer,
     NUMBOUNDS
 };
 
-
-
-//setLightIntensity(&rcstate, (uflot)1.5);
-
-//RaycastState rcstate {};
-//setLightIntensity(&rcstate, (uflot)1.5);
-//setLightIntensity(&rcstate, 1.5);
-
-//rcstate.tilesheet = tilesheet;
-//rcstate.spritesheet = spritesheet;
-//rcstate.spritesheet_mask = spritesheet_Mask;
-
-
 //Draw the floor underneath the raycast walls (ultra simple for now to save cycles)
 void raycastFoundation()
 {
     // Actually changed it to a full bg
-    //Sprites::drawOverwrite(0, 0, raycastBg, 0);
+    Sprites::drawOverwrite(0, 0, raycastBg, 0);
     //raycastFloor();
 }
 
@@ -173,11 +157,11 @@ void drawMenu(bool showHint)
     constexpr uint8_t MENUY = 22;
     constexpr uint8_t MENUSPACING = 6;
 
-    fastClear(&arduboy, VIEWWIDTH, 0, WIDTH,HEIGHT);
-    FASTRECT(arduboy, VIEWWIDTH + 1, 0, WIDTH - 1, HEIGHT - 1, WHITE);
-    arduboy.drawPixel(VIEWWIDTH + 3, 2, WHITE);
+    fastClear(&arduboy, instance.VIEWWIDTH, 0, WIDTH,HEIGHT);
+    FASTRECT(arduboy, instance.VIEWWIDTH + 1, 0, WIDTH - 1, HEIGHT - 1, WHITE);
+    arduboy.drawPixel(instance.VIEWWIDTH + 3, 2, WHITE);
     arduboy.drawPixel(WIDTH - 3, 2, WHITE);
-    arduboy.drawPixel(VIEWWIDTH + 3, HEIGHT - 3, WHITE);
+    arduboy.drawPixel(instance.VIEWWIDTH + 3, HEIGHT - 3, WHITE);
     arduboy.drawPixel(WIDTH - 3, HEIGHT - 3, WHITE);
 
     tinyfont.setCursor(109, 4);
@@ -203,7 +187,7 @@ void drawMenu(bool showHint)
 // Generate a new maze and reset the game to an initial playable state
 void generateMaze()
 {
-    clearRaycast(&arduboy);
+    instance.clearRaycast(&arduboy);
     sprites.resetAll();
     tinyfont.setCursor(12, 28);
     tinyfont.print(F("Generating maze"));
@@ -230,6 +214,11 @@ void generateMaze()
         for(uint8_t x = 3; x < 8; x++)
             worldMap.setCell(x, y, TILEEMPTY);
     #endif
+
+    instance.clearRaycast(&arduboy);
+    tinyfont.setCursor(5, 28);
+    tinyfont.print(F("Maze generation complete!"));
+    arduboy.display();
 }
 
 
@@ -259,7 +248,7 @@ void loop()
     // Funny game no state variable haha
     if(inExit()) 
     {
-        clearRaycast(&arduboy);
+        instance.clearRaycast(&arduboy);
 
         constexpr uint8_t WINX = 22;
         constexpr uint8_t WINY = 32;
@@ -271,7 +260,7 @@ void loop()
     else
     {
         #ifdef NOFLOOR
-        clearRaycast(&arduboy);
+        instance.clearRaycast(&arduboy);
         #else
         raycastFoundation();
         #endif
