@@ -64,8 +64,8 @@ RcInstance<100,HEIGHT> instance;
 
 //Big data!
 uint8_t mapBuffer[MAPHEIGHT * MAPWIDTH];
-RcSprite spritesBuffer[NUMSPRITES];
-SSprite sortedSprites[NUMSPRITES];
+RcSprite<2> spritesBuffer[NUMSPRITES];
+SSprite<2> sortedSprites[NUMSPRITES];
 RcBounds boundsBuffer[NUMBOUNDS];
 
 RcMap worldMap {
@@ -74,7 +74,7 @@ RcMap worldMap {
     MAPHEIGHT
 };
 
-RcSpriteGroup sprites {
+RcSpriteGroup<2> sprites {
     spritesBuffer,
     sortedSprites,
     NUMSPRITES,
@@ -207,7 +207,7 @@ void generateMaze()
     sprites.addSprite(6.5, 1.4, SPRITEBARREL, 1, 8, NULL);
     sprites.addSprite(7, 5, SPRITECHEST, 1, 8, NULL);
     sprites.addSprite(4, 3, SPRITEMONSTER, 1, 0, behavior_bat);
-    RcSprite * sp = sprites.addSprite(6, 3, SPRITELEVER, 1, 8, behavior_animate_16);
+    RcSprite<2> * sp = sprites.addSprite(6, 3, SPRITELEVER, 1, 8, behavior_animate_16);
     sp->intstate[0] = SPRITELEVER;
     sp->intstate[1] = 2;
     for(uint8_t y = 1; y < 8; y++)
