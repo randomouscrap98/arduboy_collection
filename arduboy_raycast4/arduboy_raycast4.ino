@@ -4,7 +4,6 @@
 
 // Libs for raycasting
 #include <ArduboyRaycast.h>
-#include <ArduboyRaycast_Extra.h>
 
 #include "mazegen.h"
 #include "behaviors.h"
@@ -60,7 +59,7 @@ constexpr MazeSize MAZESIZES[MAZESIZECOUNT] PROGMEM = {
 
 
 RcPlayer player;
-RcInstance<100,HEIGHT> instance;
+RcRender<100,HEIGHT> instance;
 
 //Big data!
 uint8_t mapBuffer[MAPHEIGHT * MAPWIDTH];
@@ -77,8 +76,8 @@ RcMap worldMap {
 RcSpriteGroup<2> sprites {
     spritesBuffer,
     sortedSprites,
-    NUMSPRITES,
     boundsBuffer,
+    NUMSPRITES,
     NUMBOUNDS
 };
 
@@ -91,8 +90,9 @@ void raycastFoundation()
 }
 
 //Simple redirection for movement attempt
-bool solidChecker(uint8_t x, uint8_t y) { 
-    return worldMap.getCell(x, y) & 1; 
+bool solidChecker(uflot x, uflot y) { 
+    return worldMap.getCell(x.getInteger(), y.getInteger()) & 1 ||
+        sprites.firstColliding(x, y) != NULL; 
 }
 
 bool inExit() { 
@@ -117,7 +117,8 @@ void movement()
     if (arduboy.pressed(LEFT_BUTTON))
         rotation = ROTSPEED;
 
-    tryMovement(&player, &sprites, movement, rotation, &solidChecker);
+    player.tryMovement(movement, rotation, &solidChecker);
+    //tryMovement(&player, &sprites, movement, rotation, &solidChecker);
 }
 
 //Menu functionality, move the cursor, select things (redraws automatically)
@@ -203,11 +204,11 @@ void generateMaze()
 
     #ifdef ADDDEBUGAREA
     worldMap.setCell(5, 0, TILEDOOR);
-    sprites.addSprite(4.5, 1.4, SPRITEBARREL, 1, 8, NULL);
-    sprites.addSprite(6.5, 1.4, SPRITEBARREL, 1, 8, NULL);
-    sprites.addSprite(7, 5, SPRITECHEST, 1, 8, NULL);
-    sprites.addSprite(4, 3, SPRITEMONSTER, 1, 0, behavior_bat);
-    RcSprite<2> * sp = sprites.addSprite(6, 3, SPRITELEVER, 1, 8, behavior_animate_16);
+    sprites.addSprite(4.5, 1.4, SPRITEBARREL, 2, 8, NULL);
+    sprites.addSprite(6.5, 1.4, SPRITEBARREL, 2, 8, NULL);
+    sprites.addSprite(7, 5, SPRITECHEST, 2, 8, NULL);
+    sprites.addSprite(4, 3, SPRITEMONSTER, 2, 0, behavior_bat);
+    RcSprite<2> * sp = sprites.addSprite(6, 3, SPRITELEVER, 2, 8, behavior_animate_16);
     sp->intstate[0] = SPRITELEVER;
     sp->intstate[1] = 2;
     for(uint8_t y = 1; y < 8; y++)
