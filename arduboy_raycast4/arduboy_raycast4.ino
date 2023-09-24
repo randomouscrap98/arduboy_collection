@@ -2,11 +2,12 @@
 #include <FixedPoints.h>
 #include <Arduboy2.h>
 
+// #define RCSMALLLOOPS
+
 // Libs for raycasting
 #include <ArduboyRaycast.h>
 
 #include "mazegen.h"
-#include "behaviors.h"
 
 // Graphics
 #include "resources/raycastbg.h"
@@ -20,13 +21,13 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 
 // And now some debug stuff
 // #define DRAWMAPDEBUG         // Display map (will take up portion of screen)
-// #define NOSPRITES            // Remove all sprites
+ // #define NOSPRITES            // Remove all sprites
 //#define NOFLOOR
  #define ADDDEBUGAREA     // Add a little debug area
 //  #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
 
 // Gameplay constants
-constexpr uint8_t FRAMERATE = 35;
+constexpr uint8_t FRAMERATE = 45;
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 
@@ -92,7 +93,7 @@ void raycastFoundation()
 //Simple redirection for movement attempt
 bool solidChecker(uflot x, uflot y) { 
     return worldMap.getCell(x.getInteger(), y.getInteger()) & 1 ||
-        sprites.firstColliding(x, y) != NULL; 
+        sprites.firstColliding(x, y, RBSTATESOLID) != NULL; 
 }
 
 bool inExit() { 
@@ -185,6 +186,18 @@ void drawMenu(bool showHint)
     tinyfont.print("o");
 }
 
+void behavior_bat(RcSprite<2> * sprite)
+{
+    sprite->x = 4 + cos((float)arduboy.frameCount / 4) / 2;
+    sprite->y = 3 + sin((float)arduboy.frameCount / 4) / 2;
+    sprite->state = (sprite->state & ~(RSSTATEYOFFSET)) | ((16 | uint8_t(15 * abs(sin((float)arduboy.frameCount / 11)))) << 3);
+}
+
+void behavior_animate_16(RcSprite<2> * sprite)
+{
+    sprite->frame = sprite->intstate[0] + ((arduboy.frameCount >> 4) & (sprite->intstate[1] - 1));
+}
+
 // Generate a new maze and reset the game to an initial playable state
 void generateMaze()
 {
@@ -268,7 +281,7 @@ void loop()
 
         instance.raycastWalls(&player, &worldMap, &arduboy);
         #ifndef NOSPRITES
-        sprites.runSprites(&arduboy);
+        sprites.runSprites();
         instance.drawSprites(&player, &sprites, &arduboy); //spritesheet, spritesheet_Mask);
         #endif
         movement();
