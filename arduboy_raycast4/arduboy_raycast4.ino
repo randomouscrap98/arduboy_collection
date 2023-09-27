@@ -23,11 +23,16 @@ Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::heigh
 // #define DRAWMAPDEBUG         // Display map (will take up portion of screen)
  // #define NOSPRITES            // Remove all sprites
 //#define NOFLOOR
- #define ADDDEBUGAREA     // Add a little debug area
+#define ADDDEBUGAREA        // Add a little debug area
+#define EXTENDEDSPRITES     // Add maximum sprites within the debug area
 //  #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
 
 // Gameplay constants
+#ifdef EXTENDEDSPRITES
 constexpr uint8_t FRAMERATE = 45;
+#else
+constexpr uint8_t FRAMERATE = 50;
+#endif
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 
@@ -86,7 +91,8 @@ RcSpriteGroup<2> sprites {
 void raycastFoundation()
 {
     // Actually changed it to a full bg
-    Sprites::drawOverwrite(0, 0, raycastBg, 0);
+    instance.drawRaycastBackground(&arduboy, raycastBg);
+    //Sprites::drawOverwrite(0, 0, raycastBg, 0);
     //raycastFloor();
 }
 
@@ -119,7 +125,6 @@ void movement()
         rotation = ROTSPEED;
 
     player.tryMovement(movement, rotation, &solidChecker);
-    //tryMovement(&player, &sprites, movement, rotation, &solidChecker);
 }
 
 //Menu functionality, move the cursor, select things (redraws automatically)
@@ -225,8 +230,19 @@ void generateMaze()
     sp->intstate[0] = SPRITELEVER;
     sp->intstate[1] = 2;
     for(uint8_t y = 1; y < 8; y++)
+    {
         for(uint8_t x = 3; x < 8; x++)
+        {
             worldMap.setCell(x, y, TILEEMPTY);
+
+            #ifdef EXTENDEDSPRITES
+            if(y >= 5)
+            {
+                sprites.addSprite(x + 0.5, y + 0.5, 8, 1, 0, NULL);
+            }
+            #endif
+        }
+    }
     #endif
 
     instance.clearRaycast(&arduboy);
@@ -244,6 +260,9 @@ void setup()
     arduboy.initRandomSeed();
     arduboy.setFrameRate(FRAMERATE);
     instance.setLightIntensity(1.5);
+    //instance.altWallShading = RcShadingType::White;
+    //instance.cornershading = 1;
+    //instance.shading = RcShadingType::None;
     instance.tilesheet = tilesheet;
     instance.spritesheet = spritesheet;
     instance.spritesheet_mask = spritesheet_Mask;
