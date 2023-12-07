@@ -7,8 +7,6 @@
 // Libs for raycasting
 #include <ArduboyRaycast.h>
 
-#include "mazegen.h"
-
 // Graphics
 #include "resources/raycastbg.h"
 #include "spritesheet.h"
@@ -19,92 +17,75 @@
 Arduboy2Base arduboy;
 Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
 
-// And now some debug stuff
-// #define DRAWMAPDEBUG         // Display map (will take up portion of screen)
- // #define NOSPRITES            // Remove all sprites
-//#define NOFLOOR
-#define ADDDEBUGAREA        // Add a little debug area
-//#define EXTENDEDSPRITES     // Add maximum sprites within the debug area
-//  #define PRINTSPRITEDATA  // Having trouble with sprites sometimes
-
-// Gameplay constants
-#ifdef EXTENDEDSPRITES
 constexpr uint8_t FRAMERATE = 45;
-#else
-constexpr uint8_t FRAMERATE = 50;
-#endif
 constexpr float MOVESPEED = 3.5f / FRAMERATE;
 constexpr float ROTSPEED = 3.5f / FRAMERATE;
 
-// Size limit for data structures
-constexpr uint8_t NUMSPRITES = 20;
-constexpr uint8_t NUMBOUNDS = 16;
-constexpr uint8_t MAPWIDTH = 16;
-constexpr uint8_t MAPHEIGHT = 16;
+// Since we're using this number so many times in template types, might 
+// as well make it a constant.
+constexpr uint8_t NUMINTERNALBYTES = 1;
+constexpr uint8_t NUMSPRITES = 16;
 
+// Once again we pick 16 sprites just in case we need them. 16 is a decent number
+// to not take up all the memory but still have enough to work with.
+RcContainer<NUMSPRITES, NUMINTERNALBYTES, 100, HEIGHT> raycast(tilesheet, spritesheet, spritesheet_Mask);
 
-//Menu related stuff
-uint8_t menuIndex = 0;
-uint8_t mazeSize = 1;
-uint8_t mazeType = 0;
+//// Size limit for data structures
+//constexpr uint8_t NUMSPRITES = 20;
+//constexpr uint8_t NUMBOUNDS = 16;
+//constexpr uint8_t MAPWIDTH = 15;
+//constexpr uint8_t MAPHEIGHT = 15;
 
-uint8_t curWidth = 0;
-uint8_t curHeight = 0;
+//RcPlayer player;
+//RcRender<100,HEIGHT> instance;
+//
+////Big data!
+//uint8_t mapBuffer[MAPHEIGHT * MAPWIDTH];
+//RcSprite<2> spritesBuffer[NUMSPRITES];
+//SSprite<2> sortedSprites[NUMSPRITES];
+//RcBounds boundsBuffer[NUMBOUNDS];
+//
+//RcMap worldMap {
+//    mapBuffer,
+//    MAPWIDTH,
+//    MAPHEIGHT
+//};
+//
+//RcSpriteGroup<2> sprites {
+//    spritesBuffer,
+//    sortedSprites,
+//    boundsBuffer,
+//    NUMSPRITES,
+//    NUMBOUNDS
+//};
 
-constexpr uint8_t MAZETYPECOUNT = 2;
-constexpr MazeType MAZETYPES[MAZETYPECOUNT] PROGMEM = {
-    { "MAZ", &genMazeType },
-    { "EPT", &genSparseRandom },
-};
+////Draw the floor underneath the raycast walls (ultra simple for now to save cycles)
+//void raycastFoundation()
+//{
+//    // Actually changed it to a full bg
+//    raycast.render.drawRaycastBackground(&arduboy, raycastBg);
+//}
 
-constexpr uint8_t MAZESIZECOUNT = 2;
-constexpr MazeSize MAZESIZES[MAZESIZECOUNT] PROGMEM = {
-    { "SML", 11, 11 },  //NOTE: must always be 2N + 1
-    { "MED", 15, 15 },
-};
+////Simple redirection for movement attempt
+//bool solidChecker(uflot x, uflot y) { 
+//    return raycast.worldMap.getCell(x.getInteger(), y.getInteger()) & 1 ||
+//        raycast.sprites.firstColliding(x, y, RBSTATESOLID) != NULL; 
+//}
 
-
-RcPlayer player;
-RcRender<100,HEIGHT> instance;
-
-//Big data!
-uint8_t mapBuffer[MAPHEIGHT * MAPWIDTH];
-RcSprite<2> spritesBuffer[NUMSPRITES];
-SSprite<2> sortedSprites[NUMSPRITES];
-RcBounds boundsBuffer[NUMBOUNDS];
-
-RcMap worldMap {
-    mapBuffer,
-    MAPWIDTH,
-    MAPHEIGHT
-};
-
-RcSpriteGroup<2> sprites {
-    spritesBuffer,
-    sortedSprites,
-    boundsBuffer,
-    NUMSPRITES,
-    NUMBOUNDS
-};
-
-//Draw the floor underneath the raycast walls (ultra simple for now to save cycles)
-void raycastFoundation()
+bool isSolid(uflot x, uflot y)
 {
-    // Actually changed it to a full bg
-    instance.drawRaycastBackground(&arduboy, raycastBg);
-    //Sprites::drawOverwrite(0, 0, raycastBg, 0);
-    //raycastFloor();
+    // The location is solid if the map cell is nonzero OR if we're colliding with
+    // any (solid) bounding boxes
+    uint8_t tile = raycast.worldMap.getCell(x.getInteger(), y.getInteger());
+
+    //return (tile != 0 && tile != MyTiles::OutdoorRockOpening) || 
+    //    raycast.sprites.firstColliding(x, y, RBSTATESOLID) != NULL;
+    return (tile != 0) || raycast.sprites.firstColliding(x, y, RBSTATESOLID) != NULL;
 }
 
-//Simple redirection for movement attempt
-bool solidChecker(uflot x, uflot y) { 
-    return worldMap.getCell(x.getInteger(), y.getInteger()) & 1 ||
-        sprites.firstColliding(x, y, RBSTATESOLID) != NULL; 
-}
-
-bool inExit() { 
-    return worldMap.getCell((int)player.posX, (int)player.posY) == TILEEXIT; 
-}
+//bool inExit() { 
+//    return raycast.worldMap.getCell((int)raycast.player.posX, (int)player.posY) == TILEEXIT; 
+//}
 
 
 // Perform ONLY player movement updates! No drawing!
@@ -124,11 +105,11 @@ void movement()
     if (arduboy.pressed(LEFT_BUTTON))
         rotation = ROTSPEED;
 
-    player.tryMovement(movement, rotation, &solidChecker);
+    raycast.player.tryMovement(movement, rotation, &isSolid);
 }
 
 //Menu functionality, move the cursor, select things (redraws automatically)
-void doMenu()
+/*void doMenu()
 {
     constexpr uint8_t MENUITEMS = 3;
     int8_t menuMod = 0;
@@ -155,7 +136,7 @@ void doMenu()
     // We check released in case the user was showing a hint
     if(menuMod || selectMod || arduboy.pressed(B_BUTTON) || arduboy.justReleased(B_BUTTON))
         drawMenu(arduboy.pressed(B_BUTTON) && menuIndex == 3);
-}
+}*/
 
 // Draw just the menu section, does not overwrite the raycast area
 void drawMenu(bool showHint)
@@ -164,13 +145,14 @@ void drawMenu(bool showHint)
     constexpr uint8_t MENUY = 22;
     constexpr uint8_t MENUSPACING = 6;
 
-    fastClear(&arduboy, instance.VIEWWIDTH, 0, WIDTH,HEIGHT);
-    FASTRECT(arduboy, instance.VIEWWIDTH + 1, 0, WIDTH - 1, HEIGHT - 1, WHITE);
-    arduboy.drawPixel(instance.VIEWWIDTH + 3, 2, WHITE);
+    fastClear(&arduboy, raycast.render.VIEWWIDTH, 0, WIDTH,HEIGHT);
+    FASTRECT(arduboy, raycast.render.VIEWWIDTH + 1, 0, WIDTH - 1, HEIGHT - 1, WHITE);
+    arduboy.drawPixel(raycast.render.VIEWWIDTH + 3, 2, WHITE);
     arduboy.drawPixel(WIDTH - 3, 2, WHITE);
-    arduboy.drawPixel(instance.VIEWWIDTH + 3, HEIGHT - 3, WHITE);
+    arduboy.drawPixel(raycast.render.VIEWWIDTH + 3, HEIGHT - 3, WHITE);
     arduboy.drawPixel(WIDTH - 3, HEIGHT - 3, WHITE);
 
+    /*
     tinyfont.setCursor(109, 4);
     tinyfont.print(F("3D"));
     tinyfont.setCursor(105, 9);
@@ -189,8 +171,10 @@ void drawMenu(bool showHint)
 
     tinyfont.setCursor(MENUX, MENUY + menuIndex * MENUSPACING);
     tinyfont.print("o");
+    */
 }
 
+/*
 void behavior_bat(RcSprite<2> * sprite)
 {
     sprite->x = 4 + cos((float)arduboy.frameCount / 4) / 2;
@@ -202,7 +186,9 @@ void behavior_animate_16(RcSprite<2> * sprite)
 {
     sprite->frame = sprite->intstate[0] + ((arduboy.frameCount >> 4) & (sprite->intstate[1] - 1));
 }
+*/
 
+/*
 // Generate a new maze and reset the game to an initial playable state
 void generateMaze()
 {
@@ -249,7 +235,7 @@ void generateMaze()
     tinyfont.setCursor(5, 28);
     tinyfont.print(F("Maze generation complete!"));
     arduboy.display();
-}
+}*/
 
 
 void setup()
@@ -259,39 +245,62 @@ void setup()
     arduboy.flashlight();
     arduboy.initRandomSeed();
     arduboy.setFrameRate(FRAMERATE);
-    instance.setLightIntensity(1.5);
+    raycast.render.setLightIntensity(1.5);
+
+    for(int i = 0; i < RCMAXMAPDIMENSION; i++)
+    {
+        raycast.worldMap.setCell(i, 0, 1);
+        raycast.worldMap.setCell(i, RCMAXMAPDIMENSION - 1, 1);
+        raycast.worldMap.setCell(0, i, 1);
+        raycast.worldMap.setCell(RCMAXMAPDIMENSION - 1, i, 1);
+    }
     //instance.altWallShading = RcShadingType::White;
     //instance.cornershading = 1;
     //instance.shading = RcShadingType::None;
-    instance.tilesheet = tilesheet;
-    instance.spritesheet = spritesheet;
-    instance.spritesheet_mask = spritesheet_Mask;
-    generateMaze();
-    drawMenu(false);
+    //instance.tilesheet = tilesheet;
+    //instance.spritesheet = spritesheet;
+    //instance.spritesheet_mask = spritesheet_Mask;
+    //generateMaze();
+    //drawMenu(false);
 }
 
 void loop()
 {
+    if(!arduboy.nextFrame()) return;
+
+    // Process player movement + interaction
+    movement();
+    //testAreaTransition();
+
+    // Draw the correct background for the area. 
+    drawMenu(false);
+    raycast.render.drawRaycastBackground(&arduboy, raycastBg);
+
+    raycast.runIteration(&arduboy);
+
+    arduboy.display();
+
+/*
     if (!arduboy.nextFrame()) return;
 
     arduboy.pollButtons();
 
-    doMenu();
+    //doMenu();
 
-    // Funny game no state variable haha
-    if(inExit()) 
-    {
-        instance.clearRaycast(&arduboy);
+    //// Funny game no state variable haha
+    //if(inExit()) 
+    //{
+    //    instance.clearRaycast(&arduboy);
 
-        constexpr uint8_t WINX = 22;
-        constexpr uint8_t WINY = 32;
+    //    constexpr uint8_t WINX = 22;
+    //    constexpr uint8_t WINY = 32;
 
-        tinyfont.setCursor(WINX, 24);
-        tinyfont.print(F("COMPLETE!"));
-        tinyfont.setCursor(WINX + 8, WINY);
-    }
-    else
-    {
+    //    tinyfont.setCursor(WINX, 24);
+    //    tinyfont.print(F("COMPLETE!"));
+    //    tinyfont.setCursor(WINX + 8, WINY);
+    //}
+    //else
+    //{
         #ifdef NOFLOOR
         instance.clearRaycast(&arduboy);
         #else
@@ -305,10 +314,8 @@ void loop()
         #endif
         movement();
 
-        #ifdef DRAWMAPDEBUG
-        drawMaze(&arduboy, worldMap, 0, 0);
-        #endif
-    }
+    //}
 
     arduboy.display();
+    */
 }
