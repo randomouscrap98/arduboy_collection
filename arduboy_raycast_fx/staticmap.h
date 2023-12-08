@@ -7,7 +7,7 @@ constexpr uint8_t staticmap_width = 64;
 constexpr uint8_t staticmap_height = 64;
 
 //4kb or something (should be fine)
-constexpr uint8_t staticmap[] PROGMEM
+constexpr uint8_t staticmap[] PROGMEM =
 {
 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,   // y=0
 1,0,1,3,1,0,0,1,0,0,0,0,0,0,1,1,0,0,0,0,1,0,1,0,0,0,1,1,0,1,0,0,0,0,0,0,3,0,1,0,0,3,0,1,0,0,3,1,0,0,0,0,0,0,0,0,3,0,0,0,1,0,0,1,   // y=1

@@ -2,6 +2,9 @@
 #include <FixedPoints.h>
 #include <Arduboy2.h>
 
+#include <ArduboyFX.h>      // required to access the FX external flash
+#include "fx/fxdata.h"  // this file contains all references to FX data
+
 //#define RCSMALLLOOPS
 
 // Libs for raycasting
@@ -200,8 +203,10 @@ void load_region()
         map_begin_y = 0; 
     }
 
+    uint8_t writelen = 1 + map_end_x - map_begin_x;
     for(uint8_t y = map_begin_y; y <= map_end_y; y++) {
-        memcpy_P(raycast.worldMap.map + (y * RCMAXMAPDIMENSION + map_begin_x), staticmap + (world_begin_y++ * staticmap_width + world_begin_x), 1 + map_end_x - map_begin_x);
+        //memcpy_P(raycast.worldMap.map + (y * RCMAXMAPDIMENSION + map_begin_x), staticmap + (world_begin_y++ * staticmap_width + world_begin_x), 1 + map_end_x - map_begin_x);
+        FX::readDataBytes(staticmap_fx + (world_begin_y++ * staticmap_width + world_begin_x), raycast.worldMap.map + (y * RCMAXMAPDIMENSION + map_begin_x), writelen);
     }
 }
 
@@ -212,6 +217,8 @@ void setup()
     arduboy.flashlight();
     arduboy.initRandomSeed();
     arduboy.setFrameRate(FRAMERATE);
+    FX::begin(FX_DATA_PAGE);    // initialise FX chip
+
     raycast.render.setLightIntensity(1.5);
 
     raycast.player.posX = CAGEX + 0.5;
@@ -236,5 +243,6 @@ void loop()
 
     raycast.worldMap.drawMap(&arduboy, 105, 0);
 
-    arduboy.display();
+    //arduboy.display();
+    FX::display(false);
 }
