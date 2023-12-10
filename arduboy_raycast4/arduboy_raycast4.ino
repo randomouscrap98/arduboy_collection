@@ -2,7 +2,7 @@
 #include <FixedPoints.h>
 #include <Arduboy2.h>
 
-// #define RCSMALLLOOPS
+//#define RCSMALLLOOPS
 
 // Libs for raycasting
 #include <ArduboyRaycast.h>

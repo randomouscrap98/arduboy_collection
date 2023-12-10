@@ -14,9 +14,11 @@
 #include "resources/raycastbg.h"
 #include "spritesheet.h"
 #include "tilesheet.h"
-#include "staticmap.h"
 
 // ARDUBOY_NO_USB
+
+constexpr uint8_t staticmap_width = 64;
+constexpr uint8_t staticmap_height = 64;
 
 Arduboy2Base arduboy;
 Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
@@ -36,7 +38,7 @@ constexpr uint8_t CAGEY = 7;
 constexpr uint8_t LOADWIDTH = 15;
 constexpr uint8_t LOADHEIGHT = 15;
 
-uint8_t world_x = CAGEX;
+uint8_t world_x = CAGEX + 1;
 uint8_t world_y = CAGEY;
 
 // Once again we pick 16 sprites just in case we need them. 16 is a decent number
@@ -205,7 +207,6 @@ void load_region()
 
     uint8_t writelen = 1 + map_end_x - map_begin_x;
     for(uint8_t y = map_begin_y; y <= map_end_y; y++) {
-        //memcpy_P(raycast.worldMap.map + (y * RCMAXMAPDIMENSION + map_begin_x), staticmap + (world_begin_y++ * staticmap_width + world_begin_x), 1 + map_end_x - map_begin_x);
         FX::readDataBytes(staticmap_fx + (world_begin_y++ * staticmap_width + world_begin_x), raycast.worldMap.map + (y * RCMAXMAPDIMENSION + map_begin_x), writelen);
     }
 }
@@ -225,6 +226,8 @@ void setup()
     raycast.player.posY = CAGEY + 0.5;
 
     load_region();
+
+    drawMenu(false);
 }
 
 
@@ -236,13 +239,12 @@ void loop()
     movement();
 
     // Draw the correct background for the area. 
-    drawMenu(false);
+    //drawMenu(false);
     raycast.render.drawRaycastBackground(&arduboy, raycastBg);
 
     raycast.runIteration(&arduboy);
 
-    raycast.worldMap.drawMap(&arduboy, 105, 0);
+    //raycast.worldMap.drawMap(&arduboy, 105, 0);
 
-    //arduboy.display();
     FX::display(false);
 }
