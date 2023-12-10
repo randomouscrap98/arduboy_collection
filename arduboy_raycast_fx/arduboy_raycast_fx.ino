@@ -24,13 +24,14 @@ Arduboy2Base arduboy;
 Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
 
 constexpr uint8_t FRAMERATE = 45;
-constexpr float MOVESPEED = 3.5f / FRAMERATE;
-constexpr float ROTSPEED = 3.5f / FRAMERATE;
+constexpr float MOVESPEED = 1.25f / FRAMERATE;
+constexpr float ROTSPEED = 1.5f / FRAMERATE;
+constexpr float RUNMULTIPLIER = 1.75;
 
 // Since we're using this number so many times in template types, might 
 // as well make it a constant.
 constexpr uint8_t NUMINTERNALBYTES = 1;
-constexpr uint8_t NUMSPRITES = 16;
+constexpr uint8_t NUMSPRITES = 32;
 
 // Some stuff for external map loading
 constexpr uint8_t CAGEX = 7;
@@ -38,8 +39,30 @@ constexpr uint8_t CAGEY = 7;
 constexpr uint8_t LOADWIDTH = 15;
 constexpr uint8_t LOADHEIGHT = 15;
 
+constexpr uint8_t SPRITEVIEW = 5;
+
+//Sprites outside this radius get banished, sprites that enter this radius
+//get loaded
+constexpr uint8_t SPRITEBEGIN_X = CAGEX - SPRITEVIEW;
+constexpr uint8_t SPRITEEND_X = CAGEX + SPRITEVIEW;
+constexpr uint8_t SPRITEBEGIN_Y = CAGEY - SPRITEVIEW;
+constexpr uint8_t SPRITEEND_Y = CAGEY + SPRITEVIEW;
+
+constexpr int16_t SPRINTMIN_SECS = 1;
+constexpr int16_t SPRINT_SECS = 5;
+constexpr int16_t SPRINTREC_SECS = 15;
+constexpr int16_t SPRINTMAX = FRAMERATE * SPRINTMIN_SECS * SPRINT_SECS * SPRINTREC_SECS; //Realistically, this should just be the lcm of all the literals below
+constexpr int16_t SPRINTMIN = SPRINTMAX / (FRAMERATE * SPRINTMIN_SECS); //If you let go of sprint, you won't be able to sprint again until there's this much sprint available
+constexpr int16_t SPRINTDRAIN = SPRINTMAX / (FRAMERATE * SPRINT_SECS); 
+constexpr int16_t SPRINTRECOVER = SPRINTMAX / (FRAMERATE * SPRINTREC_SECS); 
+//constexpr uint8_t SPRITEGC_PERFRAME = 3;  // How many sprites to loop through per frame for garbage collect
+
 uint8_t world_x = CAGEX + 1;
 uint8_t world_y = CAGEY;
+
+int16_t sprintmeter = SPRINTMAX;
+bool holding_b = false;
+//uint8_t spritegc_i = 0;
 
 // Once again we pick 16 sprites just in case we need them. 16 is a decent number
 // to not take up all the memory but still have enough to work with.
@@ -71,28 +94,54 @@ void movement()
     if (arduboy.pressed(LEFT_BUTTON))
         rotation = ROTSPEED;
 
+    if (arduboy.pressed(B_BUTTON))
+    {
+        //We're mean and always drain sprint meter if holding B
+        sprintmeter -= SPRINTDRAIN;
+
+        if(sprintmeter < 0)
+            sprintmeter = 0;
+
+        //You're allowed to run if you're already running and there's any sprint left,
+        //or if you 'just started' running and there's minimum sprint meter
+        if(holding_b && sprintmeter > 0 || sprintmeter > SPRINTMIN)
+        {
+            rotation *= RUNMULTIPLIER;
+            movement *= RUNMULTIPLIER;
+        }
+
+        //End with us knowing if they're holding B
+        holding_b = true;
+    }
+    else
+    {
+        sprintmeter = min(sprintmeter + SPRINTRECOVER, SPRINTMAX);
+        holding_b = false;
+    }
+
     raycast.player.tryMovement(movement, rotation, &isSolid);
 
     bool reload = false;
 
-    flot ofs_x = (flot)raycast.player.posX - CAGEX;
-    flot ofs_y = (flot)raycast.player.posY - CAGEY;
+    int8_t ofs_x = ((flot)raycast.player.posX - CAGEX).getInteger();
+    int8_t ofs_y = ((flot)raycast.player.posY - CAGEY).getInteger();
 
-    if(abs(ofs_x) >= 1) {
-        int8_t movement = ofs_x.getInteger();
-        world_x += movement;
-        raycast.player.posX -= movement;
+    if(ofs_x) {
+        world_x += ofs_x;
+        raycast.player.posX -= ofs_x;
         reload = true;
     }
-    if(abs(ofs_y) >= 1) {
-        int8_t movement = ofs_y.getInteger();
-        world_y += movement;
-        raycast.player.posY -= movement;
+    if(ofs_y) {
+        world_y += ofs_y;
+        raycast.player.posY -= ofs_y;
         reload = true;
     }
 
     if(reload)
+    {
+        shift_sprites(ofs_x, ofs_y);
         load_region();
+    }
 }
 
 //Menu functionality, move the cursor, select things (redraws automatically)
@@ -175,6 +224,34 @@ void behavior_animate_16(RcSprite<2> * sprite)
 }
 */
 
+//Shift ALL sprites by the given amount in x and y (whole numbers only please!). Also
+//erases sprites that go outside the usable area
+void shift_sprites(int8_t x, int8_t y)
+{
+    for(uint8_t i = 0; i < NUMSPRITES; i++)
+    {
+        RcSprite<NUMINTERNALBYTES> * sp = raycast.sprites[i];
+        if(sp->isActive())
+        {
+            sp->x += x;
+            sp->y += y;
+
+            if(sp->x < SPRITEBEGIN_X || sp->y < SPRITEBEGIN_Y || sp->x >= SPRITEEND_X + 1 || sp->y >= SPRITEEND_Y + 1)    
+                raycast.sprites.deleteSprite(sp);
+        }
+    }
+    //for(uint8_t i = 0; i < SPRITEGC_PERFRAME; i++)
+    //{
+    //    RcSprite<NUMINTERNALBYTES> * sp = raycast.sprites[spritegc_i];
+    //    if(sp->isActive())
+    //    {
+    //        if(sp->x < SPRITEBEGIN_X || sp->y < SPRITEBEGIN_Y || sp->x >= SPRITEEND_X + 1 || sp->y >= SPRITEEND_Y + 1)    
+    //            raycast.sprites.deleteSprite(sp);
+    //    }
+    //    spritegc_i = (spritegc_i + 1) % NUMSPRITES;
+    //}
+}
+
 // Reload the map for the local region. We'll see if this is too slow...
 void load_region()
 {
@@ -220,8 +297,9 @@ void setup()
     arduboy.setFrameRate(FRAMERATE);
     FX::begin(FX_DATA_PAGE);    // initialise FX chip
 
-    raycast.render.setLightIntensity(1.5);
+    //raycast.render.setLightIntensity(1.5);
 
+    //raycast.render.spritescaling[0] = d
     raycast.player.posX = CAGEX + 0.5;
     raycast.player.posY = CAGEY + 0.5;
 
@@ -244,7 +322,12 @@ void loop()
 
     raycast.runIteration(&arduboy);
 
-    //raycast.worldMap.drawMap(&arduboy, 105, 0);
+    raycast.worldMap.drawMap(&arduboy, 105, 0);
+    //tinyfont.setCursor(0,0);
+    //tinyfont.print(sprintmeter);
 
     FX::display(false);
+
+    //Figure out sprite situation
+    //sprite_gc();
 }
