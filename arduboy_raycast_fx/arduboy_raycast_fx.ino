@@ -199,7 +199,20 @@ void shift_sprites(int8_t x, int8_t y)
             sp->y += y;
 
             if(sp->x < SPRITEBEGIN_X || sp->y < SPRITEBEGIN_Y || sp->x >= SPRITEEND_X + 1 || sp->y >= SPRITEEND_Y + 1)    
-                raycast.sprites.deleteSprite(sp);
+            {
+                raycast.sprites.deleteLinked(sp);
+            }
+            else
+            {
+                RcBounds *bp = raycast.sprites.getLinkedBounds(sp);
+                if (bp)
+                {
+                    bp->x1 += x;
+                    bp->y1 += y;
+                    bp->x2 += x;
+                    bp->y2 += y;
+                }
+            }
         }
     }
     //for(uint8_t i = 0; i < SPRITEGC_PERFRAME; i++)
@@ -223,6 +236,9 @@ void load_sprites(int8_t ofs_x, int8_t ofs_y)
     uflot lcx, lcy;
     uint8_t grx, gry;
     uint8_t gcx, gcy;
+    //We ALWAYS do all of a column (ofs_x), but rows will skip the first or last element if both row/column 
+    //is loaded depending on direction moving.
+    uint8_t skipx = 0; 
 
     //These are essentially constants
     lcy = SPRITEBEGIN_Y;
@@ -233,10 +249,12 @@ void load_sprites(int8_t ofs_x, int8_t ofs_y)
     if(ofs_x < 0) {
         lcx = SPRITEBEGIN_X;
         gcx = world_x - SPRITEVIEW;
+        skipx = 0;  //Moving left, skip leftmost element on row if needed
     }
     else {
         lcx = SPRITEEND_X;
         gcx = world_x + SPRITEVIEW;
+        skipx = SPRITEVIEW * 2; //Moving right, so skip rightmost on row
     }
 
     if(ofs_y < 0) {
@@ -249,13 +267,13 @@ void load_sprites(int8_t ofs_x, int8_t ofs_y)
     }
 
     //Direction doesn't really matter, there's no cache or anything
-    for(int8_t i = SPRITEVIEW * 2 ; i >= 0; --i)
+    for(uint8_t i = 0; i <= SPRITEVIEW * 2; i++)
     {
         //row and column. Only load the final column sprite if there's no row
         if(ofs_x) {
             load_sprite(gcx, gcy + i, lcx, lcy + i);
         }
-        if(ofs_y && !(ofs_x && i == 0)) {
+        if(ofs_y && !(ofs_x && i == skipx)) { // skip one of the row loads if it intersects with the one column load
             load_sprite(grx + i, gry, lrx + i, lry);
         }
     }
@@ -273,8 +291,8 @@ void load_sprite(uint8_t x, uint8_t y, uflot local_x, uflot local_y)
 
     //Try to add a sprite. We figure out the scale and accompanying bounding box based on frame (later)
     RcSprite<NUMINTERNALBYTES> * sp = raycast.sprites.addSprite(
-        float(local_x + uflot::fromInternal(buffer[1])), float(local_y + buffer[1]), 
-        buffer[0], 1, 2, NULL);
+        float(local_x + uflot::fromInternal(buffer[1] & 0x0F)), float(local_y + uflot::fromInternal(buffer[1] / 16)), 
+        buffer[0], 0, 0, NULL);
 
     if(sp)
     {
