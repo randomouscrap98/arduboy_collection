@@ -282,6 +282,10 @@ void load_sprites(int8_t ofs_x, int8_t ofs_y)
 // Load sprite at the exact location given. Will load nothing if nothing there...
 void load_sprite(uint8_t x, uint8_t y, uflot local_x, uflot local_y)
 {
+    //Oops, trying to load outside the map.
+    if(x >= staticmap_width || y >= staticmap_height || x < 0 || y < 0)
+        return;
+
     uint8_t buffer[staticsprites_bytes];
 
     FX::readDataBytes(staticsprites_fx + staticsprites_bytes * (x + y * (uint16_t)staticmap_width), buffer, staticsprites_bytes);
@@ -292,7 +296,7 @@ void load_sprite(uint8_t x, uint8_t y, uflot local_x, uflot local_y)
     //Try to add a sprite. We figure out the scale and accompanying bounding box based on frame (later)
     RcSprite<NUMINTERNALBYTES> * sp = raycast.sprites.addSprite(
         float(local_x + uflot::fromInternal(buffer[1] & 0x0F)), float(local_y + uflot::fromInternal(buffer[1] / 16)), 
-        buffer[0], 0, -15, NULL);
+        buffer[0], 0, -7, NULL);
 
     if(sp)
     {
