@@ -14,58 +14,19 @@
 #include "resources/raycastbg.h"
 #include "spritesheet.h"
 #include "tilesheet.h"
+#include "constants.h"
 
 // ARDUBOY_NO_USB
-
-constexpr uint8_t staticmap_width = 64;
-constexpr uint8_t staticmap_height = 64;
 
 Arduboy2Base arduboy;
 Tinyfont tinyfont = Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
 
-constexpr uint8_t FRAMERATE = 45;
-constexpr float MOVESPEED = 1.25f / FRAMERATE;
-constexpr float ROTSPEED = 1.5f / FRAMERATE;
-constexpr float RUNMULTIPLIER = 1.75;
-
-// Since we're using this number so many times in template types, might 
-// as well make it a constant.
-constexpr uint8_t NUMINTERNALBYTES = 1;
-constexpr uint8_t NUMSPRITES = 32;
-
-// Some stuff for external map loading
-constexpr uint8_t CAGEX = 7;
-constexpr uint8_t CAGEY = 7;
-constexpr uint8_t LOADWIDTH = 15;
-constexpr uint8_t LOADHEIGHT = 15;
-
-constexpr uint8_t SPRITEVIEW = 5;
-
-//Sprites outside this radius get banished, sprites that enter this radius
-//get loaded
-constexpr uint8_t SPRITEBEGIN_X = CAGEX - SPRITEVIEW;
-constexpr uint8_t SPRITEEND_X = CAGEX + SPRITEVIEW;
-constexpr uint8_t SPRITEBEGIN_Y = CAGEY - SPRITEVIEW;
-constexpr uint8_t SPRITEEND_Y = CAGEY + SPRITEVIEW;
-
-constexpr int16_t SPRINTMIN_SECS = 1;
-constexpr int16_t SPRINT_SECS = 5;
-constexpr int16_t SPRINTREC_SECS = 15;
-constexpr int16_t SPRINTMAX = FRAMERATE * SPRINTMIN_SECS * SPRINT_SECS * SPRINTREC_SECS; //Realistically, this should just be the lcm of all the literals below
-constexpr int16_t SPRINTMIN = SPRINTMAX / (FRAMERATE * SPRINTMIN_SECS); //If you let go of sprint, you won't be able to sprint again until there's this much sprint available
-constexpr int16_t SPRINTDRAIN = SPRINTMAX / (FRAMERATE * SPRINT_SECS); 
-constexpr int16_t SPRINTRECOVER = SPRINTMAX / (FRAMERATE * SPRINTREC_SECS); 
-//constexpr uint8_t SPRITEGC_PERFRAME = 3;  // How many sprites to loop through per frame for garbage collect
-
-uint8_t world_x = CAGEX + 1;
-uint8_t world_y = CAGEY;
+uint8_t world_x = 3;
+uint8_t world_y = 3;
 
 int16_t sprintmeter = SPRINTMAX;
 bool holding_b = false;
-//uint8_t spritegc_i = 0;
 
-// Once again we pick 16 sprites just in case we need them. 16 is a decent number
-// to not take up all the memory but still have enough to work with.
 RcContainer<NUMSPRITES, NUMINTERNALBYTES, 100, HEIGHT> raycast(tilesheet, spritesheet, spritesheet_Mask);
 
 bool isSolid(uflot x, uflot y)
@@ -94,9 +55,9 @@ void movement()
     if (arduboy.pressed(LEFT_BUTTON))
         rotation = ROTSPEED;
 
-    if (arduboy.pressed(B_BUTTON))
+    if (arduboy.pressed(B_BUTTON) && (movement || rotation))
     {
-        //We're mean and always drain sprint meter if holding B
+        //We're mean and always drain sprint meter if holding B and moving
         sprintmeter -= SPRINTDRAIN;
 
         if(sprintmeter < 0)
@@ -106,8 +67,8 @@ void movement()
         //or if you 'just started' running and there's minimum sprint meter
         if(holding_b && sprintmeter > 0 || sprintmeter > SPRINTMIN)
         {
-            rotation *= RUNMULTIPLIER;
-            movement *= RUNMULTIPLIER;
+            rotation *= ROTMULTIPLIER;
+            movement *= MOVEMULTIPLIER;
         }
 
         //End with us knowing if they're holding B
@@ -139,7 +100,8 @@ void movement()
 
     if(reload)
     {
-        shift_sprites(ofs_x, ofs_y);
+        shift_sprites(-ofs_x, -ofs_y);
+        load_sprites(ofs_x, ofs_y);
         load_region();
     }
 }
@@ -252,6 +214,74 @@ void shift_sprites(int8_t x, int8_t y)
     //}
 }
 
+// Figure out which sprites to load based on movement. May need to be changed if loading 
+// diagonally causes problems
+void load_sprites(int8_t ofs_x, int8_t ofs_y)
+{
+    //local row/column, global row/column
+    uflot lrx, lry;
+    uflot lcx, lcy;
+    uint8_t grx, gry;
+    uint8_t gcx, gcy;
+
+    //These are essentially constants
+    lcy = SPRITEBEGIN_Y;
+    gcy = world_y - SPRITEVIEW;
+    lrx = SPRITEBEGIN_X;
+    grx = world_x - SPRITEVIEW;
+
+    if(ofs_x < 0) {
+        lcx = SPRITEBEGIN_X;
+        gcx = world_x - SPRITEVIEW;
+    }
+    else {
+        lcx = SPRITEEND_X;
+        gcx = world_x + SPRITEVIEW;
+    }
+
+    if(ofs_y < 0) {
+        lry = SPRITEBEGIN_Y;
+        gry = world_y - SPRITEVIEW;
+    }
+    else {
+        lry = SPRITEEND_Y;
+        gry = world_y + SPRITEVIEW;
+    }
+
+    //Direction doesn't really matter, there's no cache or anything
+    for(int8_t i = SPRITEVIEW * 2 ; i >= 0; --i)
+    {
+        //row and column. Only load the final column sprite if there's no row
+        if(ofs_x) {
+            load_sprite(gcx, gcy + i, lcx, lcy + i);
+        }
+        if(ofs_y && !(ofs_x && i == 0)) {
+            load_sprite(grx + i, gry, lrx + i, lry);
+        }
+    }
+}
+
+// Load sprite at the exact location given. Will load nothing if nothing there...
+void load_sprite(uint8_t x, uint8_t y, uflot local_x, uflot local_y)
+{
+    uint8_t buffer[staticsprites_bytes];
+
+    FX::readDataBytes(staticsprites_fx + staticsprites_bytes * (x + y * (uint16_t)staticmap_width), buffer, staticsprites_bytes);
+
+    //Oops, no sprite here!
+    if(!buffer[0]) return;
+
+    //Try to add a sprite. We figure out the scale and accompanying bounding box based on frame (later)
+    RcSprite<NUMINTERNALBYTES> * sp = raycast.sprites.addSprite(
+        float(local_x + uflot::fromInternal(buffer[1])), float(local_y + buffer[1]), 
+        buffer[0], 1, 2, NULL);
+
+    if(sp)
+    {
+        raycast.sprites.addSpriteBounds(sp, 1, true);
+    }
+}
+
 // Reload the map for the local region. We'll see if this is too slow...
 void load_region()
 {
@@ -284,7 +314,7 @@ void load_region()
 
     uint8_t writelen = 1 + map_end_x - map_begin_x;
     for(uint8_t y = map_begin_y; y <= map_end_y; y++) {
-        FX::readDataBytes(staticmap_fx + (world_begin_y++ * staticmap_width + world_begin_x), raycast.worldMap.map + (y * RCMAXMAPDIMENSION + map_begin_x), writelen);
+        FX::readDataBytes(staticmap_fx + (world_begin_y++ * (uint16_t)staticmap_width + world_begin_x), raycast.worldMap.map + (y * (uint16_t)RCMAXMAPDIMENSION + map_begin_x), writelen);
     }
 }
 
@@ -297,6 +327,7 @@ void setup()
     arduboy.setFrameRate(FRAMERATE);
     FX::begin(FX_DATA_PAGE);    // initialise FX chip
 
+    raycast.render.spriteShading = RcShadingType::Black;
     //raycast.render.setLightIntensity(1.5);
 
     //raycast.render.spritescaling[0] = d

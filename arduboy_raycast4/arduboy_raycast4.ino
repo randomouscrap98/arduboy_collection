@@ -259,10 +259,11 @@ void setup()
     arduboy.flashlight();
     arduboy.initRandomSeed();
     arduboy.setFrameRate(FRAMERATE);
-    instance.setLightIntensity(1.5);
+    instance.setLightIntensity(4.5);
     //instance.altWallShading = RcShadingType::White;
     //instance.cornershading = 1;
     //instance.shading = RcShadingType::None;
+    //instance.spriteShading = RcShadingType::None;
     instance.tilesheet = tilesheet;
     instance.spritesheet = spritesheet;
     instance.spritesheet_mask = spritesheet_Mask;
