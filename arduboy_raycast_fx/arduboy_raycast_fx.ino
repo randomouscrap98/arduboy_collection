@@ -292,7 +292,7 @@ void load_sprite(uint8_t x, uint8_t y, uflot local_x, uflot local_y)
     //Try to add a sprite. We figure out the scale and accompanying bounding box based on frame (later)
     RcSprite<NUMINTERNALBYTES> * sp = raycast.sprites.addSprite(
         float(local_x + uflot::fromInternal(buffer[1] & 0x0F)), float(local_y + uflot::fromInternal(buffer[1] / 16)), 
-        buffer[0], 0, 0, NULL);
+        buffer[0], 0, -15, NULL);
 
     if(sp)
     {
@@ -346,9 +346,9 @@ void setup()
     FX::begin(FX_DATA_PAGE);    // initialise FX chip
 
     raycast.render.spriteShading = RcShadingType::Black;
-    //raycast.render.setLightIntensity(1.5);
+    raycast.render.setLightIntensity(2.5);
 
-    //raycast.render.spritescaling[0] = d
+    raycast.render.spritescaling[0] = 3.0;
     raycast.player.posX = CAGEX + 0.5;
     raycast.player.posY = CAGEY + 0.5;
 

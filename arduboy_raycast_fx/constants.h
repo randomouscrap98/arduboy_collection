@@ -4,16 +4,16 @@ constexpr uint8_t staticmap_width = 64;
 constexpr uint8_t staticmap_height = 64;
 constexpr uint8_t staticsprites_bytes = 2;
 
-constexpr uint8_t FRAMERATE = 40; //Too much overdraw?
-constexpr float MOVESPEED = 3.25f / FRAMERATE;
-constexpr float ROTSPEED = 3.5f / FRAMERATE;
-constexpr float MOVEMULTIPLIER = 1.75;
+constexpr uint8_t FRAMERATE = 25; //Too much overdraw?
+constexpr float MOVESPEED = 1.25f / FRAMERATE;
+constexpr float ROTSPEED = 1.5f / FRAMERATE;
+constexpr float MOVEMULTIPLIER = 2.25;
 constexpr float ROTMULTIPLIER = 2.25;
 
 // Since we're using this number so many times in template types, might 
 // as well make it a constant.
 constexpr uint8_t NUMINTERNALBYTES = 1;
-constexpr uint8_t NUMSPRITES = 24;
+constexpr uint8_t NUMSPRITES = 32;
 
 // Some stuff for external map loading
 constexpr uint8_t CAGEX = 7;
@@ -21,7 +21,7 @@ constexpr uint8_t CAGEY = 7;
 constexpr uint8_t LOADWIDTH = 15;
 constexpr uint8_t LOADHEIGHT = 15;
 
-constexpr uint8_t SPRITEVIEW = 5;
+constexpr uint8_t SPRITEVIEW = 6;
 
 //Sprites outside this radius get banished, sprites that enter this radius
 //get loaded
