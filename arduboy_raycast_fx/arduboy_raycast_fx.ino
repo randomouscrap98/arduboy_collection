@@ -27,7 +27,7 @@ uint8_t world_y = 3;
 int16_t sprintmeter = SPRINTMAX;
 bool holding_b = false;
 
-RcContainer<NUMSPRITES, NUMINTERNALBYTES, 100, HEIGHT> raycast(tilesheet, spritesheet, spritesheet_Mask);
+RcContainer<NUMSPRITES, NUMINTERNALBYTES, SCREENWIDTH, HEIGHT> raycast(tilesheet, spritesheet, spritesheet_Mask);
 
 bool isSolid(uflot x, uflot y)
 {

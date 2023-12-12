@@ -10,6 +10,9 @@ constexpr float ROTSPEED = 3.5f / FRAMERATE;
 constexpr float MOVEMULTIPLIER = 2.25;
 constexpr float ROTMULTIPLIER = 2.25;
 
+constexpr uint8_t SCREENWIDTH = 100;
+constexpr float ROTBGSCALE = 2 * SCREENWIDTH / PI;
+
 // Since we're using this number so many times in template types, might 
 // as well make it a constant.
 constexpr uint8_t NUMINTERNALBYTES = 1;
