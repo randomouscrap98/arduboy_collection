@@ -40,7 +40,9 @@ void gen_mymap() {
   m.width = MMWIDTH;
   m.height = MMHEIGHT;
   m.map = _mdata;
-  genRoomsType(&config, m, &p);
+  Type1Config c;
+  gen_type_1(&c, m, &p);
+  // genRoomsType(&config, m, &p);
 }
 
 constexpr uint8_t MENUMAX = 6;
