@@ -1,5 +1,6 @@
 #include <Arduboy2.h>
 #include <ArduboyTones.h>
+#include <Tinyfont.h>
 
 #include "Arduboy2Core.h"
 #include "map.hpp"
@@ -7,8 +8,10 @@
 Arduboy2 arduboy;
 ArduboyTones sound(arduboy.audio.enabled);
 RoomConfig config;
+Tinyfont tinyfont =
+    Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
 
-const uint8_t FRAMERATE = 60;
+const uint8_t FRAMERATE = 30;
 const uint8_t MMWIDTH = 16;
 const uint8_t MMHEIGHT = 16;
 const uint8_t TWIDTH = HEIGHT / MMHEIGHT;
@@ -47,6 +50,13 @@ constexpr char MENULETTER[][MENUMAX] = {
   "CBCPL",
   "CBMXL",
   "BMPPL",
+ //  "M",
+ //  "D",
+ //  "M",
+ //  "9",
+ //  "C",
+ //  "C",
+ //  "B",
 };
 // clang-format on
 constexpr uint8_t MENUITEMS = sizeof(MENULETTER) / MENUMAX;
@@ -54,11 +64,12 @@ constexpr uint8_t MENUITEMS = sizeof(MENULETTER) / MENUMAX;
 uint8_t menu_pos = 0;
 void do_menu() {
   uint8_t *mval;
+  char line[MENUMAX + 10];
   for (int i = 0; i < MENUITEMS; i++) {
-    arduboy.setCursorX(64);
-    arduboy.print(i == menu_pos ? ">" : " ");
-    arduboy.print(MENULETTER[i]);
-    arduboy.print(" ");
+    tinyfont.setCursor(64, i * 5);
+    tinyfont.print(i == menu_pos ? '>' : ' ');
+    tinyfont.print(MENULETTER[i]);
+    tinyfont.print(' ');
     uint8_t *val;
     switch (i) {
     case 0:
@@ -83,8 +94,7 @@ void do_menu() {
       val = &config.bumppool;
       break;
     }
-    arduboy.print(*val);
-    arduboy.print("\n");
+    tinyfont.print(*val);
     if (i == menu_pos) {
       mval = val;
     }
@@ -99,10 +109,16 @@ void do_menu() {
     (*mval) += 1;
   if (arduboy.justPressed(LEFT_BUTTON))
     (*mval) -= 1;
+  if (arduboy.justPressed(A_BUTTON)) {
+    gen_mymap();
+    sound.tone(300, 30);
+  }
 }
 
 void setup() {
-  arduboy.begin();
+  arduboy.boot();
+  arduboy.flashlight();
+  arduboy.initRandomSeed();
   arduboy.setFrameRate(FRAMERATE);
   gen_mymap();
 }
@@ -112,10 +128,6 @@ void loop() {
     return;
   }
   arduboy.pollButtons();
-  if (arduboy.justPressed(A_BUTTON)) {
-    gen_mymap();
-    sound.tone(300, 30);
-  }
   arduboy.clear();
   do_menu();
   draw_mymap();
