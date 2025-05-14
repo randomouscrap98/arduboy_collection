@@ -16,7 +16,7 @@ const uint8_t MMWIDTH = 16;
 const uint8_t MMHEIGHT = 16;
 const uint8_t TWIDTH = HEIGHT / MMHEIGHT;
 
-uint8_t mymap[MMWIDTH * MMHEIGHT];
+uint8_t _mdata[MMWIDTH * MMHEIGHT];
 
 void draw_tile(uint8_t tile, uint8_t x, uint8_t y) {
   switch (tile) {
@@ -29,15 +29,18 @@ void draw_tile(uint8_t tile, uint8_t x, uint8_t y) {
 void draw_mymap() {
   for (int y = 0; y < MMHEIGHT; y++) {
     for (int x = 0; x < MMWIDTH; x++) {
-      draw_tile(mymap[x + y * MMWIDTH], x * TWIDTH, y * TWIDTH);
+      draw_tile(_mdata[x + y * MMWIDTH], x * TWIDTH, y * TWIDTH);
     }
   }
 }
 
 void gen_mymap() {
-  uint8_t a, b;
-  int8_t c, d;
-  genRoomsType(&config, mymap, MMWIDTH, MMHEIGHT, &a, &b, &c, &d);
+  PlayerSimple p;
+  Map m;
+  m.width = MMWIDTH;
+  m.height = MMHEIGHT;
+  m.map = _mdata;
+  genRoomsType(&config, m, &p);
 }
 
 constexpr uint8_t MENUMAX = 6;

@@ -6,6 +6,24 @@ constexpr uint8_t TILEEMPTY = 0;
 constexpr uint8_t TILEDEFAULT = 1;
 constexpr uint8_t TILEEXIT = 2;
 
+// Each room element is 4 bytes FYI (Rect)
+constexpr uint8_t ROOMSMAXDEPTH = 10;
+
+struct Map {
+  uint8_t *map;
+  uint8_t width;
+  uint8_t height;
+};
+
+struct PlayerSimple {
+  uint8_t posX;
+  uint8_t posY;
+  int8_t dirX;
+  int8_t dirY;
+};
+
+#define MAPT(m, x, y) m.map[(x) + (y) * m.width]
+
 struct RoomConfig {
   uint8_t minwidth = 2;       // Each room's minimum dimension must be this.
   uint8_t doorbuffer = 1;     // Doors not generated this close to edge
@@ -16,18 +34,26 @@ struct RoomConfig {
   uint8_t bumppool = 5;
 };
 
-// Each room element is 4 bytes FYI (Rect)
-constexpr uint8_t ROOMSMAXDEPTH = 10;
-
-static void reset_map(uint8_t *map, const uint8_t width, const uint8_t height) {
-  memset(map, TILEEMPTY, width * height);
-  memset(map, TILEDEFAULT, width);
-  memset(map + width * (height - 1), 1, width);
-  for (uint8_t i = 0; i < height; i++) {
-    map[i * width] = TILEDEFAULT;
-    map[(i + 1) * width - 1] = TILEDEFAULT;
+static void reset_map(Map m) {
+  memset(m.map, TILEEMPTY, m.width * m.height);
+  memset(m.map, TILEDEFAULT, m.width);
+  memset(m.map + m.width * (m.height - 1), TILEDEFAULT, m.width);
+  for (uint8_t i = 0; i < m.height; i++) {
+    MAPT(m, 0, i) = TILEDEFAULT;
+    MAPT(m, m.width - 1, i) = TILEDEFAULT;
   }
 }
+
+// static void fill_map(uint8_t *map, const uint8_t width, const uint8_t height)
+// {
+//   memset(map, TILEEMPTY, width * height);
+//   memset(map, TILEDEFAULT, width);
+//   memset(map + width * (height - 1), TILEDEFAULT, width);
+//   for (uint8_t i = 0; i < height; i++) {
+//     map[i * width] = TILEDEFAULT;
+//     map[(i + 1) * width - 1] = TILEDEFAULT;
+//   }
+// }
 
 // A rectangle starting at x, y and having side w, h
 struct MRect {
@@ -72,22 +98,33 @@ static MRect popRoom(RoomStack *stack) {
 //   map[rect->x + ofsx + (rect->y + ofsy) * width] = tile;
 // }
 
+void set_player_posdir(Map m, PlayerSimple *p, uint8_t posX, uint8_t posY) {
+  p->posX = posX;
+  p->posY = posY;
+
+  if (MAPT(m, p->posX, p->posY) == TILEEMPTY) {
+    p->dirX = 1;
+    p->dirY = 0;
+  } else {
+    p->dirX = 0;
+    p->dirY = 1;
+  }
+}
+
 // Split rooms into smaller rooms randomly until a minimum is reached. If a room
 // cannot be split but it's of certain dimensions, randomly add "interesting"
 // features to it.
-void genRoomsType(RoomConfig *config, uint8_t *map, uint8_t width,
-                  uint8_t height, uint8_t *posX, uint8_t *posY, int8_t *dirX,
-                  int8_t *dirY) {
-  reset_map(map, width, height);
-  map[width - 1 + (height - 3) * width] = TILEEMPTY;
+void genRoomsType(RoomConfig *config, Map m, PlayerSimple *p) {
+  reset_map(m);
+  MAPT(m, m.width - 1, m.height - 3) = TILEEMPTY;
 
   // Now clear out the whole inside. Might as well make the rect to represent
   // it.
   MRect crect;
   crect.x = 1;
   crect.y = 1;
-  crect.w = width - 2;
-  crect.h = height - 2;
+  crect.w = m.width - 2;
+  crect.h = m.height - 2;
 
   RoomStack stack;
 
@@ -120,13 +157,13 @@ void genRoomsType(RoomConfig *config, uint8_t *map, uint8_t width,
         if (longest == crect.w) {
           // X and Y are always INSIDE the room, not in the walls
           exact = crect.x + rnd;
-          if (map[exact + (crect.y - 1) * width] != TILEEMPTY &&
-              map[exact + (crect.y + crect.h) * width] != TILEEMPTY) {
+          if (MAPT(m, exact, crect.y - 1) != TILEEMPTY &&
+              MAPT(m, exact, crect.y + crect.h) != TILEEMPTY) {
             wdiv = exact;
             // Now draw the wall, add a door, and add the two sides to the stack
             for (uint8_t i = 0; i < shortest; i++) {
               if (i != door)
-                map[exact + (crect.y + i) * width] = TILEDEFAULT;
+                MAPT(m, exact, crect.y + i) = TILEDEFAULT;
             }
             // Two sides are the original x,y,h + smaller width, then
             // wall+1x,y,h + smaller width
@@ -137,13 +174,13 @@ void genRoomsType(RoomConfig *config, uint8_t *map, uint8_t width,
           }
         } else {
           exact = crect.y + rnd;
-          if (map[crect.x - 1 + exact * width] != TILEEMPTY &&
-              map[crect.x + crect.w + exact * width] != TILEEMPTY) {
+          if (MAPT(m, crect.x - 1, exact) != TILEEMPTY &&
+              MAPT(m, crect.x + crect.w, exact) != TILEEMPTY) {
             wdiv = exact;
             // Now draw the wall, add a door, and add the two sides to the stack
             for (uint8_t i = 0; i < shortest; i++) {
               if (i != door)
-                map[crect.x + i + exact * width] = TILEDEFAULT;
+                MAPT(m, crect.x + i, exact) = TILEDEFAULT;
             }
             // Two sides are original x,y,w,smaller h, then x,wall+1,w, smaller
             // h
@@ -160,8 +197,7 @@ void genRoomsType(RoomConfig *config, uint8_t *map, uint8_t width,
 // am aware it is supposed to be scoped. It's too hard to get these out of RAM
 // otherwise. The compiler refused to put any of my arrays into PROGMEM even
 // though I asked, so IDK what's going on there.
-#define df(ofsx, ofsy)                                                         \
-  map[crect.x + ofsx + (crect.y + ofsy) * width] = TILEDEFAULT
+#define df(ofsx, ofsy) MAPT(m, crect.x + ofsx, crect.y + ofsy) = TILEDEFAULT
     // set_map_ofs(map, width, &crect, ofsx, ofsy, TILEDEFAULT)
 
     // If the room was not divided, generate some things
@@ -171,16 +207,16 @@ void genRoomsType(RoomConfig *config, uint8_t *map, uint8_t width,
       // the "fuzzy match" rooms.
       if (crect.w == 9 && crect.h >= 12) {
         for (uint8_t i = 0; i < 5; ++i) {
-          map[crect.x + i + 2 + (crect.y + crect.h - 3) * width] = TILEDEFAULT;
-          map[crect.x + i + 2 + (crect.y + crect.h - 7) * width] = TILEDEFAULT;
-          map[crect.x + 2 + (crect.y + crect.h - i - 3) * width] = TILEDEFAULT;
-          map[crect.x + 6 + (crect.y + crect.h - i - 3) * width] = TILEDEFAULT;
+          MAPT(m, crect.x + i + 2, crect.y + crect.h - 3) = TILEDEFAULT;
+          MAPT(m, crect.x + i + 2, crect.y + crect.h - 7) = TILEDEFAULT;
+          MAPT(m, crect.x + 2, crect.y + crect.h - i - 3) = TILEDEFAULT;
+          MAPT(m, crect.x + 6, crect.y + crect.h - i - 3) = TILEDEFAULT;
         }
-        map[crect.x + 4 + (crect.y + crect.h - 7) * width] = TILEEMPTY;
-        map[crect.x + 4 + (crect.y + crect.h - 5) * width] = TILEEXIT;
+        MAPT(m, crect.x + 4, crect.y + crect.h - 7) = TILEEMPTY;
+        MAPT(m, crect.x + 4, crect.y + crect.h - 5) = TILEEXIT;
         for (int8_t y = crect.y + crect.h - 10; y >= crect.y + 2; y -= 3) {
-          map[crect.x + 2 + y * width] = TILEDEFAULT;
-          map[crect.x + 6 + y * width] = TILEDEFAULT;
+          MAPT(m, crect.x + 2, y) = TILEDEFAULT;
+          MAPT(m, crect.x + 6, y) = TILEDEFAULT;
         }
       } else if (crect.w == 9 && crect.h == 9) {
         // if (crect.w == 9 && crect.h == 9) {
@@ -213,11 +249,11 @@ void genRoomsType(RoomConfig *config, uint8_t *map, uint8_t width,
         // imprecise anyway; 3 wide rooms are common
         if (crect.h > 5 && (crect.h & 1)) {
           for (uint8_t i = crect.y + 2; i < crect.y + crect.h - 2; i += 2)
-            map[crect.x + 1, width * i] = TILEDEFAULT;
+            MAPT(m, crect.x + 1, i) = TILEDEFAULT;
         } else if (crect.h > 1) {
-          if (map[crect.x + 1 + (crect.y - 1) * width] != TILEEMPTY &&
+          if (MAPT(m, crect.x + 1, crect.y - 1) != TILEEMPTY &&
               random(config->bumppool) == 0)
-            map[crect.x + 1 + (crect.y) * width] = TILEDEFAULT;
+            MAPT(m, crect.x + 1, crect.y) = TILEDEFAULT;
         }
       } else {
         // These don't have at least one required exact width or height, so
@@ -226,16 +262,15 @@ void genRoomsType(RoomConfig *config, uint8_t *map, uint8_t width,
           // Go around the perimeter and, with a low chance, add random length
           // walls
           for (uint8_t x = 1; x < crect.w - 1; ++x) {
-            if (map[crect.x + x + (crect.y - 1) * width] != TILEEMPTY &&
+            if (MAPT(m, crect.x + x, crect.y - 1) != TILEEMPTY &&
                 random(config->cubiclepool) == 0) {
               for (int8_t i = random(config->cubiclemaxlength); i >= 0; --i)
-                map[crect.x + x + (crect.y + i) * width] = TILEDEFAULT;
+                MAPT(m, crect.x + x, crect.y + i) = TILEDEFAULT;
             }
-            if (map[crect.x + x + (crect.y + crect.h) * width] != TILEEMPTY &&
+            if (MAPT(m, crect.x + x, crect.y + crect.h) != TILEEMPTY &&
                 random(config->cubiclepool) == 0) {
               for (int8_t i = random(config->cubiclemaxlength); i >= 0; --i)
-                map[crect.x + x + (crect.y + crect.h - 1 - i) * width] =
-                    TILEDEFAULT;
+                MAPT(m, crect.x + x, crect.y + crect.h - 1 - i) = TILEDEFAULT;
             }
           }
         }
@@ -243,16 +278,13 @@ void genRoomsType(RoomConfig *config, uint8_t *map, uint8_t width,
     }
   }
 
-  map[width - 1 + (height - 3) * width] = TILEEXIT;
+  MAPT(m, m.width - 1, m.height - 3) = TILEEXIT;
+  set_player_posdir(m, p, 1, 1); // posX, posY, dirX, dirY);
+}
 
-  *posX = 1.6;
-  *posY = 1.6;
+struct Type1Config {};
 
-  if (map[2 + 1 * width] == TILEEMPTY) {
-    *dirX = 1;
-    *dirY = 0;
-  } else {
-    *dirY = 1;
-    *dirX = 0;
-  }
+void gen_type_1(Type1Config *config, Map m, PlayerSimple *p) {
+  memset(m.map, TILEDEFAULT, m.width * m.height);
+  set_player_posdir(m, p, m.width / 2, 1); // posX, posY, dirX, dirY);
 }
