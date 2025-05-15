@@ -10,7 +10,7 @@ void set_empty_map(Map m) {
   }
 }
 
-void set_player_posdir(Map m, PlayerSimple *p, uint8_t posX, uint8_t posY) {
+void set_player_posdir(Map m, MapPlayer *p, uint8_t posX, uint8_t posY) {
   p->posX = posX;
   p->posY = posY;
 
@@ -52,7 +52,7 @@ static MRect popRoom(RoomStack *stack) {
   return result;
 }
 
-void genRoomsType(RoomConfig *config, Map m, PlayerSimple *p) {
+void genRoomsType(RoomConfig *config, Map m, MapPlayer *p) {
   set_empty_map(m);
   MAPT(m, m.width - 1, m.height - 3) = TILEEMPTY;
 
@@ -263,7 +263,7 @@ static bool move_dir_ok(Map m, uint8_t x, uint8_t y, int8_t dx, int8_t dy) {
   //}
 }
 
-void gen_type_1(Type1Config *config, Map m, PlayerSimple *p) {
+void gen_type_1(Type1Config *config, Map m, MapPlayer *p) {
   memset(m.map, TILEDEFAULT, m.width * m.height);
   const uint8_t px = m.width / 2;
   const uint8_t py = 1;

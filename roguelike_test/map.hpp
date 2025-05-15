@@ -15,12 +15,15 @@ struct Map {
   uint8_t height;
 };
 
-struct PlayerSimple {
+struct MapPlayer {
   uint8_t posX;
   uint8_t posY;
   int8_t dirX;
   int8_t dirY;
 };
+
+#define MPLAYRAD(p)                                                            \
+  (p.dirX == 1 ? 0 : p.dirX == -1 ? PI : p.dirY == 1 ? PI * 0.5f : PI * 1.5f)
 
 // A rectangle starting at x, y and having side w, h
 struct MRect {
@@ -43,12 +46,12 @@ struct RoomConfig {
 };
 
 void set_empty_map(Map m);
-void set_player_posdir(Map m, PlayerSimple *p, uint8_t posX, uint8_t posY);
+void set_player_posdir(Map m, MapPlayer *p, uint8_t posX, uint8_t posY);
 
 // Split rooms into smaller rooms randomly until a minimum is reached. If a room
 // cannot be split but it's of certain dimensions, randomly add "interesting"
 // features to it.
-void genRoomsType(RoomConfig *config, Map m, PlayerSimple *p);
+void genRoomsType(RoomConfig *config, Map m, MapPlayer *p);
 
 struct Type1Config {
   // uint8_t startX = ;
@@ -63,4 +66,4 @@ struct Type1Config {
   uint8_t door_buffer = 0;  // min distance into room for doorway
 };
 
-void gen_type_1(Type1Config *config, Map m, PlayerSimple *p);
+void gen_type_1(Type1Config *config, Map m, MapPlayer *p);
