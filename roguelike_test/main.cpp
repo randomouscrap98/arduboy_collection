@@ -13,14 +13,17 @@
 // #include "cope.hpp"
 
 // #include "Arduboy2Core.h"
-// #include "map.hpp"
+#include "ArduboyRaycast_Map.h"
+#include "map.hpp"
 
 // Resources
 #include "bg_full.h"
 #include "fxdata/fxdata.h"
 
 Arduboy2 arduboy;
-ArduboyTones sound(arduboy.audio.enabled);
+bool always_on() { return true; }
+
+ArduboyTones sound(&always_on); // arduboy.audio.enabled);
 // RoomConfig config;
 Tinyfont tinyfont =
     Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
@@ -89,13 +92,16 @@ void movement() {
 // }
 
 void gen_mymap() {
-  // PlayerSimple p;
-  // Map m;
-  // m.width = MMWIDTH;
-  // m.height = MMHEIGHT;
+  PlayerSimple p;
+  Map m;
+  m.width = RCMAXMAPDIMENSION;
+  m.height = RCMAXMAPDIMENSION;
+  m.map = raycast.worldMap.map;
   // m.map = _mdata;
-  // Type1Config c;
-  // gen_type_1(&c, m, &p);
+  Type1Config c;
+  gen_type_1(&c, m, &p);
+  raycast.player.posX = 0.5f + (float)p.posX;
+  raycast.player.posY = 0.5f + (float)p.posY;
   // genRoomsType(&config, m, &p);
 }
 
@@ -192,30 +198,35 @@ void setup() {
   raycast.render.spriteShading = RcShadingType::Black;
   // raycast.render.
 
-  for (int i = 0; i < RCMAXMAPDIMENSION; i++) {
-    raycast.worldMap.setCell(i, 0, 2);
-    raycast.worldMap.setCell(i, RCMAXMAPDIMENSION - 1, 2);
-    raycast.worldMap.setCell(0, i, 2);
-    raycast.worldMap.setCell(RCMAXMAPDIMENSION - 1, i, 2);
-  }
+  // for (int i = 0; i < RCMAXMAPDIMENSION; i++) {
+  //   raycast.worldMap.setCell(i, 0, 2);
+  //   raycast.worldMap.setCell(i, RCMAXMAPDIMENSION - 1, 2);
+  //   raycast.worldMap.setCell(0, i, 2);
+  //   raycast.worldMap.setCell(RCMAXMAPDIMENSION - 1, i, 2);
+  // }
 
-  for (int i = 2; i < RCMAXMAPDIMENSION - 2; i += 2)
-    for (int j = 2; j < RCMAXMAPDIMENSION - 2; j += 3)
-      raycast.worldMap.setCell(i, j, 1);
+  // for (int i = 2; i < RCMAXMAPDIMENSION - 2; i += 2)
+  //   for (int j = 2; j < RCMAXMAPDIMENSION - 2; j += 3)
+  //     raycast.worldMap.setCell(i, j, 1);
 
-  for (int i = 0; i < NUMSPRITES; i++) {
-    uint8_t tile = rand() % 2;
-    RcSprite<NUMINTERNALBYTES> *sp =
-        raycast.sprites.addSprite(1.5 + (rand() % 9), 2.5 + (rand() % 9),
-                                  1 + tile, 2 - tile, 9 - 2 * tile, NULL);
-    raycast.sprites.addSpriteBounds(sp, 0.5 + 0.25 * tile, true);
-  }
+  // for (int i = 0; i < NUMSPRITES; i++) {
+  //   uint8_t tile = rand() % 2;
+  //   RcSprite<NUMINTERNALBYTES> *sp =
+  //       raycast.sprites.addSprite(1.5 + (rand() % 9), 2.5 + (rand() % 9),
+  //                                 1 + tile, 2 - tile, 9 - 2 * tile, NULL);
+  //   raycast.sprites.addSpriteBounds(sp, 0.5 + 0.25 * tile, true);
+  // }
   gen_mymap();
 }
 
 void loop() {
   if (!(arduboy.nextFrame())) {
     return;
+  }
+  arduboy.pollButtons();
+  if (arduboy.justPressed(A_BUTTON)) {
+    gen_mymap();
+    sound.tone(300, 30);
   }
 
   // Process player movement + interaction
