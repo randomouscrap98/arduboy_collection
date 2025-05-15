@@ -239,6 +239,15 @@ static bool map_area_overlaps(Map m, MRect r) { //, bool filled) {
   return false;
 }
 
+static bool move_dir_ok(Map m, uint8_t x, uint8_t y, int8_t dx, int8_t dy) {
+  uint8_t cx = x + dx;
+  uint8_t cy = y + dy;
+  return ((cx > 0) && (cy > 0) && (cx < m.width - 1) && (cy < m.height - 1) &&
+          (MAPT(m, cx, cy) != TILEEMPTY)); //{
+                                           // goto FOUNDDIR;
+  //}
+}
+
 void gen_type_1(Type1Config *config, Map m, PlayerSimple *p) {
   memset(m.map, TILEDEFAULT, m.width * m.height);
   const uint8_t px = m.width / 2;
@@ -249,9 +258,9 @@ void gen_type_1(Type1Config *config, Map m, PlayerSimple *p) {
   int8_t dx = 0, dy = 1;
   while (1) {
     MAPT(m, x, y) = TILEEMPTY;
-    if (false) { //(random(config->room_pool) == 0) {
+    if (random(config->room_pool) == 0) {
       for (uint8_t rt = 0; rt < config->room_retries; rt++) {
-        uint8_t rx = x, ry = y; //, rs;
+        uint8_t rx = x, ry = y;
         MRect checkarea;
         checkarea.w =
             config->room_min + random(config->room_max - config->room_min);
@@ -291,26 +300,12 @@ void gen_type_1(Type1Config *config, Map m, PlayerSimple *p) {
             MAPT(m, checkarea.x + w, checkarea.y + h) = TILEEMPTY;
           }
         }
-        // // Iterate over check area and see if ANY work (VERY SLOW)
-        // for(uint8_t h = 0; h <= checkarea.h; h++) {
-        //   for(uint8_t w = 0; w <= checkarea.w; w++) {
-        //     MRect check;
-        //     check.x = checkarea.x;
-        //     if(map_area_overlaps(m, check)) {
-        //       goto ENDCHECKAREA;
-        //     }
-        //   }
-        // }
-        // ENDCHECKAREA:;
-
-        // // If we're out of line, quit (underflow should be fine too)
-        // if (rx < 1 || rx >= m.width - 1 || ry < 1 || ry >= m.height - 1) {
-        //   continue;
-        // }
+        // This clears out the hallway to the room
+        MAPT(m, (rx + x) / 2, (ry + y) / 2) = TILEEMPTY;
       }
     }
     // Change direction randomly
-    if (random(config->hw_cdpool) == 0) {
+    if (!move_dir_ok(m, x, y, dx, dy) || random(config->hw_cdpool) == 0) {
       uint8_t bd = random(4);
       for (uint8_t bdi = 0; bdi < 4; bdi++) {
         // Check all directions; if they all fail, we can't continue (?)
@@ -332,10 +327,7 @@ void gen_type_1(Type1Config *config, Map m, PlayerSimple *p) {
           dy = 0;
           break;
         }
-        uint8_t cx = x + dx;
-        uint8_t cy = y + dy;
-        if ((cx > 0) && (cy > 0) && (cx < m.width - 1) && (cy < m.height - 1) &&
-            (MAPT(m, cx, cy) != TILEEMPTY)) {
+        if (move_dir_ok(m, x, y, dx, dy)) {
           goto FOUNDDIR;
         }
       }
@@ -344,9 +336,9 @@ void gen_type_1(Type1Config *config, Map m, PlayerSimple *p) {
     }
     x += dx;
     y += dy;
-    if (random(config->hw_stoppool) == 0) {
-      break;
-    }
+    // if (random(config->hw_stoppool) == 0) {
+    //   break;
+    // }
   }
 
   set_player_posdir(m, p, px, py);
