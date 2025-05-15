@@ -261,31 +261,31 @@ void gen_type_1(Type1Config *config, Map m, PlayerSimple *p) {
     if (random(config->room_pool) == 0) {
       for (uint8_t rt = 0; rt < config->room_retries; rt++) {
         uint8_t rx = x, ry = y;
-        MRect checkarea;
-        checkarea.w =
-            config->room_min + random(config->room_max - config->room_min);
-        checkarea.h =
-            config->room_min + random(config->room_max - config->room_min);
-        int8_t mod = random(1) ? -1 : 1;
+        MRect room;
+        room.w =
+            config->room_min + random(1 + config->room_max - config->room_min);
+        room.h =
+            config->room_min + random(1 + config->room_max - config->room_min);
+        int8_t mod = random(2) ? -1 : 1;
         bool valid = false;
-        if (dx == 0) {
+        if (dy == 0) { // Moving horizontally, spawn vertically
           ry += 2 * mod;
-          checkarea.y = ry + mod * (checkarea.h - 1);
-          for (uint8_t i = 0; i < checkarea.w; i++) {
-            checkarea.x = rx - i;
+          room.y = ry + (mod < 0) ? 1 - room.h : 0;
+          for (uint8_t i = 0; i < room.w; i++) {
+            room.x = x - i;
             // pick the first that works
-            if (!map_area_overlaps(m, checkarea)) {
+            if (!map_area_overlaps(m, room)) {
               valid = true;
               break;
             }
           }
-        } else {
+        } else { // moving vertically, spawn horizontally
           rx += 2 * mod;
-          checkarea.x = rx + mod * (checkarea.w - 1);
-          for (uint8_t i = 0; i < checkarea.h; i++) {
-            checkarea.y = ry - i;
+          room.x = rx + (mod < 0) ? 1 - room.w : 0;
+          for (uint8_t i = 0; i < room.h; i++) {
+            room.y = y - i;
             // pick the first that works
-            if (!map_area_overlaps(m, checkarea)) {
+            if (!map_area_overlaps(m, room)) {
               valid = true;
               break;
             }
@@ -295,9 +295,9 @@ void gen_type_1(Type1Config *config, Map m, PlayerSimple *p) {
           continue;
         }
         // I guess just make the room?
-        for (uint8_t h = 0; h < checkarea.h; h++) {
-          for (uint8_t w = 0; w < checkarea.w; w++) {
-            MAPT(m, checkarea.x + w, checkarea.y + h) = TILEEMPTY;
+        for (uint8_t h = 0; h < room.h; h++) {
+          for (uint8_t w = 0; w < room.w; w++) {
+            MAPT(m, room.x + w, room.y + h) = TILEEMPTY;
           }
         }
         // This clears out the hallway to the room
