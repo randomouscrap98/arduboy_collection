@@ -48,9 +48,7 @@ struct RoomConfig {
 void set_empty_map(Map m);
 // North, east, south, west. Up right down left. North is positive y
 void set_player_dir(MapPlayer *p, uint8_t cardinal);
-// void player_face_emptiest(MapPlayer *p, Map m);
 uint8_t get_player_bestdir(MapPlayer *p, Map m);
-// void set_player_posdir(Map m, MapPlayer *p, uint8_t posX, uint8_t posY);
 
 // Split rooms into smaller rooms randomly until a minimum is reached. If a room
 // cannot be split but it's of certain dimensions, randomly add "interesting"

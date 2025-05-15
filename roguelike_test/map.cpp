@@ -12,19 +12,20 @@ void set_empty_map(Map m) {
 
 void set_player_dir(MapPlayer *p, uint8_t cardinal) {
   switch (cardinal) {
-  case 0:
+  case 0: // North / up
     p->dirX = 0;
     p->dirY = 1;
     break;
-  case 1:
+  case 1: // East / right
     p->dirX = 1;
     p->dirY = 0;
     break;
-  case 2:
+  case 2: // South / down
     p->dirX = 0;
     p->dirY = -1;
     break;
   case 3:
+  default: // Default west? eehhhh
     p->dirX = -1;
     p->dirY = 0;
     break;
@@ -37,14 +38,14 @@ uint8_t get_player_bestdir(MapPlayer *p, Map m) {
   uint8_t max_dir = 0;
   MapPlayer pt;
   for (uint8_t i = 0; i < 4; i++) {
+    pt.posX = p->posX;
+    pt.posY = p->posY;
     set_player_dir(&pt, i);
-    uint8_t x = p->posX;
-    uint8_t y = p->posY;
     uint8_t count = 0;
     while (1) {
-      x += p->dirX;
-      y += p->dirY;
-      if (MAPT(m, x, y) != TILEEMPTY) {
+      pt.posX += pt.dirX;
+      pt.posY += pt.dirY;
+      if (MAPT(m, pt.posX, pt.posY) != TILEEMPTY) {
         break;
       }
       count++;
