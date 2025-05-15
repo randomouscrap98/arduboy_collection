@@ -220,7 +220,138 @@ void genRoomsType(RoomConfig *config, Map m, PlayerSimple *p) {
   set_player_posdir(m, p, 1, 1); // posX, posY, dirX, dirY);
 }
 
+// filled true = check for all filled instead of empty
+
+// Check if there's any empty spots in given rect in map, or if the map
+// exceeds the bounds
+static bool map_area_overlaps(Map m, MRect r) { //, bool filled) {
+  for (uint8_t y = 0; y < r.h; y++) {
+    for (uint8_t x = 0; x < r.w; x++) {
+      uint8_t rx = x + r.x, ry = y + r.y;
+      if (rx < 1 || ry < 1 || rx >= m.width - 1 || ry >= m.height - 1) {
+        return true;
+      }
+      if (MAPT(m, rx, ry) == TILEEMPTY) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 void gen_type_1(Type1Config *config, Map m, PlayerSimple *p) {
   memset(m.map, TILEDEFAULT, m.width * m.height);
-  set_player_posdir(m, p, m.width / 2, 1); // posX, posY, dirX, dirY);
+  const uint8_t px = m.width / 2;
+  const uint8_t py = 1;
+  // start walking through, setting current position to empty, deciding on a
+  // room, then figuring out if you need to change directions.
+  uint8_t x = px, y = py;
+  int8_t dx = 0, dy = 1;
+  while (1) {
+    MAPT(m, x, y) = TILEEMPTY;
+    if (false) { //(random(config->room_pool) == 0) {
+      for (uint8_t rt = 0; rt < config->room_retries; rt++) {
+        uint8_t rx = x, ry = y; //, rs;
+        MRect checkarea;
+        checkarea.w =
+            config->room_min + random(config->room_max - config->room_min);
+        checkarea.h =
+            config->room_min + random(config->room_max - config->room_min);
+        int8_t mod = random(1) ? -1 : 1;
+        bool valid = false;
+        if (dx == 0) {
+          ry += 2 * mod;
+          checkarea.y = ry + mod * (checkarea.h - 1);
+          for (uint8_t i = 0; i < checkarea.w; i++) {
+            checkarea.x = rx - i;
+            // pick the first that works
+            if (!map_area_overlaps(m, checkarea)) {
+              valid = true;
+              break;
+            }
+          }
+        } else {
+          rx += 2 * mod;
+          checkarea.x = rx + mod * (checkarea.w - 1);
+          for (uint8_t i = 0; i < checkarea.h; i++) {
+            checkarea.y = ry - i;
+            // pick the first that works
+            if (!map_area_overlaps(m, checkarea)) {
+              valid = true;
+              break;
+            }
+          }
+        }
+        if (!valid) {
+          continue;
+        }
+        // I guess just make the room?
+        for (uint8_t h = 0; h < checkarea.h; h++) {
+          for (uint8_t w = 0; w < checkarea.w; w++) {
+            MAPT(m, checkarea.x + w, checkarea.y + h) = TILEEMPTY;
+          }
+        }
+        // // Iterate over check area and see if ANY work (VERY SLOW)
+        // for(uint8_t h = 0; h <= checkarea.h; h++) {
+        //   for(uint8_t w = 0; w <= checkarea.w; w++) {
+        //     MRect check;
+        //     check.x = checkarea.x;
+        //     if(map_area_overlaps(m, check)) {
+        //       goto ENDCHECKAREA;
+        //     }
+        //   }
+        // }
+        // ENDCHECKAREA:;
+
+        // // If we're out of line, quit (underflow should be fine too)
+        // if (rx < 1 || rx >= m.width - 1 || ry < 1 || ry >= m.height - 1) {
+        //   continue;
+        // }
+      }
+    }
+    // Change direction randomly
+    if (random(config->hw_cdpool) == 0) {
+      uint8_t bd = random(4);
+      for (uint8_t bdi = 0; bdi < 4; bdi++) {
+        // Check all directions; if they all fail, we can't continue (?)
+        switch ((bd + bdi) & 3) {
+        case 0:
+          dx = 0;
+          dy = 1;
+          break;
+        case 1:
+          dx = 0;
+          dy = -1;
+          break;
+        case 2:
+          dx = 1;
+          dy = 0;
+          break;
+        case 3:
+          dx = -1;
+          dy = 0;
+          break;
+        }
+        uint8_t cx = x + dx;
+        uint8_t cy = y + dy;
+        if ((cx > 0) && (cy > 0) && (cx < m.width - 1) && (cy < m.height - 1) &&
+            (MAPT(m, cx, cy) != TILEEMPTY)) {
+          goto FOUNDDIR;
+        }
+      }
+      break;
+    FOUNDDIR:;
+    }
+    x += dx;
+    y += dy;
+    if (random(config->hw_stoppool) == 0) {
+      break;
+    }
+  }
+
+  set_player_posdir(m, p, px, py);
+
+  //  maybe meander about, spawning rooms at intervals? is ithere even enough
+  //  room for that?
+  //
 }

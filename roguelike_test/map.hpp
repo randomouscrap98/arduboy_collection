@@ -51,7 +51,16 @@ void set_player_posdir(Map m, PlayerSimple *p, uint8_t posX, uint8_t posY);
 void genRoomsType(RoomConfig *config, Map m, PlayerSimple *p);
 
 struct Type1Config {
-  // dik
+  // uint8_t startX = ;
+  // uint8_t startY;
+  uint8_t hw_stoppool = 50;
+  uint8_t hw_cdpool = 4;
+  uint8_t overlap = 0;      // 1 = hw overlap, 2 = room overlap, 3 = both ofc
+  uint8_t room_pool = 3;    // Higher = less chance
+  uint8_t room_retries = 3; // Once a spot is picked, how many times to try
+  uint8_t room_min = 2;     // min room size
+  uint8_t room_max = 4;     // max room size
+  uint8_t door_buffer = 0;  // min distance into room for doorway
 };
 
 void gen_type_1(Type1Config *config, Map m, PlayerSimple *p);
