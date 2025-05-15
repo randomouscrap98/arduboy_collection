@@ -102,7 +102,16 @@ void gen_mymap() {
   gen_type_1(&c, m, &p);
   raycast.player.posX = 0.5f + (float)p.posX;
   raycast.player.posY = 0.5f + (float)p.posY;
-  // genRoomsType(&config, m, &p);
+  arduboy.fillRect(WIDTH - 16, 0, 16, 16, BLACK);
+  for (int y = 0; y < RCMAXMAPDIMENSION; y++) {
+    for (int x = 0; x < RCMAXMAPDIMENSION; x++) {
+      if (raycast.worldMap.getCell(x, RCMAXMAPDIMENSION - 1 - y)) {
+        arduboy.drawPixel(WIDTH - 16 + x, y, WHITE);
+      }
+    }
+  }
+  // arduboy.sBuffer[];
+  //  genRoomsType(&config, m, &p);
 }
 
 // constexpr uint8_t MENUMAX = 6;
