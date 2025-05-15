@@ -224,11 +224,26 @@ void genRoomsType(RoomConfig *config, Map m, PlayerSimple *p) {
 
 // Check if there's any empty spots in given rect in map, or if the map
 // exceeds the bounds
-static bool map_area_overlaps(Map m, MRect r) { //, bool filled) {
-  for (uint8_t y = 0; y < r.h; y++) {
-    for (uint8_t x = 0; x < r.w; x++) {
-      uint8_t rx = x + r.x, ry = y + r.y;
-      if (rx < 1 || ry < 1 || rx >= m.width - 1 || ry >= m.height - 1) {
+// static bool map_area_overlaps(Map m, MRect r) { //, bool filled) {
+//   for (uint8_t y = 0; y < r.h; y++) {
+//     for (uint8_t x = 0; x < r.w; x++) {
+//       uint8_t rx = x + r.x, ry = y + r.y;
+//       if (rx < 1 || ry < 1 || rx >= m.width - 1 || ry >= m.height - 1) {
+//         return true;
+//       }
+//       if (MAPT(m, rx, ry) == TILEEMPTY) {
+//         return true;
+//       }
+//     }
+//   }
+//   return false;
+// }
+
+static bool map_area_overlaps_buffer(Map m, MRect r) { //, bool filled) {
+  for (uint8_t y = 0; y < r.h + 2; y++) {
+    for (uint8_t x = 0; x < r.w + 2; x++) {
+      uint8_t rx = x + r.x - 1, ry = y + r.y - 1;
+      if (rx > m.width - 1 || ry > m.height - 1) {
         return true;
       }
       if (MAPT(m, rx, ry) == TILEEMPTY) {
@@ -258,52 +273,54 @@ void gen_type_1(Type1Config *config, Map m, PlayerSimple *p) {
   int8_t dx = 0, dy = 1;
   while (1) {
     MAPT(m, x, y) = TILEEMPTY;
-    if (random(config->room_pool) == 0) {
-      for (uint8_t rt = 0; rt < config->room_retries; rt++) {
-        uint8_t rx = x, ry = y;
-        MRect room;
-        room.w =
-            config->room_min + random(1 + config->room_max - config->room_min);
-        room.h =
-            config->room_min + random(1 + config->room_max - config->room_min);
-        int8_t mod = random(2) ? -1 : 1;
-        bool valid = false;
-        if (dy == 0) { // Moving horizontally, spawn vertically
-          ry += 2 * mod;
-          room.y = ry + (mod < 0) ? 1 - room.h : 0;
-          for (uint8_t i = 0; i < room.w; i++) {
-            room.x = x - i;
-            // pick the first that works
-            if (!map_area_overlaps(m, room)) {
-              valid = true;
-              break;
-            }
-          }
-        } else { // moving vertically, spawn horizontally
-          rx += 2 * mod;
-          room.x = rx + (mod < 0) ? 1 - room.w : 0;
-          for (uint8_t i = 0; i < room.h; i++) {
-            room.y = y - i;
-            // pick the first that works
-            if (!map_area_overlaps(m, room)) {
-              valid = true;
-              break;
-            }
-          }
-        }
-        if (!valid) {
-          continue;
-        }
-        // I guess just make the room?
-        for (uint8_t h = 0; h < room.h; h++) {
-          for (uint8_t w = 0; w < room.w; w++) {
-            MAPT(m, room.x + w, room.y + h) = TILEEMPTY;
-          }
-        }
-        // This clears out the hallway to the room
-        MAPT(m, (rx + x) / 2, (ry + y) / 2) = TILEEMPTY;
-      }
-    }
+    // if (random(config->room_pool) == 0) {
+    //   for (uint8_t rt = 0; rt < config->room_retries; rt++) {
+    //     uint8_t rx = x, ry = y;
+    //     MRect room;
+    //     room.w =
+    //         config->room_min + random(1 + config->room_max -
+    //         config->room_min);
+    //     room.h =
+    //         config->room_min + random(1 + config->room_max -
+    //         config->room_min);
+    //     int8_t mod = random(2) ? -1 : 1;
+    //     bool valid = false;
+    //     if (dy == 0) { // Moving horizontally, spawn vertically
+    //       ry += 2 * mod;
+    //       room.y = ry + (mod < 0) ? 1 - room.h : 0;
+    //       for (uint8_t i = 0; i < room.w; i++) {
+    //         room.x = x - i;
+    //         // pick the first that works
+    //         if (!map_area_overlaps_buffer(m, room)) {
+    //           valid = true;
+    //           break;
+    //         }
+    //       }
+    //     } else { // moving vertically, spawn horizontally
+    //       rx += 2 * mod;
+    //       room.x = rx + (mod < 0) ? 1 - room.w : 0;
+    //       for (uint8_t i = 0; i < room.h; i++) {
+    //         room.y = y - i;
+    //         // pick the first that works
+    //         if (!map_area_overlaps_buffer(m, room)) {
+    //           valid = true;
+    //           break;
+    //         }
+    //       }
+    //     }
+    //     if (!valid) {
+    //       continue;
+    //     }
+    //     // I guess just make the room?
+    //     for (uint8_t h = 0; h < room.h; h++) {
+    //       for (uint8_t w = 0; w < room.w; w++) {
+    //         MAPT(m, room.x + w, room.y + h) = TILEEMPTY;
+    //       }
+    //     }
+    //     // This clears out the hallway to the room
+    //     MAPT(m, (rx + x) / 2, (ry + y) / 2) = TILEEMPTY;
+    //   }
+    // }
     // Change direction randomly
     if (!move_dir_ok(m, x, y, dx, dy) || random(config->hw_cdpool) == 0) {
       uint8_t bd = random(4);
@@ -334,6 +351,7 @@ void gen_type_1(Type1Config *config, Map m, PlayerSimple *p) {
       break;
     FOUNDDIR:;
     }
+    // MAPT(m, x + dx / 2, y + dy / 2) = TILEEMPTY;
     x += dx;
     y += dy;
     // if (random(config->hw_stoppool) == 0) {
