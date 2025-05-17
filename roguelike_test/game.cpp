@@ -61,9 +61,26 @@ uint8_t get_player_bestdir(MapPlayer *p, Map m) {
   return max_dir;
 }
 
+// uint8_t detect_move(Arduboy2Base *arduboy) {
+//   uint8_t move = 0;
+//   if (arduboy->pressed(UP_BUTTON)) {
+//     move |= GS_MOVEFORWARD;
+//   }
+//   if (arduboy->pressed(DOWN_BUTTON)) {
+//     move |= GS_MOVEBACKWARD;
+//   }
+//   if (arduboy->pressed(LEFT_BUTTON)) {
+//     move |= GS_TURNLEFT;
+//   }
+//   if (arduboy->pressed(RIGHT_BUTTON)) {
+//     move |= GS_TURNRIGHT;
+//   }
+//   return move;
+// }
+
 uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy) {
 
-  uint8_t move = 0;
+  uint8_t move = 0; // gs->buffered_input;
   int8_t pmod = 0;
   int8_t cmod = 0;
 

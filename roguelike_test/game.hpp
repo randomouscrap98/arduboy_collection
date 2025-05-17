@@ -33,9 +33,6 @@ struct MapPlayer {
   uint8_t cardinal;
 };
 
-// #define MPLAYRAD(p) (p.cardinal == 1 ? 0 : p.dirX == -1 ? PI : p.dirY == 1 ?
-// PI * 0.5f : PI * 1.5f)
-
 // North, east, south, west. Up right down left. North is positive y
 // void set_player_dir(MapPlayer *p, uint8_t cardinal);
 uint8_t get_player_bestdir(MapPlayer *p, Map m);
@@ -47,6 +44,7 @@ struct GameState {
   uint8_t state;      // current game state
   uint8_t animend;    // total frames for this animation
   uint8_t animframes; // remaining animation frames
+  // uint8_t buffered_input; // What it says
 };
 
 constexpr uint8_t GS_MOVEFORWARD = 1;

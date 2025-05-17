@@ -43,27 +43,6 @@ RcContainer<NUMSPRITES, NUMINTERNALBYTES, WIDTH - 36, HEIGHT - 8>
 
 GameState gs;
 
-// void movement() {
-//   float movement = 0;
-//   float rotation = 0;
-//
-//   // Simple movement forward and backward. Might as well also let the user
-//   //use B
-//   // to move forward for "tank" controls
-//   if (arduboy.pressed(UP_BUTTON) || arduboy.pressed(B_BUTTON))
-//     movement = MOVESPEED;
-//   if (arduboy.pressed(DOWN_BUTTON))
-//     movement = -MOVESPEED;
-//
-//   // Simple rotation
-//   if (arduboy.pressed(RIGHT_BUTTON))
-//     rotation = -ROTSPEED;
-//   if (arduboy.pressed(LEFT_BUTTON))
-//     rotation = ROTSPEED;
-//
-//   raycast.player.tryMovement(movement, rotation, &isSolid);
-// }
-
 void update_visual_position(float delta) {
   raycast.player.posX = 0.5f + ((float)gs.player.posX * (1 - delta) +
                                 (float)gs.next_player.posX * delta);
@@ -201,7 +180,7 @@ RESTARTSTATE:;
     if (gs_move(&gs, &arduboy)) {
       gs.animframes = 0; // begin animation at 0 (?)
       gs.state = GS_STATEANIMATE;
-      goto RESTARTSTATE;
+      goto RESTARTSTATE; // Eliminate pause: do animation first frame
     }
     break;
   case GS_STATEANIMATE:
