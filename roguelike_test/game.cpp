@@ -67,19 +67,19 @@ uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy) {
   int8_t pmod = 0;
   int8_t cmod = 0;
 
-  if (arduboy->justPressed(UP_BUTTON)) {
+  if (arduboy->pressed(UP_BUTTON)) {
     move |= GS_MOVEFORWARD;
     pmod = 1;
   }
-  if (arduboy->justPressed(DOWN_BUTTON)) {
+  if (arduboy->pressed(DOWN_BUTTON)) {
     move |= GS_MOVEBACKWARD;
     pmod = -1;
   }
-  if (arduboy->justPressed(LEFT_BUTTON)) {
+  if (arduboy->pressed(LEFT_BUTTON)) {
     move |= GS_TURNLEFT;
     cmod = -1;
   }
-  if (arduboy->justPressed(RIGHT_BUTTON)) {
+  if (arduboy->pressed(RIGHT_BUTTON)) {
     move |= GS_TURNRIGHT;
     cmod = 1;
   }

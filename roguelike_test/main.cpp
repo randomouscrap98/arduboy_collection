@@ -10,9 +10,6 @@
 #include <ArduboyFX.h>
 #include <ArduboyRaycastFX.h>
 
-// #include "cope.hpp"
-
-// #include "Arduboy2Core.h"
 #include "ArduboyRaycast_Map.h"
 #include "game.hpp"
 #include "map.hpp"
@@ -37,22 +34,14 @@ constexpr uint8_t FRAMERATE = 30;
 constexpr float MOVESPEED = 4.25f / FRAMERATE;
 constexpr float ROTSPEED = 3.0f / FRAMERATE;
 
+constexpr uint8_t DEFAULTANIMFRAMES = ((float)FRAMERATE) * 0.34;
+
 // Once again we pick 16 sprites just in case we need them. 16 is a decent
 // number to not take up all the memory but still have enough to work with.
 RcContainer<NUMSPRITES, NUMINTERNALBYTES, WIDTH - 36, HEIGHT - 8>
     raycast(tilesheet, spritesheet, spritesheetMask);
 
 GameState gs;
-
-// bool isSolid(uflot x, uflot y) {
-//   // The location is solid if the map cell is nonzero OR if we're colliding
-//   with
-//   // any (solid) bounding boxes
-//   uint8_t tile = raycast.worldMap.getCell(x.getInteger(), y.getInteger());
-//
-//   return (tile != 0) ||
-//          raycast.sprites.firstColliding(x, y, RBSTATESOLID) != NULL;
-// }
 
 // void movement() {
 //   float movement = 0;
@@ -75,21 +64,29 @@ GameState gs;
 //   raycast.player.tryMovement(movement, rotation, &isSolid);
 // }
 
-void force_player_position() {
-  raycast.player.posX = 0.5f + (float)gs.player.posX;
-  raycast.player.posY = 0.5f + (float)gs.player.posY;
-  raycast.player.initPlayerDirection(cardinal_to_rad(gs.player.cardinal), FOV);
+void update_visual_position(float delta) {
+  raycast.player.posX = 0.5f + ((float)gs.player.posX * (1 - delta) +
+                                (float)gs.next_player.posX * delta);
+  raycast.player.posY = 0.5f + ((float)gs.player.posY * (1 - delta) +
+                                (float)gs.next_player.posY * delta);
+  float c1 = cardinal_to_rad(gs.player.cardinal);
+  float c2 = cardinal_to_rad(gs.next_player.cardinal);
+  // There are certain turns which go the long way. Fix that.
+  if (fabs(c2 - c1) > 2) {
+    if (c2 > c1) {
+      c2 -= 2 * PI;
+    } else {
+      c1 -= 2 * PI;
+    }
+  }
+  raycast.player.initPlayerDirection((1 - delta) * c1 + delta * c2, FOV);
 }
 
 void gen_mymap() {
   Type1Config c;
   gen_type_1(&c, gs.map, &gs.player);
-  force_player_position();
-  // arduboy.fillRect(100, 20, 28, 44, BLACK);
-  // tinyfont.setCursor(100, 20);
-  // tinyfont.print(gs.player.dirX);
-  // tinyfont.print(',');
-  // tinyfont.print(gs.player.dirY);
+  gs.next_player = gs.player;
+  update_visual_position(0);
   gs_draw_map(&gs, &arduboy, WIDTH - 16, 0);
 }
 
@@ -182,6 +179,8 @@ void setup() {
   gs.map.width = RCMAXMAPDIMENSION;
   gs.map.height = RCMAXMAPDIMENSION;
   gs.map.map = raycast.worldMap.map;
+  gs.state = GS_STATEMAIN;
+  gs.animend = DEFAULTANIMFRAMES;
   gen_mymap();
 }
 
@@ -190,17 +189,30 @@ void loop() {
     return;
   }
   arduboy.pollButtons();
-  if (arduboy.justPressed(A_BUTTON)) {
-    gen_mymap();
-    sound.tone(300, 30);
-  }
 
-  if (gs_move(&gs, &arduboy)) {
-    gs.player = gs.next_player;
-    force_player_position();
+RESTARTSTATE:;
+
+  switch (gs.state) {
+  case GS_STATEMAIN:
+    if (arduboy.justPressed(A_BUTTON)) {
+      gen_mymap();
+      sound.tone(300, 30);
+    }
+    if (gs_move(&gs, &arduboy)) {
+      gs.animframes = 0; // begin animation at 0 (?)
+      gs.state = GS_STATEANIMATE;
+      goto RESTARTSTATE;
+    }
+    break;
+  case GS_STATEANIMATE:
+    gs.animframes++;
+    update_visual_position((float)gs.animframes / (float)gs.animend);
+    if (gs.animframes >= gs.animend) {
+      gs.state = GS_STATEMAIN;
+      gs.player = gs.next_player;
+    }
+    break;
   }
-  // Process player movement + interaction
-  // movement();
 
   // Draw the correct background for the area.
   raycast.render.drawRaycastBackground(&arduboy, bg_full);

@@ -44,12 +44,18 @@ struct GameState {
   Map map;
   MapPlayer player;
   MapPlayer next_player;
+  uint8_t state;      // current game state
+  uint8_t animend;    // total frames for this animation
+  uint8_t animframes; // remaining animation frames
 };
 
 constexpr uint8_t GS_MOVEFORWARD = 1;
 constexpr uint8_t GS_MOVEBACKWARD = 2;
 constexpr uint8_t GS_TURNLEFT = 4;
 constexpr uint8_t GS_TURNRIGHT = 8;
+
+constexpr uint8_t GS_STATEMAIN = 1;
+constexpr uint8_t GS_STATEANIMATE = 2;
 
 // Attempt certain movement, returning which action was performed. The changes
 // are applied immediately to the state.
