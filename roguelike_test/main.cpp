@@ -75,12 +75,16 @@ GameState gs;
 //   raycast.player.tryMovement(movement, rotation, &isSolid);
 // }
 
+void force_player_position() {
+  raycast.player.posX = 0.5f + (float)gs.player.posX;
+  raycast.player.posY = 0.5f + (float)gs.player.posY;
+  raycast.player.initPlayerDirection(cardinal_to_rad(gs.player.cardinal), FOV);
+}
+
 void gen_mymap() {
   Type1Config c;
   gen_type_1(&c, gs.map, &gs.player);
-  raycast.player.posX = 0.5f + (float)gs.player.posX;
-  raycast.player.posY = 0.5f + (float)gs.player.posY;
-  raycast.player.initPlayerDirection(DIRRADS[gs.player.cardinal], FOV);
+  force_player_position();
   // arduboy.fillRect(100, 20, 28, 44, BLACK);
   // tinyfont.setCursor(100, 20);
   // tinyfont.print(gs.player.dirX);
@@ -191,6 +195,10 @@ void loop() {
     sound.tone(300, 30);
   }
 
+  if (gs_move(&gs, &arduboy)) {
+    gs.player = gs.next_player;
+    force_player_position();
+  }
   // Process player movement + interaction
   // movement();
 

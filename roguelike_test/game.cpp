@@ -1,6 +1,6 @@
 #include "game.hpp"
 
-void cardinal_to_dir(uint8_t cardinal, float *dx, float *dy) {
+void cardinal_to_dir(uint8_t cardinal, int8_t *dx, int8_t *dy) {
   *dx = 0;
   *dy = 0;
   switch (cardinal) {
@@ -19,8 +19,20 @@ void cardinal_to_dir(uint8_t cardinal, float *dx, float *dy) {
     return;
   }
 }
-// void set_player_dir(MapPlayer *p, uint8_t cardinal) {
-// }
+
+float cardinal_to_rad(uint8_t cardinal) {
+  switch (cardinal) {
+  case 0: // North / up
+    return PI * 0.5f;
+  case 1: // East / right
+    return 0;
+  case 2: // South / down
+    return PI * 1.5f;
+  case 3:
+  default: // Default west? eehhhh
+    return PI;
+  }
+}
 
 uint8_t get_player_bestdir(MapPlayer *p, Map m) {
   // uint8_t thi[4] = {0};
@@ -55,26 +67,37 @@ uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy) {
   int8_t pmod = 0;
   int8_t cmod = 0;
 
-  if (arduboy->pressed(UP_BUTTON)) {
+  if (arduboy->justPressed(UP_BUTTON)) {
     move |= GS_MOVEFORWARD;
     pmod = 1;
   }
-  if (arduboy->pressed(DOWN_BUTTON)) {
+  if (arduboy->justPressed(DOWN_BUTTON)) {
     move |= GS_MOVEBACKWARD;
     pmod = -1;
   }
-  if (arduboy->pressed(LEFT_BUTTON)) {
+  if (arduboy->justPressed(LEFT_BUTTON)) {
     move |= GS_TURNLEFT;
+    cmod = -1;
   }
-  if (arduboy->pressed(RIGHT_BUTTON)) {
+  if (arduboy->justPressed(RIGHT_BUTTON)) {
     move |= GS_TURNRIGHT;
+    cmod = 1;
   }
 
-  // if (move) {
-  //   gs->prev_player = gs->player;
-  //   gs->player.posX += pmod * gs->prev_player.dirX;
-  //   gs->player.posY += pmod * gs->prev_player.dirY;
-  // }
+  if (move) {
+    int8_t dx, dy;
+    gs->next_player = gs->player;
+    cardinal_to_dir(gs->player.cardinal, &dx, &dy);
+    gs->next_player.posX += pmod * dx;
+    gs->next_player.posY += pmod * dy;
+    if (MAPT(gs->map, gs->next_player.posX, gs->next_player.posY) !=
+        TILEEMPTY) {
+      move &= ~(GS_MOVEBACKWARD | GS_MOVEFORWARD);
+      gs->next_player = gs->player; // Undo what we did before
+    }
+    // This should always succeed
+    gs->next_player.cardinal = (gs->next_player.cardinal + 4 + cmod) & 3;
+  }
 
   return move;
 }

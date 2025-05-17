@@ -8,9 +8,8 @@ constexpr uint8_t DIREAST = 1;
 constexpr uint8_t DIRSOUTH = 2;
 constexpr uint8_t DIRWEST = 3;
 
-constexpr float DIRRADS[] = {PI * 0.5f, 0, PI * 1.5f, PI};
-
 void cardinal_to_dir(uint8_t cardinal, int8_t *dx, int8_t *dy);
+float cardinal_to_rad(uint8_t cardinal);
 
 // A rectangle starting at x, y and having side w, h
 struct MRect {
@@ -44,7 +43,7 @@ uint8_t get_player_bestdir(MapPlayer *p, Map m);
 struct GameState {
   Map map;
   MapPlayer player;
-  MapPlayer prev_player;
+  MapPlayer next_player;
 };
 
 constexpr uint8_t GS_MOVEFORWARD = 1;
