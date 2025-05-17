@@ -10,54 +10,6 @@ void set_empty_map(Map m) {
   }
 }
 
-void set_player_dir(MapPlayer *p, uint8_t cardinal) {
-  switch (cardinal) {
-  case 0: // North / up
-    p->dirX = 0;
-    p->dirY = 1;
-    break;
-  case 1: // East / right
-    p->dirX = 1;
-    p->dirY = 0;
-    break;
-  case 2: // South / down
-    p->dirX = 0;
-    p->dirY = -1;
-    break;
-  case 3:
-  default: // Default west? eehhhh
-    p->dirX = -1;
-    p->dirY = 0;
-    break;
-  }
-}
-
-uint8_t get_player_bestdir(MapPlayer *p, Map m) {
-  // uint8_t thi[4] = {0};
-  uint8_t max_count = 0;
-  uint8_t max_dir = 0;
-  MapPlayer pt;
-  for (uint8_t i = 0; i < 4; i++) {
-    pt.posX = p->posX;
-    pt.posY = p->posY;
-    set_player_dir(&pt, i);
-    uint8_t count = 0;
-    while (1) {
-      pt.posX += pt.dirX;
-      pt.posY += pt.dirY;
-      if (MAPT(m, pt.posX, pt.posY) != TILEEMPTY) {
-        break;
-      }
-      count++;
-    }
-    if (count > max_count) {
-      max_dir = i;
-      max_count = count;
-    }
-  }
-  return max_dir;
-}
-
 // void set_player_posdir(Map m, MapPlayer *p, uint8_t posX, uint8_t posY) {
 //   p->posX = posX;
 //   p->posY = posY;
@@ -315,19 +267,23 @@ static bool move_dir_ok(Map m, uint8_t x, uint8_t y, int8_t dx, int8_t dy) {
   uint8_t cx = x + dx;
   uint8_t cy = y + dy;
   return ((cx > 0) && (cy > 0) && (cx < m.width - 1) && (cy < m.height - 1) &&
-          (MAPT(m, cx, cy) != TILEEMPTY)); //{
-                                           // goto FOUNDDIR;
+          (MAPT(m, cx, cy) != TILEEMPTY));
+  //{
+  // goto FOUNDDIR;
   //}
 }
 
+//  maybe meander about, spawning rooms at intervals? is ithere even enough
+//  room for that?
 void gen_type_1(Type1Config *config, Map m, MapPlayer *p) {
   memset(m.map, TILEDEFAULT, m.width * m.height);
   p->posX = m.width / 2;
   p->posY = 1;
-  p->dirX = 0;
-  p->dirY = 1;
-  // start walking through, setting current position to empty, deciding on a
-  // room, then figuring out if you need to change directions.
+  int8_t dx = 0, dy = 1;
+  // p->dirX = 0;
+  // p->dirY = 1;
+  //  start walking through, setting current position to empty, deciding on a
+  //  room, then figuring out if you need to change directions.
   uint8_t x = p->posX, y = p->posY;
   // int8_t dx = 0, dy = 1;
   while (1) {
@@ -381,31 +337,29 @@ void gen_type_1(Type1Config *config, Map m, MapPlayer *p) {
     //   }
     // }
     // Change direction randomly
-    if (!move_dir_ok(m, x, y, p->dirX, p->dirY) ||
-        random(config->hw_cdpool) == 0) {
+    if (!move_dir_ok(m, x, y, dx, dy) || random(config->hw_cdpool) == 0) {
       uint8_t bd = random(4);
       for (uint8_t bdi = 0; bdi < 4; bdi++) {
         // Check all directions; if they all fail, we can't continue (?)
-        set_player_dir(p, (bd + bdi) & 3);
-        if (move_dir_ok(m, x, y, p->dirX, p->dirY)) {
+        cardinal_to_dir((bd + bdi) & 3, &dx, &dy);
+        // set_player_dir(p, (bd + bdi) & 3);
+        if (move_dir_ok(m, x, y, dx, dy)) {
           goto FOUNDDIR;
         }
       }
       break;
     FOUNDDIR:;
     }
+    // For moving by 2
     // MAPT(m, x + dx / 2, y + dy / 2) = TILEEMPTY;
-    x += p->dirX;
-    y += p->dirY;
+    x += dx;
+    y += dy;
+    // For early stops
     // if (random(config->hw_stoppool) == 0) {
     //   break;
     // }
   }
 
-  set_player_dir(p, get_player_bestdir(p, m));
-  // set_player_posdir(m, p, px, py);
-
-  //  maybe meander about, spawning rooms at intervals? is ithere even enough
-  //  room for that?
-  //
+  p->cardinal = get_player_bestdir(p, m);
+  // set_player_dir(p, get_player_bestdir(p, m));
 }

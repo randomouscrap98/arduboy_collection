@@ -2,38 +2,13 @@
 
 #include <Arduboy2.h>
 
-constexpr uint8_t TILEEMPTY = 0;
+#include "game.hpp"
+
 constexpr uint8_t TILEDEFAULT = 1;
 constexpr uint8_t TILEEXIT = 2;
 
 // Each room element is 4 bytes FYI (Rect)
 constexpr uint8_t ROOMSMAXDEPTH = 10;
-
-struct Map {
-  uint8_t *map;
-  uint8_t width;
-  uint8_t height;
-};
-
-struct MapPlayer {
-  uint8_t posX;
-  uint8_t posY;
-  int8_t dirX;
-  int8_t dirY;
-};
-
-#define MPLAYRAD(p)                                                            \
-  (p.dirX == 1 ? 0 : p.dirX == -1 ? PI : p.dirY == 1 ? PI * 0.5f : PI * 1.5f)
-
-// A rectangle starting at x, y and having side w, h
-struct MRect {
-  uint8_t x = 0;
-  uint8_t y = 0;
-  uint8_t w = 0;
-  uint8_t h = 0;
-};
-
-#define MAPT(m, x, y) m.map[(x) + (y) * m.width]
 
 struct RoomConfig {
   uint8_t minwidth = 2;       // Each room's minimum dimension must be this.
@@ -46,9 +21,6 @@ struct RoomConfig {
 };
 
 void set_empty_map(Map m);
-// North, east, south, west. Up right down left. North is positive y
-void set_player_dir(MapPlayer *p, uint8_t cardinal);
-uint8_t get_player_bestdir(MapPlayer *p, Map m);
 
 // Split rooms into smaller rooms randomly until a minimum is reached. If a room
 // cannot be split but it's of certain dimensions, randomly add "interesting"

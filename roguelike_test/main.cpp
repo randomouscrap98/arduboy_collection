@@ -14,7 +14,7 @@
 
 // #include "Arduboy2Core.h"
 #include "ArduboyRaycast_Map.h"
-#include "gamestate.hpp"
+#include "game.hpp"
 #include "map.hpp"
 
 // Resources
@@ -80,12 +80,12 @@ void gen_mymap() {
   gen_type_1(&c, gs.map, &gs.player);
   raycast.player.posX = 0.5f + (float)gs.player.posX;
   raycast.player.posY = 0.5f + (float)gs.player.posY;
-  raycast.player.initPlayerDirection(MPLAYRAD(gs.player), FOV);
-  arduboy.fillRect(100, 20, 28, 44, BLACK);
-  tinyfont.setCursor(100, 20);
-  tinyfont.print(gs.player.dirX);
-  tinyfont.print(',');
-  tinyfont.print(gs.player.dirY);
+  raycast.player.initPlayerDirection(DIRRADS[gs.player.cardinal], FOV);
+  // arduboy.fillRect(100, 20, 28, 44, BLACK);
+  // tinyfont.setCursor(100, 20);
+  // tinyfont.print(gs.player.dirX);
+  // tinyfont.print(',');
+  // tinyfont.print(gs.player.dirY);
   gs_draw_map(&gs, &arduboy, WIDTH - 16, 0);
 }
 
