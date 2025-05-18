@@ -3,9 +3,9 @@
 #include <Tinyfont.h>
 
 // JUST TO SHUTUP CLANGD
-// #ifndef __uint24
-// #define __uint24 uint32_t
-// #endif
+#ifdef __clang__
+#define __uint24 uint32_t
+#endif
 
 #include <ArduboyFX.h>
 #include <ArduboyRaycastFX.h>
@@ -15,7 +15,7 @@
 #include "map.hpp"
 
 // Resources
-#include "bg_full.h"
+// #include "bg_full.h"
 #include "fxdata/fxdata.h"
 
 Arduboy2 arduboy;
@@ -28,9 +28,11 @@ Tinyfont tinyfont =
 
 constexpr uint8_t NUMINTERNALBYTES = 1;
 constexpr uint8_t NUMSPRITES = 16;
+constexpr uint8_t BOTTOMSIZE = 8;
+constexpr uint8_t SIDESIZE = 32;
 
 constexpr float FOV = 1.0f;
-constexpr uint8_t FRAMERATE = 30;
+constexpr uint8_t FRAMERATE = 40;
 constexpr float MOVESPEED = 4.25f / FRAMERATE;
 constexpr float ROTSPEED = 3.0f / FRAMERATE;
 
@@ -38,8 +40,8 @@ constexpr uint8_t DEFAULTANIMFRAMES = ((float)FRAMERATE) * 0.34;
 
 // Once again we pick 16 sprites just in case we need them. 16 is a decent
 // number to not take up all the memory but still have enough to work with.
-RcContainer<NUMSPRITES, NUMINTERNALBYTES, WIDTH - 36, HEIGHT - 8>
-    raycast(tilesheet, spritesheet, spritesheetMask);
+RcContainer<NUMSPRITES, NUMINTERNALBYTES, WIDTH - SIDESIZE, HEIGHT - BOTTOMSIZE>
+    raycast(tilesheet, NULL, NULL); // spritesheet, spritesheetMask);
 
 GameState gs;
 
@@ -61,12 +63,23 @@ void update_visual_position(float delta) {
   raycast.player.initPlayerDirection((1 - delta) * c1 + delta * c2, FOV);
 }
 
+// very optimized render image at specific address byte chunks only
+void render_fximage(uint24_t addr, uint8_t *at, uint8_t width, uint8_t height) {
+  height = height >> 3; // it's actually per byte ofc
+  for (uint8_t i = 0; i < height; i++) {
+    FX::readDataBytes(addr + 4 + i * width, at + i * WIDTH, width);
+  }
+}
+
 void gen_mymap() {
   Type1Config c;
   gen_type_1(&c, gs.map, &gs.player);
   gs.next_player = gs.player;
   update_visual_position(0);
-  gs_draw_map(&gs, &arduboy, WIDTH - 16, 0);
+  // IDK where to put this
+  render_fximage(menu, arduboy.sBuffer, WIDTH, HEIGHT);
+  // FX::drawBitmap(0, 0, menu, 0, dbmOverwrite);
+  gs_draw_map(&gs, &arduboy, WIDTH - SIDESIZE + 4, 20);
 }
 
 // constexpr uint8_t MENUMAX = 6;
@@ -194,7 +207,10 @@ RESTARTSTATE:;
   }
 
   // Draw the correct background for the area.
-  raycast.render.drawRaycastBackground(&arduboy, bg_full);
+  // raycast.render.drawRaycastBackground(&arduboy, bg_full);
+  render_fximage(bg, arduboy.sBuffer, raycast.render.VIEWWIDTH,
+                 raycast.render.VIEWHEIGHT);
+  // FX::drawBitmap(0, 0, bg, 0, dbmOverwrite);
   raycast.runIteration(&arduboy);
 
   FX::display(false);
