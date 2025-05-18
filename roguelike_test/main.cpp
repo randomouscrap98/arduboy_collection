@@ -72,8 +72,20 @@ void render_fximage(uint24_t addr, uint8_t *at, uint8_t width, uint8_t height) {
 }
 
 void gen_mymap() {
-  Type1Config c;
-  gen_type_1(&c, gs.map, &gs.player);
+  // Dungeon, might be good.
+  Type2Config c;
+  c.room_min = 3;
+  // c.room_max = 5;
+  c.stops = 5;
+  c.room_unlikely = 1;
+
+  // // Trees, maybe
+  // Type2Config c;
+  // c.room_min = 2;
+  // c.room_max = 3;
+  // c.stops = 15;
+  // c.room_unlikely = 3;
+  gen_type_2(&c, gs.map, &gs.player);
   gs.next_player = gs.player;
   update_visual_position(0);
   // IDK where to put this

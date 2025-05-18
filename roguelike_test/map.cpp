@@ -10,18 +10,18 @@ void set_empty_map(Map m) {
   }
 }
 
-// void set_player_posdir(Map m, MapPlayer *p, uint8_t posX, uint8_t posY) {
-//   p->posX = posX;
-//   p->posY = posY;
-//
-//   if (MAPT(m, p->posX, p->posY) == TILEEMPTY) {
-//     p->dirX = 1;
-//     p->dirY = 0;
-//   } else {
-//     p->dirX = 0;
-//     p->dirY = 1;
-//   }
-// }
+bool clear_rect_map(Map m, MRect room) {
+  if (room.x > 0 && room.x + room.w < m.width - 1 && room.y > 0 &&
+      room.y + room.h < m.height - 1) {
+    for (uint8_t h = 0; h < room.h; h++) {
+      for (uint8_t w = 0; w < room.w; w++) {
+        MAPT(m, room.x + w, room.y + h) = TILEEMPTY;
+      }
+    }
+    return true;
+  }
+  return false;
+}
 
 struct RoomStack {
   MRect rooms[ROOMSMAXDEPTH];
@@ -268,9 +268,6 @@ static bool move_dir_ok(Map m, uint8_t x, uint8_t y, int8_t dx, int8_t dy) {
   uint8_t cy = y + dy;
   return ((cx > 0) && (cy > 0) && (cx < m.width - 1) && (cy < m.height - 1) &&
           (MAPT(m, cx, cy) != TILEEMPTY));
-  //{
-  // goto FOUNDDIR;
-  //}
 }
 
 //  maybe meander about, spawning rooms at intervals? is ithere even enough
@@ -280,12 +277,9 @@ void gen_type_1(Type1Config *config, Map m, MapPlayer *p) {
   p->posX = m.width / 2;
   p->posY = 1;
   int8_t dx = 0, dy = 1;
-  // p->dirX = 0;
-  // p->dirY = 1;
   //  start walking through, setting current position to empty, deciding on a
   //  room, then figuring out if you need to change directions.
   uint8_t x = p->posX, y = p->posY;
-  // int8_t dx = 0, dy = 1;
   while (1) {
     MAPT(m, x, y) = TILEEMPTY;
     // if (random(config->room_pool) == 0) {
@@ -362,4 +356,50 @@ void gen_type_1(Type1Config *config, Map m, MapPlayer *p) {
 
   p->cardinal = get_player_bestdir(p, m);
   // set_player_dir(p, get_player_bestdir(p, m));
+}
+
+void gen_type_2(Type2Config *config, Map m, MapPlayer *p) {
+  memset(m.map, TILEDEFAULT, m.width * m.height);
+  p->posX = m.width / 2;
+  p->posY = 1;
+  //  start walking through, setting current position to empty, deciding on a
+  //  room, then figuring out if you need to change directions.
+  uint8_t x = p->posX, y = p->posY;
+  for (uint8_t stop = 0; stop < config->stops; stop++) {
+    // Pick a place to stop
+    uint8_t sx = 1 + random(m.width - 2);
+    uint8_t sy = 1 + random(m.height - 2);
+    if (random(config->room_unlikely) == 0) {
+      // Try to generate a room.
+      MRect room = {
+          .x = sx,
+          .y = sy,
+          .w = RANDROOMDIM(config),
+          .h = RANDROOMDIM(config),
+      };
+      clear_rect_map(m, room);
+    }
+    int8_t mx = sx > x ? 1 : -1;
+    int8_t my = sy > y ? 1 : -1;
+    // Step towards that place in a predictable pattern
+    // while (sx != x && sy != y) {
+    //   for (; x != sx; x += mx) {
+    //     MAPT(m, x, y) = TILEEMPTY;
+    //     if (random(config->turn_unlikely) == 0)
+    //       break;
+    //   }
+    //   for (; y != sy; y += my) {
+    //     MAPT(m, x, y) = TILEEMPTY;
+    //     if (random(config->turn_unlikely) == 0)
+    //       break;
+    //   }
+    // }
+    for (; x != sx; x += mx) {
+      MAPT(m, x, y) = TILEEMPTY;
+    }
+    for (; y != sy; y += my) {
+      MAPT(m, x, y) = TILEEMPTY;
+    }
+  }
+  p->cardinal = get_player_bestdir(p, m);
 }

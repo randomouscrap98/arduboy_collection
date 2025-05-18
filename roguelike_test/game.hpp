@@ -13,10 +13,11 @@ float cardinal_to_rad(uint8_t cardinal);
 
 // A rectangle starting at x, y and having side w, h
 struct MRect {
-  uint8_t x = 0;
-  uint8_t y = 0;
-  uint8_t w = 0;
-  uint8_t h = 0;
+  uint8_t x, y, w, h;
+  // uint8_t x = 0;
+  // uint8_t y = 0;
+  // uint8_t w = 0;
+  // uint8_t h = 0;
 };
 
 struct Map {

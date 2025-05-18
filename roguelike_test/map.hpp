@@ -10,6 +10,12 @@ constexpr uint8_t TILEEXIT = 2;
 // Each room element is 4 bytes FYI (Rect)
 constexpr uint8_t ROOMSMAXDEPTH = 10;
 
+#define RANDROOMDIM(config)                                                    \
+  (config->room_min + random(1 + config->room_max - config->room_min))
+
+void set_empty_map(Map m);
+bool clear_rect_map(Map m, MRect r);
+
 struct RoomConfig {
   uint8_t minwidth = 2;       // Each room's minimum dimension must be this.
   uint8_t doorbuffer = 1;     // Doors not generated this close to edge
@@ -19,8 +25,6 @@ struct RoomConfig {
   uint8_t cubiclemaxlength = 4;
   uint8_t bumppool = 5;
 };
-
-void set_empty_map(Map m);
 
 // Split rooms into smaller rooms randomly until a minimum is reached. If a room
 // cannot be split but it's of certain dimensions, randomly add "interesting"
@@ -41,3 +45,13 @@ struct Type1Config {
 };
 
 void gen_type_1(Type1Config *config, Map m, MapPlayer *p);
+
+struct Type2Config {
+  uint8_t stops = 10;
+  // uint8_t turn_unlikely = 3;
+  uint8_t room_unlikely = 6; // How unlikely a room is to spawn at a stop.
+  uint8_t room_min = 2;      // min room size
+  uint8_t room_max = 4;      // max room size
+};
+
+void gen_type_2(Type2Config *config, Map m, MapPlayer *p);
