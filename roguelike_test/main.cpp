@@ -78,7 +78,6 @@ void gen_mymap() {
   update_visual_position(0);
   // IDK where to put this
   render_fximage(menu, arduboy.sBuffer, WIDTH, HEIGHT);
-  // FX::drawBitmap(0, 0, menu, 0, dbmOverwrite);
   gs_draw_map(&gs, &arduboy, WIDTH - SIDESIZE + 4, 20);
 }
 
@@ -207,10 +206,8 @@ RESTARTSTATE:;
   }
 
   // Draw the correct background for the area.
-  // raycast.render.drawRaycastBackground(&arduboy, bg_full);
   render_fximage(bg, arduboy.sBuffer, raycast.render.VIEWWIDTH,
                  raycast.render.VIEWHEIGHT);
-  // FX::drawBitmap(0, 0, bg, 0, dbmOverwrite);
   raycast.runIteration(&arduboy);
 
   FX::display(false);
