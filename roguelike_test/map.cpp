@@ -402,24 +402,24 @@ void gen_type_2(Type2Config *config, Map m, MapPlayer *p) {
       };
       clear_rect_map(m, room);
     }
-    l_to_pos(m, x, y, sx, sy);
-    x = sx;
-    y = sy;
-    // int8_t mx = sx > x ? 1 : -1;
-    // int8_t my = sy > y ? 1 : -1;
-    // // Step towards that place in a predictable pattern
-    // while (!(sx == x && sy == y)) {
-    //   for (; x != sx; x += mx) {
-    //     MAPT(m, x, y) = TILEEMPTY;
-    //     if (random(config->turn_unlikely) == 0)
-    //       break;
-    //   }
-    //   for (; y != sy; y += my) {
-    //     MAPT(m, x, y) = TILEEMPTY;
-    //     if (random(config->turn_unlikely) == 0)
-    //       break;
-    //   }
-    // }
+    // l_to_pos(m, x, y, sx, sy);
+    // x = sx;
+    // y = sy;
+    int8_t mx = sx > x ? 1 : -1;
+    int8_t my = sy > y ? 1 : -1;
+    // Step towards that place in a predictable pattern
+    while (!(sx == x && sy == y)) {
+      for (; x != sx; x += mx) {
+        MAPT(m, x, y) = TILEEMPTY;
+        if (random(config->turn_unlikely) == 0)
+          break;
+      }
+      for (; y != sy; y += my) {
+        MAPT(m, x, y) = TILEEMPTY;
+        if (random(config->turn_unlikely) == 0)
+          break;
+      }
+    }
 
     // for (; x != sx; x += mx) {
     //   MAPT(m, x, y) = TILEEMPTY;

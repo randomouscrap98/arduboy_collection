@@ -35,7 +35,7 @@ constexpr uint8_t MAPY = 2;
 constexpr uint8_t MAPRANGE = 1;
 
 constexpr float FOV = 1.0f;
-constexpr uint8_t FRAMERATE = 40;
+constexpr uint8_t FRAMERATE = 30;
 constexpr float MOVESPEED = 4.25f / FRAMERATE;
 constexpr float ROTSPEED = 3.0f / FRAMERATE;
 
