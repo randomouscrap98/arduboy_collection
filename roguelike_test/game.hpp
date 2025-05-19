@@ -3,6 +3,7 @@
 #include <Arduboy2.h>
 
 constexpr uint8_t TILEEMPTY = 0;
+constexpr uint8_t TILEEXIT = 15;
 constexpr uint8_t DIRNORTH = 0;
 constexpr uint8_t DIREAST = 1;
 constexpr uint8_t DIRSOUTH = 2;
@@ -51,10 +52,13 @@ constexpr uint8_t GS_TURNRIGHT = 8;
 
 constexpr uint8_t GS_STATEMAIN = 1;
 constexpr uint8_t GS_STATEANIMATE = 2;
+constexpr uint8_t GS_FLOORTRANSITION = 3;
 
 // Attempt certain movement, returning which action was performed. The changes
 // are applied immediately to the state.
 uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy);
+
+bool gs_exiting(GameState *gs);
 
 // Draw very simple 1:1 map at given location. Does not check if out of bounds
 void gs_draw_map(GameState *gs, Arduboy2Base *arduboy, uint8_t x, uint8_t y);

@@ -107,8 +107,8 @@ uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy) {
     cardinal_to_dir(gs->player.cardinal, &dx, &dy);
     gs->next_player.posX += pmod * dx;
     gs->next_player.posY += pmod * dy;
-    if (MAPT(gs->map, gs->next_player.posX, gs->next_player.posY) !=
-        TILEEMPTY) {
+    uint8_t mt = MAPT(gs->map, gs->next_player.posX, gs->next_player.posY);
+    if (!(mt == TILEEMPTY || (mt & TILEEXIT) == TILEEXIT)) {
       move &= ~(GS_MOVEBACKWARD | GS_MOVEFORWARD);
       gs->next_player = gs->player; // Undo what we did before
     }
@@ -117,6 +117,11 @@ uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy) {
   }
 
   return move;
+}
+
+bool gs_exiting(GameState *gs) {
+  return (MAPT(gs->map, gs->next_player.posX, gs->next_player.posY) &
+          TILEEXIT) == TILEEXIT;
 }
 
 void gs_draw_map(GameState *gs, Arduboy2Base *arduboy, uint8_t xs, uint8_t ys) {

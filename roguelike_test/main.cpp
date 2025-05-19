@@ -7,6 +7,8 @@
 #define __uint24 uint32_t
 #endif
 
+// #define FULLMAP
+
 #include <ArduboyFX.h>
 #include <ArduboyRaycastFX.h>
 
@@ -33,6 +35,7 @@ constexpr uint8_t SIDESIZE = 32;
 constexpr uint8_t MAPX = WIDTH - 18;
 constexpr uint8_t MAPY = 2;
 constexpr uint8_t MAPRANGE = 1;
+constexpr uint8_t MAPFLASH = 8;
 
 constexpr float FOV = 1.0f;
 constexpr uint8_t FRAMERATE = 30;
@@ -40,6 +43,7 @@ constexpr float MOVESPEED = 4.25f / FRAMERATE;
 constexpr float ROTSPEED = 3.0f / FRAMERATE;
 
 constexpr uint8_t DEFAULTANIMFRAMES = ((float)FRAMERATE) * 0.34;
+constexpr uint8_t DEFAULTANIMEXITFRAMES = ((float)FRAMERATE) * 0.6;
 
 // Once again we pick 16 sprites just in case we need them. 16 is a decent
 // number to not take up all the memory but still have enough to work with.
@@ -74,6 +78,27 @@ void render_fximage(uint24_t addr, uint8_t *at, uint8_t width, uint8_t height) {
   }
 }
 
+// uint8_t lcg8(uint8_t x) { return (0x41 * x + 0x1F); }
+uint8_t prng() {
+  // Seed this 8bit manually
+  static uint8_t s = 0xAA, a = 0;
+  s ^= s << 3;
+  s ^= s >> 5;
+  s ^= a++ >> 2;
+  return s;
+}
+
+void faze_screen() {
+  for (uint16_t i = 0; i < 1024; i++) {
+    // if (lcg8(arduboy.frameCount + lcg8(i)) & 1)
+    arduboy.sBuffer[i] <<= prng() & 3;
+    // if (prng() & 1)
+    //   arduboy.sBuffer[i] <<= 2;
+    // else
+    //   arduboy.sBuffer[i] >>= 2;
+  }
+}
+
 void gen_mymap() {
   // Dungeon, might be good.
   Type2Config c;
@@ -94,10 +119,19 @@ void gen_mymap() {
   gen_type_2(&c, gs.map, &gs.player);
   gs.next_player = gs.player;
   update_visual_position(0);
-  // IDK where to put this
   render_fximage(menu, arduboy.sBuffer, WIDTH, HEIGHT);
-  // gs_draw_map_near(&gs, &arduboy, MAPX, MAPY, MAPRANGE);
+#ifdef FULLMAP
   gs_draw_map(&gs, &arduboy, MAPX, MAPY);
+#else
+  gs_draw_map_near(&gs, &arduboy, MAPX, MAPY, MAPRANGE);
+#endif
+}
+
+void rcd() {
+  // Draw the correct background for the area.
+  render_fximage(bg, arduboy.sBuffer, raycast.render.VIEWWIDTH,
+                 raycast.render.VIEWHEIGHT);
+  raycast.runIteration(&arduboy);
 }
 
 void setup() {
@@ -129,27 +163,51 @@ RESTARTSTATE:;
 
   switch (gs.state) {
   case GS_STATEMAIN:
-    if (arduboy.justPressed(A_BUTTON)) {
-      gen_mymap();
-      sound.tone(300, 30);
-    }
+    // if (arduboy.justPressed(A_BUTTON)) {
+    // }
     gs_draw_map_player(&gs, &arduboy, MAPX, MAPY,
-                       arduboy.frameCount & 16 ? BLACK : WHITE);
+                       arduboy.frameCount & MAPFLASH ? BLACK : WHITE);
     // arduboy.drawPixel();
     if (gs_move(&gs, &arduboy)) {
       gs.animframes = 0; // begin animation at 0 (?)
-      gs.state = GS_STATEANIMATE;
+      if (gs_exiting(&gs)) {
+        gs.state = GS_FLOORTRANSITION;
+        gs.animend = DEFAULTANIMEXITFRAMES;
+        // gs.animend = DEFAULTANIMEXITFRAMES;
+      } else {
+        gs.state = GS_STATEANIMATE;
+        gs.animend = DEFAULTANIMFRAMES;
+      }
       goto RESTARTSTATE; // Eliminate pause: do animation first frame
     }
+    // rcd();
+    //  faze_screen();
     break;
   case GS_STATEANIMATE:
     gs.animframes++;
     update_visual_position((float)gs.animframes / (float)gs.animend);
     if (gs.animframes >= gs.animend) {
+      // if (gs_exiting(&gs)) {
+      //   gs.animframes = 0;
+      //   gs.animend = DEFAULTANIMEXITFRAMES;
+      //   gs.state = GS_FLOORTRANSITION;
+      // } else {
       gs.state = GS_STATEMAIN;
       gs.player = gs.next_player;
       gs_draw_map_near(&gs, &arduboy, MAPX, MAPY, MAPRANGE);
+      //}
     }
+    // rcd();
+    break;
+  case GS_FLOORTRANSITION:
+    faze_screen();
+    gs.animframes++;
+    if (gs.animframes >= gs.animend) {
+      gs.state = GS_STATEMAIN;
+      gen_mymap();
+      sound.tone(300, 30);
+    }
+    goto SKIPRCRENDER;
     break;
   }
 
@@ -158,5 +216,6 @@ RESTARTSTATE:;
                  raycast.render.VIEWHEIGHT);
   raycast.runIteration(&arduboy);
 
+SKIPRCRENDER:;
   FX::display(false);
 }

@@ -1,14 +1,14 @@
 #include "map.hpp"
 
-void set_empty_map(Map m) {
-  memset(m.map, TILEEMPTY, m.width * m.height);
-  memset(m.map, TILEDEFAULT, m.width);
-  memset(m.map + m.width * (m.height - 1), TILEDEFAULT, m.width);
-  for (uint8_t i = 0; i < m.height; i++) {
-    MAPT(m, 0, i) = TILEDEFAULT;
-    MAPT(m, m.width - 1, i) = TILEDEFAULT;
-  }
-}
+// void set_empty_map(Map m) {
+//   memset(m.map, TILEEMPTY, m.width * m.height);
+//   memset(m.map, TILEDEFAULT, m.width);
+//   memset(m.map + m.width * (m.height - 1), TILEDEFAULT, m.width);
+//   for (uint8_t i = 0; i < m.height; i++) {
+//     MAPT(m, 0, i) = TILEDEFAULT;
+//     MAPT(m, m.width - 1, i) = TILEDEFAULT;
+//   }
+// }
 
 void set_filled_map(Map m, TileConfig tiles) {
   memset(m.map, tiles.main, m.width * m.height);
@@ -282,91 +282,91 @@ static bool move_dir_ok(Map m, uint8_t x, uint8_t y, int8_t dx, int8_t dy) {
 
 //  maybe meander about, spawning rooms at intervals? is ithere even enough
 //  room for that?
-void gen_type_1(Type1Config *config, Map m, MapPlayer *p) {
-  memset(m.map, TILEDEFAULT, m.width * m.height);
-  p->posX = m.width / 2;
-  p->posY = 1;
-  int8_t dx = 0, dy = 1;
-  //  start walking through, setting current position to empty, deciding on a
-  //  room, then figuring out if you need to change directions.
-  uint8_t x = p->posX, y = p->posY;
-  while (1) {
-    MAPT(m, x, y) = TILEEMPTY;
-    // if (random(config->room_pool) == 0) {
-    //   for (uint8_t rt = 0; rt < config->room_retries; rt++) {
-    //     uint8_t rx = x, ry = y;
-    //     MRect room;
-    //     room.w =
-    //         config->room_min + random(1 + config->room_max -
-    //         config->room_min);
-    //     room.h =
-    //         config->room_min + random(1 + config->room_max -
-    //         config->room_min);
-    //     int8_t mod = random(2) ? -1 : 1;
-    //     bool valid = false;
-    //     if (dy == 0) { // Moving horizontally, spawn vertically
-    //       ry += 2 * mod;
-    //       room.y = ry + (mod < 0) ? 1 - room.h : 0;
-    //       for (uint8_t i = 0; i < room.w; i++) {
-    //         room.x = x - i;
-    //         // pick the first that works
-    //         if (!map_area_overlaps_buffer(m, room)) {
-    //           valid = true;
-    //           break;
-    //         }
-    //       }
-    //     } else { // moving vertically, spawn horizontally
-    //       rx += 2 * mod;
-    //       room.x = rx + (mod < 0) ? 1 - room.w : 0;
-    //       for (uint8_t i = 0; i < room.h; i++) {
-    //         room.y = y - i;
-    //         // pick the first that works
-    //         if (!map_area_overlaps_buffer(m, room)) {
-    //           valid = true;
-    //           break;
-    //         }
-    //       }
-    //     }
-    //     if (!valid) {
-    //       continue;
-    //     }
-    //     // I guess just make the room?
-    //     for (uint8_t h = 0; h < room.h; h++) {
-    //       for (uint8_t w = 0; w < room.w; w++) {
-    //         MAPT(m, room.x + w, room.y + h) = TILEEMPTY;
-    //       }
-    //     }
-    //     // This clears out the hallway to the room
-    //     MAPT(m, (rx + x) / 2, (ry + y) / 2) = TILEEMPTY;
-    //   }
-    // }
-    // Change direction randomly
-    if (!move_dir_ok(m, x, y, dx, dy) || random(config->hw_cdpool) == 0) {
-      uint8_t bd = random(4);
-      for (uint8_t bdi = 0; bdi < 4; bdi++) {
-        // Check all directions; if they all fail, we can't continue (?)
-        cardinal_to_dir((bd + bdi) & 3, &dx, &dy);
-        // set_player_dir(p, (bd + bdi) & 3);
-        if (move_dir_ok(m, x, y, dx, dy)) {
-          goto FOUNDDIR;
-        }
-      }
-      break;
-    FOUNDDIR:;
-    }
-    // For moving by 2
-    // MAPT(m, x + dx / 2, y + dy / 2) = TILEEMPTY;
-    x += dx;
-    y += dy;
-    // For early stops
-    // if (random(config->hw_stoppool) == 0) {
-    //   break;
-    // }
-  }
-
-  p->cardinal = get_player_bestdir(p, m);
-  // set_player_dir(p, get_player_bestdir(p, m));
-}
+// void gen_type_1(Type1Config *config, Map m, MapPlayer *p) {
+//   memset(m.map, TILEDEFAULT, m.width * m.height);
+//   p->posX = m.width / 2;
+//   p->posY = 1;
+//   int8_t dx = 0, dy = 1;
+//   //  start walking through, setting current position to empty, deciding on a
+//   //  room, then figuring out if you need to change directions.
+//   uint8_t x = p->posX, y = p->posY;
+//   while (1) {
+//     MAPT(m, x, y) = TILEEMPTY;
+//     // if (random(config->room_pool) == 0) {
+//     //   for (uint8_t rt = 0; rt < config->room_retries; rt++) {
+//     //     uint8_t rx = x, ry = y;
+//     //     MRect room;
+//     //     room.w =
+//     //         config->room_min + random(1 + config->room_max -
+//     //         config->room_min);
+//     //     room.h =
+//     //         config->room_min + random(1 + config->room_max -
+//     //         config->room_min);
+//     //     int8_t mod = random(2) ? -1 : 1;
+//     //     bool valid = false;
+//     //     if (dy == 0) { // Moving horizontally, spawn vertically
+//     //       ry += 2 * mod;
+//     //       room.y = ry + (mod < 0) ? 1 - room.h : 0;
+//     //       for (uint8_t i = 0; i < room.w; i++) {
+//     //         room.x = x - i;
+//     //         // pick the first that works
+//     //         if (!map_area_overlaps_buffer(m, room)) {
+//     //           valid = true;
+//     //           break;
+//     //         }
+//     //       }
+//     //     } else { // moving vertically, spawn horizontally
+//     //       rx += 2 * mod;
+//     //       room.x = rx + (mod < 0) ? 1 - room.w : 0;
+//     //       for (uint8_t i = 0; i < room.h; i++) {
+//     //         room.y = y - i;
+//     //         // pick the first that works
+//     //         if (!map_area_overlaps_buffer(m, room)) {
+//     //           valid = true;
+//     //           break;
+//     //         }
+//     //       }
+//     //     }
+//     //     if (!valid) {
+//     //       continue;
+//     //     }
+//     //     // I guess just make the room?
+//     //     for (uint8_t h = 0; h < room.h; h++) {
+//     //       for (uint8_t w = 0; w < room.w; w++) {
+//     //         MAPT(m, room.x + w, room.y + h) = TILEEMPTY;
+//     //       }
+//     //     }
+//     //     // This clears out the hallway to the room
+//     //     MAPT(m, (rx + x) / 2, (ry + y) / 2) = TILEEMPTY;
+//     //   }
+//     // }
+//     // Change direction randomly
+//     if (!move_dir_ok(m, x, y, dx, dy) || random(config->hw_cdpool) == 0) {
+//       uint8_t bd = random(4);
+//       for (uint8_t bdi = 0; bdi < 4; bdi++) {
+//         // Check all directions; if they all fail, we can't continue (?)
+//         cardinal_to_dir((bd + bdi) & 3, &dx, &dy);
+//         // set_player_dir(p, (bd + bdi) & 3);
+//         if (move_dir_ok(m, x, y, dx, dy)) {
+//           goto FOUNDDIR;
+//         }
+//       }
+//       break;
+//     FOUNDDIR:;
+//     }
+//     // For moving by 2
+//     // MAPT(m, x + dx / 2, y + dy / 2) = TILEEMPTY;
+//     x += dx;
+//     y += dy;
+//     // For early stops
+//     // if (random(config->hw_stoppool) == 0) {
+//     //   break;
+//     // }
+//   }
+//
+//   p->cardinal = get_player_bestdir(p, m);
+//   // set_player_dir(p, get_player_bestdir(p, m));
+// }
 
 void l_to_pos(Map m, uint8_t x, uint8_t y, uint8_t ex, uint8_t ey) {
   int8_t mx = ex > x ? 1 : -1;

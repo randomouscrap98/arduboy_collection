@@ -4,8 +4,8 @@
 
 #include "game.hpp"
 
-constexpr uint8_t TILEDEFAULT = 1;
-constexpr uint8_t TILEEXIT = 2;
+// constexpr uint8_t TILEDEFAULT = 1;
+// constexpr uint8_t TILEEXIT = 2;
 
 // Each room element is 4 bytes FYI (Rect)
 constexpr uint8_t ROOMSMAXDEPTH = 10;
