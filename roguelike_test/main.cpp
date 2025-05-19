@@ -81,6 +81,8 @@ void gen_mymap() {
   // c.room_max = 5;
   c.stops = 5;
   c.room_unlikely = 1;
+  c.tiles.main = 1;
+  c.tiles.perimeter = 7;
 
   // // Trees, maybe
   // Type2Config c;
@@ -96,81 +98,6 @@ void gen_mymap() {
   // gs_draw_map_near(&gs, &arduboy, MAPX, MAPY, MAPRANGE);
   gs_draw_map(&gs, &arduboy, MAPX, MAPY);
 }
-
-// constexpr uint8_t MENUMAX = 6;
-// // clang-format off
-// constexpr char MENULETTER[][MENUMAX] = {
-//   "MINWD",
-//   "DRBUF",
-//   "MXWRT",
-//   "9POOL",
-//   "CBCPL",
-//   "CBMXL",
-//   "BMPPL",
-//  //  "M",
-//  //  "D",
-//  //  "M",
-//  //  "9",
-//  //  "C",
-//  //  "C",
-//  //  "B",
-// };
-// // clang-format on
-// constexpr uint8_t MENUITEMS = sizeof(MENULETTER) / MENUMAX;
-//
-// uint8_t menu_pos = 0;
-// void do_menu() {
-//   uint8_t *mval;
-//   char line[MENUMAX + 10];
-//   for (int i = 0; i < MENUITEMS; i++) {
-//     tinyfont.setCursor(64, i * 5);
-//     tinyfont.print(i == menu_pos ? '>' : ' ');
-//     tinyfont.print(MENULETTER[i]);
-//     tinyfont.print(' ');
-//     uint8_t *val;
-//     switch (i) {
-//     case 0:
-//       val = &config.minwidth;
-//       break;
-//     case 1:
-//       val = &config.doorbuffer;
-//       break;
-//     case 2:
-//       val = &config.maxwallretries;
-//       break;
-//     case 3:
-//       val = &config.ninepool;
-//       break;
-//     case 4:
-//       val = &config.cubiclepool;
-//       break;
-//     case 5:
-//       val = &config.cubiclemaxlength;
-//       break;
-//     case 6:
-//       val = &config.bumppool;
-//       break;
-//     }
-//     tinyfont.print(*val);
-//     if (i == menu_pos) {
-//       mval = val;
-//     }
-//   }
-//   int8_t dir = 0;
-//   if (arduboy.justPressed(DOWN_BUTTON))
-//     dir = 1;
-//   if (arduboy.justPressed(UP_BUTTON))
-//     dir = -1;
-//   menu_pos = (menu_pos + dir + MENUITEMS) % MENUITEMS;
-//   if (arduboy.justPressed(RIGHT_BUTTON))
-//     (*mval) += 1;
-//   if (arduboy.justPressed(LEFT_BUTTON))
-//     (*mval) -= 1;
-//   if (arduboy.justPressed(A_BUTTON)) {
-//     gen_mymap();
-//     sound.tone(300, 30);
-//   }
-// }
 
 void setup() {
   arduboy.boot();

@@ -10,9 +10,19 @@ void set_empty_map(Map m) {
   }
 }
 
+void set_filled_map(Map m, TileConfig tiles) {
+  memset(m.map, tiles.main, m.width * m.height);
+  memset(m.map, tiles.perimeter, m.width);
+  memset(m.map + m.width * (m.height - 1), tiles.perimeter, m.width);
+  for (uint8_t i = 0; i < m.height; i++) {
+    MAPT(m, 0, i) = tiles.perimeter;
+    MAPT(m, m.width - 1, i) = tiles.perimeter;
+  }
+}
+
 bool clear_rect_map(Map m, MRect room) {
-  if (room.x > 0 && room.x + room.w < m.width - 1 && room.y > 0 &&
-      room.y + room.h < m.height - 1) {
+  if (room.x > 0 && room.x + room.w <= m.width - 1 && room.y > 0 &&
+      room.y + room.h <= m.height - 1) {
     for (uint8_t h = 0; h < room.h; h++) {
       for (uint8_t w = 0; w < room.w; w++) {
         MAPT(m, room.x + w, room.y + h) = TILEEMPTY;
@@ -23,34 +33,34 @@ bool clear_rect_map(Map m, MRect room) {
   return false;
 }
 
-struct RoomStack {
-  MRect rooms[ROOMSMAXDEPTH];
-  uint8_t count = 0; // 1 past the "top" of the stack
-};
-
-static bool pushRoom(RoomStack *stack, uint8_t x, uint8_t y, uint8_t w,
-                     uint8_t h) {
-  if (stack->count == ROOMSMAXDEPTH)
-    return false;
-  MRect *r = &stack->rooms[stack->count];
-  r->x = x;
-  r->y = y;
-  r->w = w;
-  r->h = h;
-  stack->count += 1;
-  return true;
-}
-
-static MRect popRoom(RoomStack *stack) {
-  MRect result;
-
-  if (stack->count != 0) {
-    stack->count -= 1;
-    memcpy(&result, &stack->rooms[stack->count], sizeof(MRect));
-  }
-
-  return result;
-}
+// struct RoomStack {
+//   MRect rooms[ROOMSMAXDEPTH];
+//   uint8_t count = 0; // 1 past the "top" of the stack
+// };
+//
+// static bool pushRoom(RoomStack *stack, uint8_t x, uint8_t y, uint8_t w,
+//                      uint8_t h) {
+//   if (stack->count == ROOMSMAXDEPTH)
+//     return false;
+//   MRect *r = &stack->rooms[stack->count];
+//   r->x = x;
+//   r->y = y;
+//   r->w = w;
+//   r->h = h;
+//   stack->count += 1;
+//   return true;
+// }
+//
+// static MRect popRoom(RoomStack *stack) {
+//   MRect result;
+//
+//   if (stack->count != 0) {
+//     stack->count -= 1;
+//     memcpy(&result, &stack->rooms[stack->count], sizeof(MRect));
+//   }
+//
+//   return result;
+// }
 
 // void genRoomsType(RoomConfig *config, Map m, MapPlayer *p) {
 //   set_empty_map(m);
@@ -359,7 +369,8 @@ void gen_type_1(Type1Config *config, Map m, MapPlayer *p) {
 }
 
 void gen_type_2(Type2Config *config, Map m, MapPlayer *p) {
-  memset(m.map, TILEDEFAULT, m.width * m.height);
+  set_filled_map(m, config->tiles);
+  // memset(m.map, TILEDEFAULT, m.width * m.height);
   p->posX = 1 + random(m.width - 2); // m.width / 2;
   p->posY = 1;
   //  start walking through, setting current position to empty, deciding on a
@@ -382,24 +393,24 @@ void gen_type_2(Type2Config *config, Map m, MapPlayer *p) {
     int8_t mx = sx > x ? 1 : -1;
     int8_t my = sy > y ? 1 : -1;
     // Step towards that place in a predictable pattern
-    // while (sx != x && sy != y) {
-    //   for (; x != sx; x += mx) {
-    //     MAPT(m, x, y) = TILEEMPTY;
-    //     if (random(config->turn_unlikely) == 0)
-    //       break;
-    //   }
-    //   for (; y != sy; y += my) {
-    //     MAPT(m, x, y) = TILEEMPTY;
-    //     if (random(config->turn_unlikely) == 0)
-    //       break;
-    //   }
+    while (!(sx == x && sy == y)) {
+      for (; x != sx; x += mx) {
+        MAPT(m, x, y) = TILEEMPTY;
+        if (random(config->turn_unlikely) == 0)
+          break;
+      }
+      for (; y != sy; y += my) {
+        MAPT(m, x, y) = TILEEMPTY;
+        if (random(config->turn_unlikely) == 0)
+          break;
+      }
+    }
+    // for (; x != sx; x += mx) {
+    //   MAPT(m, x, y) = TILEEMPTY;
     // }
-    for (; x != sx; x += mx) {
-      MAPT(m, x, y) = TILEEMPTY;
-    }
-    for (; y != sy; y += my) {
-      MAPT(m, x, y) = TILEEMPTY;
-    }
+    // for (; y != sy; y += my) {
+    //   MAPT(m, x, y) = TILEEMPTY;
+    // }
   }
   p->cardinal = get_player_bestdir(p, m);
 }

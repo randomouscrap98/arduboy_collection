@@ -46,12 +46,19 @@ struct Type1Config {
 
 void gen_type_1(Type1Config *config, Map m, MapPlayer *p);
 
+struct TileConfig {
+  uint8_t perimeter;
+  uint8_t main;
+};
+
 struct Type2Config {
   uint8_t stops = 10;
   // uint8_t turn_unlikely = 3;
   uint8_t room_unlikely = 6; // How unlikely a room is to spawn at a stop.
   uint8_t room_min = 2;      // min room size
   uint8_t room_max = 4;      // max room size
+  uint8_t turn_unlikely = 255;
+  TileConfig tiles;
 };
 
 void gen_type_2(Type2Config *config, Map m, MapPlayer *p);
