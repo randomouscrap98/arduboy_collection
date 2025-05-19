@@ -368,6 +368,18 @@ void gen_type_1(Type1Config *config, Map m, MapPlayer *p) {
   // set_player_dir(p, get_player_bestdir(p, m));
 }
 
+void l_to_pos(Map m, uint8_t x, uint8_t y, uint8_t ex, uint8_t ey) {
+  int8_t mx = ex > x ? 1 : -1;
+  int8_t my = ey > y ? 1 : -1;
+  // Step towards that place in a predictable pattern
+  for (; x != ex; x += mx) {
+    MAPT(m, x, y) = TILEEMPTY;
+  }
+  for (; y != ey; y += my) {
+    MAPT(m, x, y) = TILEEMPTY;
+  }
+}
+
 void gen_type_2(Type2Config *config, Map m, MapPlayer *p) {
   set_filled_map(m, config->tiles);
   // memset(m.map, TILEDEFAULT, m.width * m.height);
@@ -390,21 +402,25 @@ void gen_type_2(Type2Config *config, Map m, MapPlayer *p) {
       };
       clear_rect_map(m, room);
     }
-    int8_t mx = sx > x ? 1 : -1;
-    int8_t my = sy > y ? 1 : -1;
-    // Step towards that place in a predictable pattern
-    while (!(sx == x && sy == y)) {
-      for (; x != sx; x += mx) {
-        MAPT(m, x, y) = TILEEMPTY;
-        if (random(config->turn_unlikely) == 0)
-          break;
-      }
-      for (; y != sy; y += my) {
-        MAPT(m, x, y) = TILEEMPTY;
-        if (random(config->turn_unlikely) == 0)
-          break;
-      }
-    }
+    l_to_pos(m, x, y, sx, sy);
+    x = sx;
+    y = sy;
+    // int8_t mx = sx > x ? 1 : -1;
+    // int8_t my = sy > y ? 1 : -1;
+    // // Step towards that place in a predictable pattern
+    // while (!(sx == x && sy == y)) {
+    //   for (; x != sx; x += mx) {
+    //     MAPT(m, x, y) = TILEEMPTY;
+    //     if (random(config->turn_unlikely) == 0)
+    //       break;
+    //   }
+    //   for (; y != sy; y += my) {
+    //     MAPT(m, x, y) = TILEEMPTY;
+    //     if (random(config->turn_unlikely) == 0)
+    //       break;
+    //   }
+    // }
+
     // for (; x != sx; x += mx) {
     //   MAPT(m, x, y) = TILEEMPTY;
     // }
@@ -412,5 +428,41 @@ void gen_type_2(Type2Config *config, Map m, MapPlayer *p) {
     //   MAPT(m, x, y) = TILEEMPTY;
     // }
   }
+  // Now, generate the exit along one of the alt walls
+  int8_t ex, ey = 1 + random(m.width - 2);
+  int8_t emx = 0, emy = 0;
+  switch (random(3)) {
+  case 0:
+    ex = 0;
+    emx = 1;
+    break;
+  case 1:
+    ex = m.width - 1;
+    emx = -1;
+    break;
+  case 2:
+    ex = ey;
+    ey = m.height - 1;
+    emy = -1;
+    break;
+  }
+  MAPT(m, ex, ey) = config->tiles.exit;
+  ex += emx;
+  ey += emy;
+  // Scan for the first empty slot, make a simple L to it
+  for (int8_t p = 1; p < m.width / 2; p++) {
+    // This wastes time rescanning but it's less code (I think)
+    for (int8_t y = -p; y <= p; y++) {
+      for (int8_t x = -p; x <= p; x++) {
+        uint8_t tx = ex + x;
+        uint8_t ty = ey + y;
+        if (tx < m.width && ty < m.height && MAPT(m, tx, ty) == TILEEMPTY) {
+          l_to_pos(m, ex, ey, tx, ty);
+          goto ENDTYPE2EXITFIND;
+        }
+      }
+    }
+  }
+ENDTYPE2EXITFIND:;
   p->cardinal = get_player_bestdir(p, m);
 }

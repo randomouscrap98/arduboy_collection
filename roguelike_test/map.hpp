@@ -49,6 +49,7 @@ void gen_type_1(Type1Config *config, Map m, MapPlayer *p);
 struct TileConfig {
   uint8_t perimeter;
   uint8_t main;
+  uint8_t exit;
 };
 
 struct Type2Config {

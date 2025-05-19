@@ -83,6 +83,7 @@ void gen_mymap() {
   c.room_unlikely = 1;
   c.tiles.main = 1;
   c.tiles.perimeter = 7;
+  c.tiles.exit = 15;
 
   // // Trees, maybe
   // Type2Config c;
@@ -107,7 +108,7 @@ void setup() {
   FX_INIT();
   // NOTE: second value FOV
   // raycast.player.initPlayerDirection(0, 1.0); // 0.75);
-  raycast.render.setLightIntensity(2.0);
+  raycast.render.setLightIntensity(1.5); // 2.0
   raycast.render.spritescaling[2] = 0.75;
   raycast.render.spriteShading = RcShadingType::Black;
   gs.map.width = RCMAXMAPDIMENSION;
