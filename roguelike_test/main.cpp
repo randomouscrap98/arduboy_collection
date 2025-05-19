@@ -37,6 +37,9 @@ constexpr uint8_t MAPY = 2;
 constexpr uint8_t MAPRANGE = 1;
 constexpr uint8_t MAPFLASH = 8;
 
+constexpr uint16_t TINYDIGITS[] = {0xF9F, 0xAF8, 0xDDA, 0x9DF, 0x74F,
+                                   0xBDD, 0xFDC, 0x11F, 0xFCF, 0x75F};
+
 constexpr float FOV = 1.0f;
 constexpr uint8_t FRAMERATE = 30;
 constexpr float MOVESPEED = 4.25f / FRAMERATE;
@@ -75,6 +78,14 @@ void render_fximage(uint24_t addr, uint8_t *at, uint8_t width, uint8_t height) {
   height = height >> 3; // it's actually per byte ofc
   for (uint8_t i = 0; i < height; i++) {
     FX::readDataBytes(addr + 4 + i * width, at + i * WIDTH, width);
+  }
+}
+
+// Print tiny digits at given location
+void print_tinydigit(uint8_t v, uint8_t x, uint8_t y) {
+  for (uint8_t i = 0; i < 3; i++) {
+    uint8_t dig = (TINYDIGITS[v] >> ((2 - i) * 4)) & 0xF;
+    arduboy.sBuffer[x + i + (y >> 3) * WIDTH] |= (dig << (y & 7));
   }
 }
 
@@ -118,8 +129,20 @@ void gen_mymap() {
   // c.room_unlikely = 3;
   gen_type_2(&c, gs.map, &gs.player);
   gs.next_player = gs.player;
+  gs.total_floor++;
+  gs.region_floor++;
   update_visual_position(0);
   render_fximage(menu, arduboy.sBuffer, WIDTH, HEIGHT);
+  print_tinydigit(gs.region, 113, 20);
+  print_tinydigit(gs.region_floor / 10, 120, 20);
+  print_tinydigit(gs.region_floor % 10, 124, 20);
+  // tinyfont.setCursor(113, 20);
+  // tinyfont.print(gs.region);
+  //  tinyfont.setCursor(120, 20);
+  //  if (gs.region_floor < 10) {
+  //    tinyfont.print(0);
+  //  }
+  //  tinyfont.print(gs.region_floor);
 #ifdef FULLMAP
   gs_draw_map(&gs, &arduboy, MAPX, MAPY);
 #else
@@ -150,6 +173,9 @@ void setup() {
   gs.map.map = raycast.worldMap.map;
   gs.state = GS_STATEMAIN;
   gs.animend = DEFAULTANIMFRAMES;
+  gs.region = 1;
+  gs.region_floor = 0;
+  gs.total_floor = 0;
   gen_mymap();
 }
 
@@ -167,37 +193,26 @@ RESTARTSTATE:;
     // }
     gs_draw_map_player(&gs, &arduboy, MAPX, MAPY,
                        arduboy.frameCount & MAPFLASH ? BLACK : WHITE);
-    // arduboy.drawPixel();
     if (gs_move(&gs, &arduboy)) {
       gs.animframes = 0; // begin animation at 0 (?)
       if (gs_exiting(&gs)) {
         gs.state = GS_FLOORTRANSITION;
         gs.animend = DEFAULTANIMEXITFRAMES;
-        // gs.animend = DEFAULTANIMEXITFRAMES;
       } else {
         gs.state = GS_STATEANIMATE;
         gs.animend = DEFAULTANIMFRAMES;
       }
       goto RESTARTSTATE; // Eliminate pause: do animation first frame
     }
-    // rcd();
-    //  faze_screen();
     break;
   case GS_STATEANIMATE:
     gs.animframes++;
     update_visual_position((float)gs.animframes / (float)gs.animend);
     if (gs.animframes >= gs.animend) {
-      // if (gs_exiting(&gs)) {
-      //   gs.animframes = 0;
-      //   gs.animend = DEFAULTANIMEXITFRAMES;
-      //   gs.state = GS_FLOORTRANSITION;
-      // } else {
       gs.state = GS_STATEMAIN;
       gs.player = gs.next_player;
       gs_draw_map_near(&gs, &arduboy, MAPX, MAPY, MAPRANGE);
-      //}
     }
-    // rcd();
     break;
   case GS_FLOORTRANSITION:
     faze_screen();

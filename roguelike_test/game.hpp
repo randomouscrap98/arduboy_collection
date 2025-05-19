@@ -42,6 +42,9 @@ struct GameState {
   uint8_t state;      // current game state
   uint8_t animend;    // total frames for this animation
   uint8_t animframes; // remaining animation frames
+  uint8_t region;
+  uint8_t region_floor;
+  uint8_t total_floor;
   // uint8_t buffered_input; // What it says
 };
 
