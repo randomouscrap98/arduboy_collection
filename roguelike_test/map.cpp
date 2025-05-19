@@ -360,7 +360,7 @@ void gen_type_1(Type1Config *config, Map m, MapPlayer *p) {
 
 void gen_type_2(Type2Config *config, Map m, MapPlayer *p) {
   memset(m.map, TILEDEFAULT, m.width * m.height);
-  p->posX = m.width / 2;
+  p->posX = 1 + random(m.width - 2); // m.width / 2;
   p->posY = 1;
   //  start walking through, setting current position to empty, deciding on a
   //  room, then figuring out if you need to change directions.

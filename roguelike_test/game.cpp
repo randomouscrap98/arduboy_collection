@@ -119,6 +119,10 @@ uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy) {
   return move;
 }
 
+// GSMAPPX()
+// void gs_draw_map_px(Arduboy2Base *arduboy, uint8_t xs, uint8_t uint8_t col) {
+// }
+
 void gs_draw_map(GameState *gs, Arduboy2Base *arduboy, uint8_t xs, uint8_t ys) {
   arduboy->fillRect(xs, ys, gs->map.width, gs->map.height, BLACK);
   for (int y = 0; y < gs->map.height; y++) {
@@ -128,4 +132,26 @@ void gs_draw_map(GameState *gs, Arduboy2Base *arduboy, uint8_t xs, uint8_t ys) {
       }
     }
   }
+}
+
+void gs_draw_map_near(GameState *gs, Arduboy2Base *arduboy, uint8_t xs,
+                      uint8_t ys, uint8_t range) {
+  for (int8_t y = -range; y <= range; y++) {
+    for (int8_t x = -range; x <= range; x++) {
+      uint8_t px = x + gs->player.posX;
+      uint8_t py = y + gs->player.posY;
+      if (px >= gs->map.width || py >= gs->map.height)
+        continue;
+      uint8_t mt = MAPT(gs->map, px, py);
+      arduboy->drawPixel(xs + px, ys + gs->map.height - 1 - py,
+                         mt ? WHITE : BLACK);
+    }
+  }
+}
+
+void gs_draw_map_player(GameState *gs, Arduboy2Base *arduboy, uint8_t xs,
+                        uint8_t ys, uint8_t col) {
+  arduboy->drawPixel(xs + gs->player.posX,
+                     ys + gs->map.height - 1 - gs->player.posY, col);
+  //(arduboy->frameCount & ) ? BLACK : WHITE);
 }

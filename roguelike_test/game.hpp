@@ -62,3 +62,7 @@ uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy);
 
 // Draw very simple 1:1 map at given location. Does not check if out of bounds
 void gs_draw_map(GameState *gs, Arduboy2Base *arduboy, uint8_t x, uint8_t y);
+void gs_draw_map_near(GameState *gs, Arduboy2Base *arduboy, uint8_t xs,
+                      uint8_t ys, uint8_t range);
+void gs_draw_map_player(GameState *gs, Arduboy2Base *arduboy, uint8_t xs,
+                        uint8_t ys, uint8_t col);

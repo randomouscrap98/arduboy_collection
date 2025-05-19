@@ -30,6 +30,9 @@ constexpr uint8_t NUMINTERNALBYTES = 1;
 constexpr uint8_t NUMSPRITES = 16;
 constexpr uint8_t BOTTOMSIZE = 8;
 constexpr uint8_t SIDESIZE = 32;
+constexpr uint8_t MAPX = WIDTH - 18;
+constexpr uint8_t MAPY = 2;
+constexpr uint8_t MAPRANGE = 1;
 
 constexpr float FOV = 1.0f;
 constexpr uint8_t FRAMERATE = 40;
@@ -90,7 +93,8 @@ void gen_mymap() {
   update_visual_position(0);
   // IDK where to put this
   render_fximage(menu, arduboy.sBuffer, WIDTH, HEIGHT);
-  gs_draw_map(&gs, &arduboy, WIDTH - SIDESIZE + 4, 20);
+  // gs_draw_map_near(&gs, &arduboy, MAPX, MAPY, MAPRANGE);
+  gs_draw_map(&gs, &arduboy, MAPX, MAPY);
 }
 
 // constexpr uint8_t MENUMAX = 6;
@@ -201,6 +205,9 @@ RESTARTSTATE:;
       gen_mymap();
       sound.tone(300, 30);
     }
+    gs_draw_map_player(&gs, &arduboy, MAPX, MAPY,
+                       arduboy.frameCount & 16 ? BLACK : WHITE);
+    // arduboy.drawPixel();
     if (gs_move(&gs, &arduboy)) {
       gs.animframes = 0; // begin animation at 0 (?)
       gs.state = GS_STATEANIMATE;
@@ -213,6 +220,7 @@ RESTARTSTATE:;
     if (gs.animframes >= gs.animend) {
       gs.state = GS_STATEMAIN;
       gs.player = gs.next_player;
+      gs_draw_map_near(&gs, &arduboy, MAPX, MAPY, MAPRANGE);
     }
     break;
   }
