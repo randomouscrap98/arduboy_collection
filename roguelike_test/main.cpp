@@ -132,7 +132,7 @@ void gen_mymap() {
   c.tiles.extras[0].unlikely = 10;
   c.tiles.extras[1].tile = 3;
   c.tiles.extras[1].type = TILEEXTRATYPE_NOCORNER;
-  c.tiles.extras[1].unlikely = 3;
+  c.tiles.extras[1].unlikely = 1;
 
   // // Trees, maybe
   // Type2Config c;

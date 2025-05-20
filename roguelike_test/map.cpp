@@ -62,9 +62,9 @@ static bool any_corner_exposed(Map m, uint8_t x, uint8_t y) {
   for (uint8_t i = 0; i < 8; i += 2) {
     uint8_t ts = 0;
     for (uint8_t c = 1; c <= 3; c++) {
-      ts |=
-          MAPT(m, x + pgm_read_byte(PERIMETERBUF + ((c + i) & 7)),
-               y + pgm_read_byte(PERIMETERBUF + ((c + i + PERIMETERYOFS) & 7)));
+      int8_t xofs = pgm_read_byte(PERIMETERBUF + ((c + i) & 7));
+      int8_t yofs = pgm_read_byte(PERIMETERBUF + ((c + i + PERIMETERYOFS) & 7));
+      ts |= MAPT(m, x + xofs, y + yofs);
     }
     if (ts == 0)
       return true;
@@ -74,7 +74,6 @@ static bool any_corner_exposed(Map m, uint8_t x, uint8_t y) {
 
 void gen_type_2(Type2Config *config, Map m, MapPlayer *p) {
   set_filled_map(m, config->tiles);
-  // memset(m.map, TILEDEFAULT, m.width * m.height);
   p->posX = 1 + random(m.width - 2); // m.width / 2;
   p->posY = 1 + random(m.height - 2);
   //  start walking through, setting current position to empty, deciding on a
@@ -94,9 +93,6 @@ void gen_type_2(Type2Config *config, Map m, MapPlayer *p) {
       };
       clear_rect_map(m, room);
     }
-    // l_to_pos(m, x, y, sx, sy);
-    // x = sx;
-    // y = sy;
     int8_t mx = sx > x ? 1 : -1;
     int8_t my = sy > y ? 1 : -1;
     // Step towards that place in a predictable pattern
@@ -146,12 +142,6 @@ void gen_type_2(Type2Config *config, Map m, MapPlayer *p) {
   MAPT(m, ex, ey) = config->tiles.exit;
   ex += emx;
   ey += emy;
-  // int16_t etx = ex;
-  // int16_t ety = ey;
-  // int16_t esdist = 9999;
-  // uint8_t eex, eey;
-
-  // l_to_pos(m, ex, ey, eex, eey);
 
   // Scan for the first empty slot, make a simple L to it
   for (int8_t p = 1; p < m.width / 2; p++) {
@@ -173,15 +163,6 @@ ENDTYPE2EXITFIND:;
   for (uint8_t y = 1; y < m.height - 1; y++) {
     for (uint8_t x = 1; x < m.height - 1; x++) {
       uint8_t tile = MAPT(m, x, y);
-      // if (tile == TILEEMPTY) {
-      //   int16_t tx = x, ty = y;
-      //   int16_t dist = DISTSQRD(etx, ety, tx, ty);
-      //   if (dist < esdist) {
-      //     esdist = dist;
-      //     eex = x;
-      //     eey = y;
-      //   }
-      // }
       for (uint8_t i = 0; i < config->tiles.extras_count; i++) {
         if (random(config->tiles.extras[i].unlikely) == 0) {
           switch (config->tiles.extras[i].type) {

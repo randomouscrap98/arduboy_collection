@@ -24,9 +24,23 @@ constexpr uint8_t TILEEXTRATYPE_PILLAR = 3;
 
 constexpr uint8_t TILEEXTRAMAX = 4;
 
-constexpr int8_t PERIMETERBUF[] PROGMEM = {1, 1, 1, 0, -1, -1, -1, 0};
+/* clang-format off */
+constexpr int8_t PERIMETERBUF[] PROGMEM =
+  {1, 1, 1, 0, -1, -1, -1, 0};
+// {
+//   -1, 0,
+//   -1, -1,
+//   0, -1,
+//   1, -1,
+//   1, 0,
+//   1, 1,
+//   0, 1,
+//   -1, 1,
+// };
+  //1, 1, 1, 0, -1, -1, -1, 0};
+/* clang-format on */
 constexpr uint8_t PERIMETERYOFS = 6;
-constexpr uint8_t PERIMETERCORNEROFS = 1;
+// constexpr uint8_t PERIMETERCORNEROFS = 1;
 
 struct TileConfig {
   uint8_t perimeter;
