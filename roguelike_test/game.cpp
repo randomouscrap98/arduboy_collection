@@ -34,6 +34,36 @@ float cardinal_to_rad(uint8_t cardinal) {
   }
 }
 
+// uint8_t prng() {
+//   // Seed this 8bit manually
+//   static uint8_t s = 0xAA, a = 0;
+//   s ^= s << 3;
+//   s ^= s >> 5;
+//   s ^= a++ >> 2;
+//   return s;
+// }
+
+// uint8_t prng() {
+//   static uint8_t x = 0, y = 0, z = 0, a = 1;
+//   uint8_t t = x ^ (x << 5);
+//   x = y;
+//   y = z;
+//   z = a;
+//   return a = z ^ (z >> 1) ^ t ^ (t << 3);
+// }
+
+#define rot8(x, k) (((x) << (k)) | ((x) >> (8 - (k))))
+uint8_t prng() { // jsf8, see https://filterpaper.github.io/prng.html#jsf8
+  static uint8_t a = 0xf1;
+  static uint8_t b = 0xee, c = 0xee, d = 0xee;
+
+  uint8_t e = a - rot8(b, 1);
+  a = b ^ rot8(c, 4);
+  b = c + d;
+  c = d + e;
+  return d = e + a;
+}
+
 uint8_t get_player_bestdir(MapPlayer *p, Map m) {
   // uint8_t thi[4] = {0};
   uint8_t max_count = 0;

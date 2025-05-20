@@ -93,14 +93,14 @@ void print_tinydigit(uint8_t v, uint8_t x, uint8_t y) {
 }
 
 // uint8_t lcg8(uint8_t x) { return (0x41 * x + 0x1F); }
-uint8_t prng() {
-  // Seed this 8bit manually
-  static uint8_t s = 0xAA, a = 0;
-  s ^= s << 3;
-  s ^= s >> 5;
-  s ^= a++ >> 2;
-  return s;
-}
+// uint8_t prng() {
+//   // Seed this 8bit manually
+//   static uint8_t s = 0xAA, a = 0;
+//   s ^= s << 3;
+//   s ^= s >> 5;
+//   s ^= a++ >> 2;
+//   return s;
+// }
 
 void faze_screen() {
   for (uint16_t i = 0; i < 1024; i++) {
@@ -132,7 +132,7 @@ void gen_mymap() {
   c.tiles.extras[0].unlikely = 10;
   c.tiles.extras[1].tile = 3;
   c.tiles.extras[1].type = TILEEXTRATYPE_NOCORNER;
-  c.tiles.extras[1].unlikely = 1;
+  c.tiles.extras[1].unlikely = 2;
 
   // // Trees, maybe
   // Type2Config c;
@@ -163,18 +163,18 @@ void gen_mymap() {
 #endif
 }
 
-void rcd() {
-  // Draw the correct background for the area.
-  render_fximage(bg, arduboy.sBuffer, raycast.render.VIEWWIDTH,
-                 raycast.render.VIEWHEIGHT);
-  raycast.runIteration(&arduboy);
-}
+// void rcd() {
+//   // Draw the correct background for the area.
+//   render_fximage(bg, arduboy.sBuffer, raycast.render.VIEWWIDTH,
+//                  raycast.render.VIEWHEIGHT);
+//   raycast.runIteration(&arduboy);
+// }
 
 void setup() {
   arduboy.boot();
   arduboy.flashlight();
   arduboy.setFrameRate(FRAMERATE);
-  arduboy.initRandomSeed();
+  // arduboy.initRandomSeed();
   FX_INIT();
   // NOTE: second value FOV
   // raycast.player.initPlayerDirection(0, 1.0); // 0.75);

@@ -22,7 +22,7 @@ constexpr uint8_t TILEEXTRATYPE_NORMAL = 1;
 constexpr uint8_t TILEEXTRATYPE_NOCORNER = 2;
 constexpr uint8_t TILEEXTRATYPE_PILLAR = 3;
 
-constexpr uint8_t TILEEXTRAMAX = 4;
+constexpr uint8_t TILEEXTRAMAX = 8;
 
 /* clang-format off */
 constexpr int8_t PERIMETERBUF[] PROGMEM =

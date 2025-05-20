@@ -74,16 +74,16 @@ static bool any_corner_exposed(Map m, uint8_t x, uint8_t y) {
 
 void gen_type_2(Type2Config *config, Map m, MapPlayer *p) {
   set_filled_map(m, config->tiles);
-  p->posX = 1 + random(m.width - 2); // m.width / 2;
-  p->posY = 1 + random(m.height - 2);
+  p->posX = 1 + RANDB(m.width - 2); // m.width / 2;
+  p->posY = 1 + RANDB(m.height - 2);
   //  start walking through, setting current position to empty, deciding on a
   //  room, then figuring out if you need to change directions.
   uint8_t x = p->posX, y = p->posY;
   for (uint8_t stop = 0; stop < config->stops; stop++) {
     // Pick a place to stop
-    uint8_t sx = 1 + random(m.width - 2);
-    uint8_t sy = 1 + random(m.height - 2);
-    if (random(config->room_unlikely) == 0) {
+    uint8_t sx = 1 + RANDB(m.width - 2);
+    uint8_t sy = 1 + RANDB(m.height - 2);
+    if (RANDB(config->room_unlikely) == 0) {
       // Try to generate a room.
       MRect room = {
           .x = sx,
@@ -99,12 +99,12 @@ void gen_type_2(Type2Config *config, Map m, MapPlayer *p) {
     while (!(sx == x && sy == y)) {
       for (; x != sx; x += mx) {
         MAPT(m, x, y) = TILEEMPTY;
-        if (random(config->turn_unlikely) == 0)
+        if (RANDB(config->turn_unlikely) == 0)
           break;
       }
       for (; y != sy; y += my) {
         MAPT(m, x, y) = TILEEMPTY;
-        if (random(config->turn_unlikely) == 0)
+        if (RANDB(config->turn_unlikely) == 0)
           break;
       }
     }
@@ -117,9 +117,9 @@ void gen_type_2(Type2Config *config, Map m, MapPlayer *p) {
     // }
   }
   // Now, generate the exit along one of the alt walls
-  int8_t ex, ey = 1 + random(m.width - 2);
+  int8_t ex, ey = 1 + RANDB(m.width - 2);
   int8_t emx = 0, emy = 0;
-  switch (random(4)) {
+  switch (RANDB(4)) {
   case 0:
     ex = 0;
     emx = 1;
@@ -164,7 +164,7 @@ ENDTYPE2EXITFIND:;
     for (uint8_t x = 1; x < m.height - 1; x++) {
       uint8_t tile = MAPT(m, x, y);
       for (uint8_t i = 0; i < config->tiles.extras_count; i++) {
-        if (random(config->tiles.extras[i].unlikely) == 0) {
+        if (RANDB(config->tiles.extras[i].unlikely) == 0) {
           switch (config->tiles.extras[i].type) {
           case TILEEXTRATYPE_NORMAL:
             if (tile != TILEEMPTY) {

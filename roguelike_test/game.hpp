@@ -12,6 +12,10 @@ constexpr uint8_t DIRWEST = 3;
 void cardinal_to_dir(uint8_t cardinal, int8_t *dx, int8_t *dy);
 float cardinal_to_rad(uint8_t cardinal);
 
+uint8_t prng();
+
+#define RANDB(x) (prng() % (x))
+
 // A rectangle starting at x, y and having side w, h
 struct MRect {
   uint8_t x, y, w, h;
