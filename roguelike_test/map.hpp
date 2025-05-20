@@ -4,52 +4,36 @@
 
 #include "game.hpp"
 
-// constexpr uint8_t TILEDEFAULT = 1;
-// constexpr uint8_t TILEEXIT = 2;
-
-// Each room element is 4 bytes FYI (Rect)
-constexpr uint8_t ROOMSMAXDEPTH = 10;
-
 #define RANDROOMDIM(config)                                                    \
   (config->room_min + random(1 + config->room_max - config->room_min))
+#define DISTSQRD(x1, y1, x2, y2)                                               \
+  (((x2) - (x1)) * ((x2) - (x1)) + ((y2) - (y1)) * ((y2) - (y1)))
 
 void set_empty_map(Map m);
 bool clear_rect_map(Map m, MRect r);
 
-struct RoomConfig {
-  uint8_t minwidth = 2;       // Each room's minimum dimension must be this.
-  uint8_t doorbuffer = 1;     // Doors not generated this close to edge
-  uint8_t maxwallretries = 3; // This changes the chance of "big" rooms
-  uint8_t ninepool = 9;       // Larger = less likely
-  uint8_t cubiclepool = 5;
-  uint8_t cubiclemaxlength = 4;
-  uint8_t bumppool = 5;
+struct TileExtra {
+  uint8_t tile;
+  uint8_t unlikely;
+  uint8_t type;
 };
 
-// Split rooms into smaller rooms randomly until a minimum is reached. If a room
-// cannot be split but it's of certain dimensions, randomly add "interesting"
-// features to it.
-void genRoomsType(RoomConfig *config, Map m, MapPlayer *p);
+constexpr uint8_t TILEEXTRATYPE_NORMAL = 1;
+constexpr uint8_t TILEEXTRATYPE_NOCORNER = 2;
+constexpr uint8_t TILEEXTRATYPE_PILLAR = 3;
 
-struct Type1Config {
-  // uint8_t startX = ;
-  // uint8_t startY;
-  uint8_t hw_stoppool = 50;
-  uint8_t hw_cdpool = 4;
-  uint8_t overlap = 0;      // 1 = hw overlap, 2 = room overlap, 3 = both ofc
-  uint8_t room_pool = 3;    // Higher = less chance
-  uint8_t room_retries = 3; // Once a spot is picked, how many times to try
-  uint8_t room_min = 2;     // min room size
-  uint8_t room_max = 4;     // max room size
-  uint8_t door_buffer = 0;  // min distance into room for doorway
-};
+constexpr uint8_t TILEEXTRAMAX = 4;
 
-void gen_type_1(Type1Config *config, Map m, MapPlayer *p);
+constexpr int8_t PERIMETERBUF[] PROGMEM = {1, 1, 1, 0, -1, -1, -1, 0};
+constexpr uint8_t PERIMETERYOFS = 6;
+constexpr uint8_t PERIMETERCORNEROFS = 1;
 
 struct TileConfig {
   uint8_t perimeter;
   uint8_t main;
   uint8_t exit;
+  TileExtra extras[TILEEXTRAMAX];
+  uint8_t extras_count;
 };
 
 struct Type2Config {

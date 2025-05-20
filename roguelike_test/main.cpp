@@ -1,13 +1,15 @@
 #include <Arduboy2.h>
 #include <ArduboyTones.h>
 #include <Tinyfont.h>
+#include <avr/pgmspace.h>
 
 // JUST TO SHUTUP CLANGD
 #ifdef __clang__
 #define __uint24 uint32_t
 #endif
 
-// #define FULLMAP
+#define FULLMAP
+#define INSTANTFLOORUP
 
 #include <ArduboyFX.h>
 #include <ArduboyRaycastFX.h>
@@ -28,6 +30,10 @@ ArduboyTones sound(&always_on); // arduboy.audio.enabled);
 Tinyfont tinyfont =
     Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
 
+constexpr uint16_t TINYDIGITS[] PROGMEM = {
+    0xF9F, 0xAF8, 0xDDA, 0x9DF, 0x74F, 0xBDD, 0xFDC, 0x11F, 0xFCF, 0x75F,
+};
+
 constexpr uint8_t NUMINTERNALBYTES = 1;
 constexpr uint8_t NUMSPRITES = 16;
 constexpr uint8_t BOTTOMSIZE = 8;
@@ -36,9 +42,6 @@ constexpr uint8_t MAPX = WIDTH - 18;
 constexpr uint8_t MAPY = 2;
 constexpr uint8_t MAPRANGE = 1;
 constexpr uint8_t MAPFLASH = 8;
-
-constexpr uint16_t TINYDIGITS[] = {0xF9F, 0xAF8, 0xDDA, 0x9DF, 0x74F,
-                                   0xBDD, 0xFDC, 0x11F, 0xFCF, 0x75F};
 
 constexpr float FOV = 1.0f;
 constexpr uint8_t FRAMERATE = 30;
@@ -84,7 +87,7 @@ void render_fximage(uint24_t addr, uint8_t *at, uint8_t width, uint8_t height) {
 // Print tiny digits at given location
 void print_tinydigit(uint8_t v, uint8_t x, uint8_t y) {
   for (uint8_t i = 0; i < 3; i++) {
-    uint8_t dig = (TINYDIGITS[v] >> ((2 - i) * 4)) & 0xF;
+    uint8_t dig = ((pgm_read_word(TINYDIGITS + v)) >> ((2 - i) * 4)) & 0xF;
     arduboy.sBuffer[x + i + (y >> 3) * WIDTH] |= (dig << (y & 7));
   }
 }
@@ -113,13 +116,23 @@ void faze_screen() {
 void gen_mymap() {
   // Dungeon, might be good.
   Type2Config c;
-  c.room_min = 3;
+  // c.room_min = 3;
   // c.room_max = 5;
-  c.stops = 5;
-  c.room_unlikely = 1;
+  // c.stops = 5;
+  // c.room_unlikely = 1;
+  c.room_min = 2;
+  c.stops = 10;
+  c.room_unlikely = 3;
   c.tiles.main = 1;
   c.tiles.perimeter = 7;
   c.tiles.exit = 15;
+  c.tiles.extras_count = 2;
+  c.tiles.extras[0].tile = 2;
+  c.tiles.extras[0].type = TILEEXTRATYPE_NORMAL;
+  c.tiles.extras[0].unlikely = 10;
+  c.tiles.extras[1].tile = 3;
+  c.tiles.extras[1].type = TILEEXTRATYPE_NOCORNER;
+  c.tiles.extras[1].unlikely = 3;
 
   // // Trees, maybe
   // Type2Config c;
@@ -189,8 +202,13 @@ RESTARTSTATE:;
 
   switch (gs.state) {
   case GS_STATEMAIN:
-    // if (arduboy.justPressed(A_BUTTON)) {
-    // }
+#ifdef INSTANTFLOORUP
+    if (arduboy.justPressed(A_BUTTON)) {
+      gs.animframes = 0; // begin animation at 0 (?)
+      gs.state = GS_FLOORTRANSITION;
+      gs.animend = DEFAULTANIMEXITFRAMES;
+    }
+#endif
     gs_draw_map_player(&gs, &arduboy, MAPX, MAPY,
                        arduboy.frameCount & MAPFLASH ? BLACK : WHITE);
     if (gs_move(&gs, &arduboy)) {
