@@ -8,8 +8,8 @@
 #define __uint24 uint32_t
 #endif
 
-#define FULLMAP
-#define INSTANTFLOORUP
+// #define FULLMAP
+// #define INSTANTFLOORUP
 
 #include <ArduboyFX.h>
 #include <ArduboyRaycastFX.h>
