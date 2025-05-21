@@ -10,6 +10,7 @@
 
 // #define FULLMAP
 // #define INSTANTFLOORUP
+// #define PRINTSTAMHEALTH
 
 #include <ArduboyFX.h>
 #include <ArduboyRaycastFX.h>
@@ -34,7 +35,7 @@ constexpr uint16_t TINYDIGITS[] PROGMEM = {
     0xF9F, 0xAF8, 0xDDA, 0x9DF, 0x74F, 0xBDD, 0xFDC, 0x11F, 0xFDF, 0x75F,
 };
 
-constexpr uint8_t NUMINTERNALBYTES = 1;
+constexpr uint8_t NUMINTERNALBYTES = 4;
 constexpr uint8_t NUMSPRITES = 16;
 constexpr uint8_t BOTTOMSIZE = 8;
 constexpr uint8_t SIDESIZE = 32;
@@ -64,6 +65,9 @@ RcContainer<NUMSPRITES, NUMINTERNALBYTES, WIDTH - SIDESIZE, HEIGHT - BOTTOMSIZE>
 
 GameState gs;
 
+// Update animation rotation/position based on given delta between current
+// position and new player position. Will NOT be extended to enemies, since
+// they don't have rotation and their position is different
 void update_visual_position(float delta) {
   raycast.player.posX = 0.5f + ((float)gs.player.posX * (1 - delta) +
                                 (float)gs.next_player.posX * delta);
@@ -106,71 +110,42 @@ void print_tinynumber(uint16_t v, uint8_t w, uint8_t x, uint8_t y) {
   }
 }
 
-// uint8_t lcg8(uint8_t x) { return (0x41 * x + 0x1F); }
-// uint8_t prng() {
-//   // Seed this 8bit manually
-//   static uint8_t s = 0xAA, a = 0;
-//   s ^= s << 3;
-//   s ^= s >> 5;
-//   s ^= a++ >> 2;
-//   return s;
-// }
-
 void faze_screen() {
   for (uint16_t i = 0; i < 1024; i++) {
-    // if (lcg8(arduboy.frameCount + lcg8(i)) & 1)
     arduboy.sBuffer[i] <<= prng() & 3;
-    // if (prng() & 1)
-    //   arduboy.sBuffer[i] <<= 2;
-    // else
-    //   arduboy.sBuffer[i] >>= 2;
   }
 }
 
-void gen_mymap() {
-  // Dungeon, might be good.
+void gen_region(uint8_t region) {
   Type2Config c;
-  // c.room_min = 3;
-  // c.room_max = 5;
-  // c.stops = 5;
-  // c.room_unlikely = 1;
-  c.room_min = 2;
-  c.stops = 10;
-  c.room_unlikely = 3;
-  c.tiles.main = 1;
-  c.tiles.perimeter = 7;
-  c.tiles.exit = 15;
-  c.tiles.extras_count = 2;
-  c.tiles.extras[0].tile = 2;
-  c.tiles.extras[0].type = TILEEXTRATYPE_NORMAL;
-  c.tiles.extras[0].unlikely = 10;
-  c.tiles.extras[1].tile = 3;
-  c.tiles.extras[1].type = TILEEXTRATYPE_NOCORNER;
-  c.tiles.extras[1].unlikely = 2;
+  // For now, these are constants (but may change per region)
+  raycast.render.setLightIntensity(1.5); // 2.0
+  raycast.render.spriteShading = RcShadingType::Black;
+  switch (region) {
+  case 1:
+  default:
+    c.room_min = 2;
+    c.stops = 10;
+    c.room_unlikely = 3;
+    c.tiles.main = 1;
+    c.tiles.perimeter = 7;
+    c.tiles.exit = 15;
+    c.tiles.extras_count = 2;
+    c.tiles.extras[0].tile = 2;
+    c.tiles.extras[0].type = TILEEXTRATYPE_NORMAL;
+    c.tiles.extras[0].unlikely = 10;
+    c.tiles.extras[1].tile = 3;
+    c.tiles.extras[1].type = TILEEXTRATYPE_NOCORNER;
+    c.tiles.extras[1].unlikely = 2;
+    gen_type_2(&c, gs.map, &gs.player);
+    break;
+  }
+}
 
-  // // Trees, maybe
-  // Type2Config c;
-  // c.room_min = 2;
-  // c.room_max = 3;
-  // c.stops = 15;
-  // c.room_unlikely = 3;
-  gen_type_2(&c, gs.map, &gs.player);
-  gs.next_player = gs.player;
-  gs.total_floor++;
-  gs.region_floor++;
-  update_visual_position(0);
+void refresh_screen_full() {
   render_fximage(menu, arduboy.sBuffer, WIDTH, HEIGHT);
   print_tinydigit(gs.region, 113, 20);
   print_tinynumber(gs.region_floor, 2, 120, 20);
-  // print_tinydigit(gs.region_floor / 10, 120, 20);
-  // print_tinydigit(gs.region_floor % 10, 124, 20);
-  // tinyfont.setCursor(113, 20);
-  // tinyfont.print(gs.region);
-  //  tinyfont.setCursor(120, 20);
-  //  if (gs.region_floor < 10) {
-  //    tinyfont.print(0);
-  //  }
-  //  tinyfont.print(gs.region_floor);
 #ifdef FULLMAP
   gs_draw_map(&gs, &arduboy, MAPX, MAPY);
 #else
@@ -178,13 +153,38 @@ void gen_mymap() {
 #endif
 }
 
-// void rcd() {
-//   // Draw the correct background for the area.
-//   render_fximage(bg, arduboy.sBuffer, raycast.render.VIEWWIDTH,
-//                  raycast.render.VIEWHEIGHT);
-//   raycast.runIteration(&arduboy);
+void goto_next_floor() {
+  gen_region(gs.region);
+  gs.next_player = gs.player;
+  gs.total_floor++;
+  gs.region_floor++;
+  update_visual_position(0);
+}
+
+void initiate_floor_transition() {
+  gs.animframes = 0; // begin animation at 0 (?)
+  gs.state = GS_FLOORTRANSITION;
+  gs.animend = DEFAULTANIMEXITFRAMES;
+}
+
+// void gen_mymap() {
+//   // Dungeon, might be good.
+//   //Type2Config c;
+//   // c.room_min = 3;
+//   // c.room_max = 5;
+//   // c.stops = 5;
+//   // c.room_unlikely = 1;
+//
+//   // // Trees, maybe
+//   // Type2Config c;
+//   // c.room_min = 2;
+//   // c.room_max = 3;
+//   // c.stops = 15;
+//   // c.room_unlikely = 3;
 // }
 
+// ASSUMING THE TEXT AREA DECORATION IS KNOWN, this will very VERY quickly clear
+// JUST the text area fully. It's very fast and very little code...
 void clear_textarea() {
   memset(arduboy.sBuffer + (WIDTH * ((HEIGHT >> 3) - 1)), 1, WIDTH);
 }
@@ -210,6 +210,18 @@ void draw_std_bar(uint8_t x, uint8_t filled, uint8_t max) {
   }
 }
 
+void draw_runtime_data() {
+  draw_std_bar(HEALTHBARX, gs.health, BASESTAMHEALTH);
+  draw_std_bar(STAMINABARX, gs.stamina, BASESTAMHEALTH);
+#ifdef PRINTSTAMHEALTH
+  clear_textarea();
+  print_tinynumber(gs.health, 3, 0, HEIGHT - 5);
+  print_tinynumber(gs.stamina, 3, 16, HEIGHT - 5);
+#endif
+  gs_draw_map_player(&gs, &arduboy, MAPX, MAPY,
+                     arduboy.frameCount & MAPFLASH ? BLACK : WHITE);
+}
+
 void runAction() { gs_tickstamina(&gs); }
 
 void resetGame() {
@@ -233,11 +245,12 @@ void setup() {
   FX_INIT();
   // NOTE: second value FOV
   // raycast.player.initPlayerDirection(0, 1.0); // 0.75);
-  raycast.render.setLightIntensity(1.5); // 2.0
   raycast.render.spritescaling[2] = 0.75;
-  raycast.render.spriteShading = RcShadingType::Black;
   resetGame();
-  gen_mymap();
+  initiate_floor_transition();
+  // goto_next_floor();
+  // refresh_screen_full();
+  // gen_mymap();
 }
 
 void loop() {
@@ -253,29 +266,20 @@ RESTARTSTATE:;
   case GS_STATEMAIN:
 #ifdef INSTANTFLOORUP
     if (arduboy.justPressed(A_BUTTON)) {
-      gs.animframes = 0; // begin animation at 0 (?)
-      gs.state = GS_FLOORTRANSITION;
-      gs.animend = DEFAULTANIMEXITFRAMES;
+      initiate_floor_transition();
     }
 #endif
-    draw_std_bar(HEALTHBARX, gs.health, BASESTAMHEALTH);
-    draw_std_bar(STAMINABARX, gs.stamina, BASESTAMHEALTH);
-    clear_textarea();
-    print_tinynumber(gs.health, 3, 0, HEIGHT - 5);
-    print_tinynumber(gs.stamina, 3, 16, HEIGHT - 5);
-    gs_draw_map_player(&gs, &arduboy, MAPX, MAPY,
-                       arduboy.frameCount & MAPFLASH ? BLACK : WHITE);
+    draw_runtime_data();
     movement = gs_move(&gs, &arduboy);
     if (movement) {
       // Run sim here? Some kind of "action"?
       if (movement & (GS_MOVEBACKWARD | GS_MOVEFORWARD)) {
         runAction();
       }
-      gs.animframes = 0; // begin animation at 0 (?)
       if (gs_exiting(&gs)) {
-        gs.state = GS_FLOORTRANSITION;
-        gs.animend = DEFAULTANIMEXITFRAMES;
+        initiate_floor_transition();
       } else {
+        gs.animframes = 0; // begin animation at 0 (?)
         gs.state = GS_STATEANIMATE;
         gs.animend = DEFAULTANIMFRAMES;
       }
@@ -296,7 +300,8 @@ RESTARTSTATE:;
     gs.animframes++;
     if (gs.animframes >= gs.animend) {
       gs.state = GS_STATEMAIN;
-      gen_mymap();
+      goto_next_floor();
+      refresh_screen_full();
       sound.tone(300, 30);
     }
     goto SKIPRCRENDER;
