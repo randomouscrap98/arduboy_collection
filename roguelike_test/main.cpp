@@ -31,7 +31,7 @@ Tinyfont tinyfont =
     Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
 
 constexpr uint16_t TINYDIGITS[] PROGMEM = {
-    0xF9F, 0xAF8, 0xDDA, 0x9DF, 0x74F, 0xBDD, 0xFDC, 0x11F, 0xFCF, 0x75F,
+    0xF9F, 0xAF8, 0xDDA, 0x9DF, 0x74F, 0xBDD, 0xFDC, 0x11F, 0xFDF, 0x75F,
 };
 
 constexpr uint8_t NUMINTERNALBYTES = 1;
@@ -42,6 +42,12 @@ constexpr uint8_t MAPX = WIDTH - 18;
 constexpr uint8_t MAPY = 2;
 constexpr uint8_t MAPRANGE = 1;
 constexpr uint8_t MAPFLASH = 8;
+constexpr uint8_t BARWIDTH = 2;
+constexpr uint8_t BARHEIGHT = 16;
+constexpr uint8_t BARTOP = 2;
+constexpr uint8_t HEALTHBARX = 99;
+constexpr uint8_t STAMINABARX = 104;
+constexpr uint8_t BASESTAMHEALTH = 255;
 
 constexpr float FOV = 1.0f;
 constexpr uint8_t FRAMERATE = 30;
@@ -89,6 +95,14 @@ void print_tinydigit(uint8_t v, uint8_t x, uint8_t y) {
   for (uint8_t i = 0; i < 3; i++) {
     uint8_t dig = ((pgm_read_word(TINYDIGITS + v)) >> ((2 - i) * 4)) & 0xF;
     arduboy.sBuffer[x + i + (y >> 3) * WIDTH] |= (dig << (y & 7));
+  }
+}
+
+// Print a number to the given amount of digits
+void print_tinynumber(uint16_t v, uint8_t w, uint8_t x, uint8_t y) {
+  for (uint8_t i = 0; i < w; i++) {
+    print_tinydigit(v % 10, x + 4 * (w - i - 1), y);
+    v /= 10;
   }
 }
 
@@ -147,8 +161,9 @@ void gen_mymap() {
   update_visual_position(0);
   render_fximage(menu, arduboy.sBuffer, WIDTH, HEIGHT);
   print_tinydigit(gs.region, 113, 20);
-  print_tinydigit(gs.region_floor / 10, 120, 20);
-  print_tinydigit(gs.region_floor % 10, 124, 20);
+  print_tinynumber(gs.region_floor, 2, 120, 20);
+  // print_tinydigit(gs.region_floor / 10, 120, 20);
+  // print_tinydigit(gs.region_floor % 10, 124, 20);
   // tinyfont.setCursor(113, 20);
   // tinyfont.print(gs.region);
   //  tinyfont.setCursor(120, 20);
@@ -170,6 +185,46 @@ void gen_mymap() {
 //   raycast.runIteration(&arduboy);
 // }
 
+void clear_textarea() {
+  memset(arduboy.sBuffer + (WIDTH * ((HEIGHT >> 3) - 1)), 1, WIDTH);
+}
+
+// Draw a standard 2x16 bar at given x, y chosen by default
+void draw_std_bar(uint8_t x, uint8_t filled, uint8_t max) {
+  // uint8_t bs = 256 / a.h; // let's hope this is SOMETHING...
+  // uint8_t fh = filled / bs + 1 - a.h;
+  // for (uint8_t y = 0; y < a.h; y++) {
+  //   uint8_t col = y < fh ? BLACK : WHITE;
+  //   for (uint8_t x = 0; x < a.w; x++) {
+  //     arduboy.drawPixel(a.x + x, a.y + y, col);
+  //   }
+  // }
+  // uint8_t bs = 256 / a.h; // let's hope this is SOMETHING...
+  float ffilled = BARHEIGHT * (float)filled / (float)max;
+  uint8_t fh = BARHEIGHT - round(ffilled);
+  // BARHEIGHT - filled / (256 / BARHEIGHT);
+  for (uint8_t y = 0; y < BARHEIGHT; y++) {
+    uint8_t col = y < fh ? BLACK : WHITE;
+    arduboy.drawPixel(x, BARTOP + y, col);
+    arduboy.drawPixel(x + 1, BARTOP + y, col);
+  }
+}
+
+void runAction() { gs_tickstamina(&gs); }
+
+void resetGame() {
+  gs.map.width = RCMAXMAPDIMENSION;
+  gs.map.height = RCMAXMAPDIMENSION;
+  gs.map.map = raycast.worldMap.map;
+  gs.state = GS_STATEMAIN;
+  gs.animend = DEFAULTANIMFRAMES;
+  gs.region = 1;
+  gs.region_floor = 0;
+  gs.total_floor = 0;
+  gs.stamina = BASESTAMHEALTH;
+  gs.health = BASESTAMHEALTH;
+}
+
 void setup() {
   arduboy.boot();
   arduboy.flashlight();
@@ -181,14 +236,7 @@ void setup() {
   raycast.render.setLightIntensity(1.5); // 2.0
   raycast.render.spritescaling[2] = 0.75;
   raycast.render.spriteShading = RcShadingType::Black;
-  gs.map.width = RCMAXMAPDIMENSION;
-  gs.map.height = RCMAXMAPDIMENSION;
-  gs.map.map = raycast.worldMap.map;
-  gs.state = GS_STATEMAIN;
-  gs.animend = DEFAULTANIMFRAMES;
-  gs.region = 1;
-  gs.region_floor = 0;
-  gs.total_floor = 0;
+  resetGame();
   gen_mymap();
 }
 
@@ -198,6 +246,7 @@ void loop() {
   }
   arduboy.pollButtons();
 
+  uint8_t movement;
 RESTARTSTATE:;
 
   switch (gs.state) {
@@ -209,9 +258,19 @@ RESTARTSTATE:;
       gs.animend = DEFAULTANIMEXITFRAMES;
     }
 #endif
+    draw_std_bar(HEALTHBARX, gs.health, BASESTAMHEALTH);
+    draw_std_bar(STAMINABARX, gs.stamina, BASESTAMHEALTH);
+    clear_textarea();
+    print_tinynumber(gs.health, 3, 0, HEIGHT - 5);
+    print_tinynumber(gs.stamina, 3, 16, HEIGHT - 5);
     gs_draw_map_player(&gs, &arduboy, MAPX, MAPY,
                        arduboy.frameCount & MAPFLASH ? BLACK : WHITE);
-    if (gs_move(&gs, &arduboy)) {
+    movement = gs_move(&gs, &arduboy);
+    if (movement) {
+      // Run sim here? Some kind of "action"?
+      if (movement & (GS_MOVEBACKWARD | GS_MOVEFORWARD)) {
+        runAction();
+      }
       gs.animframes = 0; // begin animation at 0 (?)
       if (gs_exiting(&gs)) {
         gs.state = GS_FLOORTRANSITION;
@@ -245,6 +304,10 @@ RESTARTSTATE:;
   }
 
   // Draw the correct background for the area.
+  // draw_v_bar({.x = 99, .y = 2, .w = 2, .h = 16}, gs.health);
+  // draw_v_bar({.x = 104, .y = 2, .w = 2, .h = 16}, gs.stamina);
+  //  draw_v_bar({.x = 108, .y = 2, .w = 2, .h = 16}, gs.stamina);
+  //  draw_v_bar({.x = 110, .y = 2, .w = 2, .h = 16}, gs.stamina);
   render_fximage(bg, arduboy.sBuffer, raycast.render.VIEWWIDTH,
                  raycast.render.VIEWHEIGHT);
   raycast.runIteration(&arduboy);

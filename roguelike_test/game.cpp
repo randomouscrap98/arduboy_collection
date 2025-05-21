@@ -108,6 +108,7 @@ uint8_t get_player_bestdir(MapPlayer *p, Map m) {
 //   return move;
 // }
 
+// Run movement, setting "next player"
 uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy) {
 
   uint8_t move = 0; // gs->buffered_input;
@@ -147,6 +148,18 @@ uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy) {
   }
 
   return move;
+}
+
+void gs_tickstamina(GameState *gs) {
+  if (gs->stamina) {
+    gs->stamina--;
+    if (gs->stamina && gs->health < 255) {
+      gs->stamina--;
+      gs->health++;
+    }
+  } else if (gs->health) {
+    gs->health--;
+  }
 }
 
 bool gs_exiting(GameState *gs) {

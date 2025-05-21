@@ -49,6 +49,8 @@ struct GameState {
   uint8_t region;
   uint8_t region_floor;
   uint8_t total_floor;
+  uint8_t stamina;
+  uint8_t health;
   // uint8_t buffered_input; // What it says
 };
 
@@ -64,6 +66,9 @@ constexpr uint8_t GS_FLOORTRANSITION = 3;
 // Attempt certain movement, returning which action was performed. The changes
 // are applied immediately to the state.
 uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy);
+
+// Drain stamina, heal health or hurt it.
+void gs_tickstamina(GameState *gs);
 
 bool gs_exiting(GameState *gs);
 
