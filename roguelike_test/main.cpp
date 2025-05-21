@@ -1,7 +1,12 @@
+// TODO: in main menu, add arduboy.exitToBootloader() option
+
 #include <Arduboy2.h>
 #include <ArduboyTones.h>
 #include <Tinyfont.h>
 #include <avr/pgmspace.h>
+
+// This saves ~2700 pgm and 110 ram, will need exitToBootloader in menu
+// ARDUBOY_NO_USB
 
 // JUST TO SHUTUP CLANGD
 #ifdef __clang__
@@ -23,7 +28,7 @@
 // #include "bg_full.h"
 #include "fxdata/fxdata.h"
 
-Arduboy2 arduboy;
+Arduboy2Base arduboy;
 bool always_on() { return true; }
 
 ArduboyTones sound(&always_on); // arduboy.audio.enabled);
@@ -142,6 +147,8 @@ void gen_region(uint8_t region) {
   }
 }
 
+// Refresh the full menu background, the region digits, and the local map
+// around the player.
 void refresh_screen_full() {
   render_fximage(menu, arduboy.sBuffer, WIDTH, HEIGHT);
   print_tinydigit(gs.region, 113, 20);
@@ -224,6 +231,7 @@ void draw_runtime_data() {
 
 void runAction() { gs_tickstamina(&gs); }
 
+// Reset the gamestate to all defaults, ready for a new game.
 void resetGame() {
   gs.map.width = RCMAXMAPDIMENSION;
   gs.map.height = RCMAXMAPDIMENSION;
@@ -239,7 +247,7 @@ void resetGame() {
 
 void setup() {
   arduboy.boot();
-  arduboy.flashlight();
+  arduboy.flashlight(); // or safeMode(); for an extra 24 bytes wooo
   arduboy.setFrameRate(FRAMERATE);
   // arduboy.initRandomSeed();
   FX_INIT();
@@ -248,9 +256,6 @@ void setup() {
   raycast.render.spritescaling[2] = 0.75;
   resetGame();
   initiate_floor_transition();
-  // goto_next_floor();
-  // refresh_screen_full();
-  // gen_mymap();
 }
 
 void loop() {
@@ -293,6 +298,7 @@ RESTARTSTATE:;
       gs.state = GS_STATEMAIN;
       gs.player = gs.next_player;
       gs_draw_map_near(&gs, &arduboy, MAPX, MAPY, MAPRANGE);
+      // arduboy.exitToBootloader();
     }
     break;
   case GS_FLOORTRANSITION:
@@ -309,10 +315,6 @@ RESTARTSTATE:;
   }
 
   // Draw the correct background for the area.
-  // draw_v_bar({.x = 99, .y = 2, .w = 2, .h = 16}, gs.health);
-  // draw_v_bar({.x = 104, .y = 2, .w = 2, .h = 16}, gs.stamina);
-  //  draw_v_bar({.x = 108, .y = 2, .w = 2, .h = 16}, gs.stamina);
-  //  draw_v_bar({.x = 110, .y = 2, .w = 2, .h = 16}, gs.stamina);
   render_fximage(bg, arduboy.sBuffer, raycast.render.VIEWWIDTH,
                  raycast.render.VIEWHEIGHT);
   raycast.runIteration(&arduboy);
