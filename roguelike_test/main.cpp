@@ -13,8 +13,8 @@
 #define __uint24 uint32_t
 #endif
 
-// #define FULLMAP
-// #define INSTANTFLOORUP
+#define FULLMAP
+#define INSTANTFLOORUP
 // #define PRINTSTAMHEALTH
 
 #include <ArduboyFX.h>
@@ -135,13 +135,16 @@ void gen_region(uint8_t region) {
     c.tiles.main = 1;
     c.tiles.perimeter = 7;
     c.tiles.exit = 15;
-    c.tiles.extras_count = 2;
+    c.tiles.extras_count = 3;
     c.tiles.extras[0].tile = 2;
     c.tiles.extras[0].type = TILEEXTRATYPE_NORMAL;
     c.tiles.extras[0].unlikely = 10;
     c.tiles.extras[1].tile = 3;
     c.tiles.extras[1].type = TILEEXTRATYPE_NOCORNER;
     c.tiles.extras[1].unlikely = 2;
+    c.tiles.extras[2].tile = 4;
+    c.tiles.extras[2].type = TILEEXTRATYPE_PILLAR;
+    c.tiles.extras[2].unlikely = 20;
     gen_type_2(&c, gs.map, &gs.player);
     break;
   }

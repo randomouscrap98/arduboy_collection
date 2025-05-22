@@ -72,6 +72,18 @@ static bool any_corner_exposed(Map m, uint8_t x, uint8_t y) {
   return false;
 }
 
+static bool block_empty(Map m, uint8_t x, uint8_t y) {
+  if (x < 1 || y < 1 || x >= m.width - 1 || y >= m.height - 1)
+    return false;
+  for (int8_t yi = -1; yi <= 1; yi++) {
+    for (int8_t xi = -1; xi <= 1; xi++) {
+      if (MAPT(m, x + xi, y + yi) != TILEEMPTY)
+        return false;
+    }
+  }
+  return true;
+}
+
 void gen_type_2(Type2Config *config, Map m, MapPlayer *p) {
   set_filled_map(m, config->tiles);
   p->posX = 1 + RANDB(m.width - 2); // m.width / 2;
@@ -162,6 +174,10 @@ ENDTYPE2EXITFIND:;
   // Scan over the whole map, doing a bunch of extra "fluff".
   for (uint8_t y = 1; y < m.height - 1; y++) {
     for (uint8_t x = 1; x < m.height - 1; x++) {
+      // Don't do ANYTHING in the player area
+      if (x == p->posX && y == p->posY) {
+        continue;
+      }
       uint8_t tile = MAPT(m, x, y);
       for (uint8_t i = 0; i < config->tiles.extras_count; i++) {
         if (RANDB(config->tiles.extras[i].unlikely) == 0) {
@@ -176,6 +192,10 @@ ENDTYPE2EXITFIND:;
               MAPT(m, x, y) = config->tiles.extras[i].tile;
             }
             break;
+          case TILEEXTRATYPE_PILLAR:
+            if (block_empty(m, x, y)) {
+              MAPT(m, x, y) = config->tiles.extras[i].tile;
+            }
           }
         }
       }
