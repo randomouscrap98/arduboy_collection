@@ -36,6 +36,8 @@ ArduboyTones sound(&always_on); // arduboy.audio.enabled);
 Tinyfont tinyfont =
     Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
 
+prng16_state rngstate;
+
 constexpr uint16_t TINYDIGITS[] PROGMEM = {
     0xF9F, 0xAF8, 0xDDA, 0x9DF, 0x74F, 0xBDD, 0xFDC, 0x11F, 0xFDF, 0x75F,
 };
@@ -123,6 +125,7 @@ void faze_screen() {
 
 void gen_region(uint8_t region) {
   Type2Config c;
+  c.state = &rngstate;
   // For now, these are constants (but may change per region)
   raycast.render.setLightIntensity(1.5); // 2.0
   raycast.render.spriteShading = RcShadingType::Black;
@@ -141,7 +144,7 @@ void gen_region(uint8_t region) {
     c.tiles.extras[0].unlikely = 10;
     c.tiles.extras[1].tile = 3;
     c.tiles.extras[1].type = TILEEXTRATYPE_NOCORNER;
-    c.tiles.extras[1].unlikely = 2;
+    c.tiles.extras[1].unlikely = 2; // It's fun to have a lot of these?
     c.tiles.extras[2].tile = 4;
     c.tiles.extras[2].type = TILEEXTRATYPE_PILLAR;
     c.tiles.extras[2].unlikely = 20;
@@ -236,6 +239,8 @@ void runAction() { gs_tickstamina(&gs); }
 
 // Reset the gamestate to all defaults, ready for a new game.
 void resetGame() {
+  // TODO: will need to pull from save
+  prng16_init(&rngstate, 1);
   gs.map.width = RCMAXMAPDIMENSION;
   gs.map.height = RCMAXMAPDIMENSION;
   gs.map.map = raycast.worldMap.map;

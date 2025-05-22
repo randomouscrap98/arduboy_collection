@@ -4,8 +4,8 @@
 
 #include "game.hpp"
 
-#define RANDROOMDIM(config)                                                    \
-  (config->room_min + random(1 + config->room_max - config->room_min))
+// #define RANDROOMDIM(config)                                                    \
+//   (config->room_min + random(1 + config->room_max - config->room_min))
 #define DISTSQRD(x1, y1, x2, y2)                                               \
   (((x2) - (x1)) * ((x2) - (x1)) + ((y2) - (y1)) * ((y2) - (y1)))
 
@@ -51,6 +51,7 @@ struct TileConfig {
 };
 
 struct Type2Config {
+  prng16_state *state;
   uint8_t stops = 10;
   // uint8_t turn_unlikely = 3;
   uint8_t room_unlikely = 6; // How unlikely a room is to spawn at a stop.

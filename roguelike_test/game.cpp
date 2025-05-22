@@ -64,6 +64,22 @@ uint8_t prng() { // jsf8, see https://filterpaper.github.io/prng.html#jsf8
   return d = e + a;
 }
 
+void prng16_init(prng16_state *x, uint16_t seed) {
+  x->a = 0x5eed;
+  x->b = x->c = x->d = seed;
+}
+
+#define rot16(x, k) (((x) << (k)) | ((x) >> (16 - (k))))
+// jsf16, see https://filterpaper.github.io/prng.html#jsf16
+uint16_t prng16(prng16_state *x) {
+  uint16_t e = x->a - rot16(x->b, 13);
+  x->a = x->b ^ rot16(x->c, 8);
+  x->b = x->c + x->d;
+  x->c = x->d + e;
+  x->d = e + x->a;
+  return x->d;
+}
+
 uint8_t get_player_bestdir(MapPlayer *p, Map m) {
   // uint8_t thi[4] = {0};
   uint8_t max_count = 0;
