@@ -51,7 +51,7 @@ struct TileConfig {
 };
 
 struct Type2Config {
-  prng16_state *state;
+  // prng16_state *state;
   uint8_t stops = 10;
   // uint8_t turn_unlikely = 3;
   uint8_t room_unlikely = 6; // How unlikely a room is to spawn at a stop.

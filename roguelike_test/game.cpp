@@ -52,33 +52,46 @@ float cardinal_to_rad(uint8_t cardinal) {
 //   return a = z ^ (z >> 1) ^ t ^ (t << 3);
 // }
 
+struct prng_state __prng_state = {.a = 0xfa, .b = 0xee, .c = 0xee, .d = 0xee};
+
 #define rot8(x, k) (((x) << (k)) | ((x) >> (8 - (k))))
 uint8_t prng() { // jsf8, see https://filterpaper.github.io/prng.html#jsf8
-  static uint8_t a = 0xf1;
-  static uint8_t b = 0xee, c = 0xee, d = 0xee;
-
-  uint8_t e = a - rot8(b, 1);
-  a = b ^ rot8(c, 4);
-  b = c + d;
-  c = d + e;
-  return d = e + a;
+  uint8_t e = __prng_state.a - rot8(__prng_state.b, 1);
+  __prng_state.a = __prng_state.b ^ rot8(__prng_state.c, 4);
+  __prng_state.b = __prng_state.c + __prng_state.d;
+  __prng_state.c = __prng_state.d + e;
+  return __prng_state.d = e + __prng_state.a;
 }
 
-void prng16_init(prng16_state *x, uint16_t seed) {
-  x->a = 0x5eed;
-  x->b = x->c = x->d = seed;
+void prng_seed(uint16_t seed) {
+  __prng_state.a = 0xf1; // From https://filterpaper.github.io/prng.html#jsf8
+  __prng_state.b = 0xee;
+  // Just a handful of seeds out of 65,536 are bad (luckily)
+  if (seed == 6332 || seed == 18002 || seed == 19503)
+    __prng_state.b = 0xef;
+  __prng_state.c = (seed >> 8) & 0xff;
+  __prng_state.d = seed & 0xff;
 }
 
-#define rot16(x, k) (((x) << (k)) | ((x) >> (16 - (k))))
-// jsf16, see https://filterpaper.github.io/prng.html#jsf16
-uint16_t prng16(prng16_state *x) {
-  uint16_t e = x->a - rot16(x->b, 13);
-  x->a = x->b ^ rot16(x->c, 8);
-  x->b = x->c + x->d;
-  x->c = x->d + e;
-  x->d = e + x->a;
-  return x->d;
-}
+// Copies internal __prng_state (4 bytes only, luckily)
+prng_state prng_snapshot() { return __prng_state; }
+void prng_restore(prng_state state) { __prng_state = state; }
+
+// void prng16_init(prng16_state *x, uint16_t seed) {
+//   x->a = 0x5eed;
+//   x->b = x->c = x->d = seed;
+// }
+//
+// #define rot16(x, k) (((x) << (k)) | ((x) >> (16 - (k))))
+// // jsf16, see https://filterpaper.github.io/prng.html#jsf16
+// uint16_t prng16(prng16_state *x) {
+//   uint16_t e = x->a - rot16(x->b, 13);
+//   x->a = x->b ^ rot16(x->c, 8);
+//   x->b = x->c + x->d;
+//   x->c = x->d + e;
+//   x->d = e + x->a;
+//   return x->d;
+// }
 
 uint8_t get_player_bestdir(MapPlayer *p, Map m) {
   // uint8_t thi[4] = {0};

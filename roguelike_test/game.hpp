@@ -12,13 +12,21 @@ constexpr uint8_t DIRWEST = 3;
 void cardinal_to_dir(uint8_t cardinal, int8_t *dx, int8_t *dy);
 float cardinal_to_rad(uint8_t cardinal);
 
-struct prng16_state {
-  uint16_t a, b, c, d;
+// struct prng16_state {
+//   uint16_t a, b, c, d;
+// };
+
+struct prng_state {
+  uint8_t a, b, c, d;
 };
 
 uint8_t prng();
-uint16_t prng16(prng16_state *s);
-void prng16_init(prng16_state *x, uint16_t seed);
+void prng_seed(uint16_t seed);
+prng_state prng_snapshot();
+void prng_restore(prng_state state);
+
+// uint16_t prng16(prng16_state *s);
+// void prng16_init(prng16_state *x, uint16_t seed);
 
 #define RANDB(x) (prng() % (x))
 
