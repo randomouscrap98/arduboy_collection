@@ -160,16 +160,19 @@ uint16_t menu_animation() {
   // Load each row from the image, offset each one until they match the bytes
   // on screen.
   uint16_t pending = 0;
-  uint8_t row[WIDTH]; // We SHOULD have enough stack for this...
+  // uint8_t row[WIDTH]; // We SHOULD have enough stack for this...
   for (uint8_t y = 0; y < HEIGHT >> 3; y++) {
     // for (uint8_t y = 0; y < HEIGHT; y++) {
-    FX::readDataBytes(titleimg + 4 + y * WIDTH, row, WIDTH);
+    // FX::readDataBytes(titleimg + 4 + y * WIDTH, row, WIDTH);
     for (uint8_t x = 0; x < WIDTH; x++) {
       uint16_t pos = x + y * WIDTH;
-      if (arduboy.sBuffer[pos] == row[x])
+      uint8_t b;
+      FX::readDataBytes(titleimg + 4 + pos, &b, 1);
+      if (arduboy.sBuffer[pos] == b) // row[x])
         continue;
       // arduboy.sBuffer[pos] = row[x]; // << (prng() & 7);
-      arduboy.sBuffer[pos] = row[x] << (prng() & 7);
+      // arduboy.sBuffer[pos] = row[x] << (prng() & 7);
+      arduboy.sBuffer[pos] = b << (prng() & 7);
       pending++;
     }
   }
@@ -329,6 +332,7 @@ void setup() {
   gs.map.map = raycast.worldMap.map;
   gs.animend = DEFAULTANIMFRAMES;
   gs.state = GS_STATEMENUANIM;
+  // begin_game();
 }
 
 void loop() {
