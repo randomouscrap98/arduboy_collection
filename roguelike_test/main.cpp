@@ -1,5 +1,6 @@
 // TODO: in main menu, add arduboy.exitToBootloader() option
 
+#include "Arduboy2Core.h"
 #include <Arduboy2.h>
 #include <ArduboyTones.h>
 #include <Tinyfont.h>
@@ -25,13 +26,13 @@
 #include "map.hpp"
 
 // Resources
-// #include "bg_full.h"
 #include "fxdata/fxdata.h"
 
 Arduboy2Base arduboy;
-bool always_on() { return true; }
+// bool always_on() { return true; }
 
-ArduboyTones sound(&always_on); // arduboy.audio.enabled);
+ArduboyTones
+    sound(arduboy.audio.enabled); //&always_on); // arduboy.audio.enabled);
 // RoomConfig config;
 Tinyfont tinyfont =
     Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
@@ -71,6 +72,28 @@ RcContainer<NUMSPRITES, NUMINTERNALBYTES, WIDTH - SIDESIZE, HEIGHT - BOTTOMSIZE>
     raycast(tilesheet, NULL, NULL); // spritesheet, spritesheetMask);
 
 GameState gs;
+
+void initiate_floor_transition() {
+  gs.animframes = 0; // begin animation at 0 (?)
+  gs.state = GS_FLOORTRANSITION;
+  gs.animend = DEFAULTANIMEXITFRAMES;
+}
+
+void begin_game() {
+  gs.region = 1;
+  gs.region_floor = 0;
+  gs.total_floor = 0;
+  gs.stamina = BASESTAMHEALTH;
+  gs.health = BASESTAMHEALTH;
+  gs.menu_pos = 0;
+  // TODO: will need to generate a player seed based on what... frame count(?)
+  // and have iteration be their current run count. Will generate save and
+  // update values on new game, so the frame count is a bit more random.
+  // Iteration will start at 0, then increment by 1 on NEW GAME so people can't
+  // save scum(?)
+  prng_seed(lcg_shuffle(0, 0)); // change this later
+  initiate_floor_transition();
+}
 
 // Update animation rotation/position based on given delta between current
 // position and new player position. Will NOT be extended to enemies, since
@@ -123,6 +146,67 @@ void faze_screen() {
   }
 }
 
+void clear_full_rect(MRect r) {
+  r.y >>= 3;
+  r.h >>= 3;
+  for (uint8_t y = 0; y < r.h; y++) {
+    for (uint8_t x = 0; x < r.w; x++) {
+      arduboy.sBuffer[x + r.x + (y + r.y) * WIDTH] = 0;
+    }
+  }
+}
+
+uint16_t menu_animation() {
+  // Load each row from the image, offset each one until they match the bytes
+  // on screen.
+  uint16_t pending = 0;
+  uint8_t row[WIDTH]; // We SHOULD have enough stack for this...
+  for (uint8_t y = 0; y < HEIGHT >> 3; y++) {
+    // for (uint8_t y = 0; y < HEIGHT; y++) {
+    FX::readDataBytes(titleimg + 4 + y * WIDTH, row, WIDTH);
+    for (uint8_t x = 0; x < WIDTH; x++) {
+      uint16_t pos = x + y * WIDTH;
+      if (arduboy.sBuffer[pos] == row[x])
+        continue;
+      // arduboy.sBuffer[pos] = row[x]; // << (prng() & 7);
+      arduboy.sBuffer[pos] = row[x] << (prng() & 7);
+      pending++;
+    }
+  }
+  return pending;
+}
+
+void run_menu() {
+  clear_full_rect({.x = 7, .y = 8, .w = 50, .h = 24});
+  tinyfont.setCursor(12, 12);
+  tinyfont.print("NEW GAME");
+  tinyfont.setCursor(12, 18);
+  tinyfont.print(arduboy.audio.enabled() ? "SOUND:ON" : "SOUND:OFF");
+  tinyfont.setCursor(12, 24);
+  tinyfont.print("QUIT");
+  gs.menu_pos = (gs.menu_pos + 3 + (arduboy.justPressed(DOWN_BUTTON) ? 1 : 0) -
+                 (arduboy.justPressed(UP_BUTTON) ? 1 : 0)) %
+                3;
+  tinyfont.setCursor(7, 12 + 6 * gs.menu_pos);
+  tinyfont.print("#");
+  if (arduboy.justPressed(A_BUTTON)) {
+    switch (gs.menu_pos) {
+    case 0:
+      // Need to do a BIT more...
+      begin_game();
+      break;
+    case 1:
+      // Don't save it (for now)
+      arduboy.audio.toggle();
+      break;
+    case 2:
+      // Can exit immediately
+      arduboy.exitToBootloader();
+      break;
+    }
+  }
+}
+
 void gen_region(uint8_t region) {
   Type2Config c;
   // c.state = &rngstate;
@@ -172,12 +256,6 @@ void goto_next_floor() {
   gs.total_floor++;
   gs.region_floor++;
   update_visual_position(0);
-}
-
-void initiate_floor_transition() {
-  gs.animframes = 0; // begin animation at 0 (?)
-  gs.state = GS_FLOORTRANSITION;
-  gs.animend = DEFAULTANIMEXITFRAMES;
 }
 
 // void gen_mymap() {
@@ -237,23 +315,6 @@ void draw_runtime_data() {
 
 void runAction() { gs_tickstamina(&gs); }
 
-// Reset the gamestate to all defaults, ready for a new game.
-void resetGame() {
-  // TODO: will need to pull from save
-  // prng16_init(&rngstate, 1);
-  prng_seed(1); // change this later
-  gs.map.width = RCMAXMAPDIMENSION;
-  gs.map.height = RCMAXMAPDIMENSION;
-  gs.map.map = raycast.worldMap.map;
-  gs.state = GS_STATEMAIN;
-  gs.animend = DEFAULTANIMFRAMES;
-  gs.region = 1;
-  gs.region_floor = 0;
-  gs.total_floor = 0;
-  gs.stamina = BASESTAMHEALTH;
-  gs.health = BASESTAMHEALTH;
-}
-
 void setup() {
   arduboy.boot();
   arduboy.flashlight(); // or safeMode(); for an extra 24 bytes wooo
@@ -263,8 +324,11 @@ void setup() {
   // NOTE: second value FOV
   // raycast.player.initPlayerDirection(0, 1.0); // 0.75);
   raycast.render.spritescaling[2] = 0.75;
-  resetGame();
-  initiate_floor_transition();
+  gs.map.width = RCMAXMAPDIMENSION;
+  gs.map.height = RCMAXMAPDIMENSION;
+  gs.map.map = raycast.worldMap.map;
+  gs.animend = DEFAULTANIMFRAMES;
+  gs.state = GS_STATEMENUANIM;
 }
 
 void loop() {
@@ -307,7 +371,6 @@ RESTARTSTATE:;
       gs.state = GS_STATEMAIN;
       gs.player = gs.next_player;
       gs_draw_map_near(&gs, &arduboy, MAPX, MAPY, MAPRANGE);
-      // arduboy.exitToBootloader();
     }
     break;
   case GS_FLOORTRANSITION:
@@ -319,6 +382,17 @@ RESTARTSTATE:;
       refresh_screen_full();
       sound.tone(300, 30);
     }
+    goto SKIPRCRENDER;
+    break;
+  case GS_STATEMENUANIM:
+    if (menu_animation() < 32) {
+      gs.state = GS_STATEMENU;
+      render_fximage(titleimg, arduboy.sBuffer, WIDTH, HEIGHT);
+    }
+    goto SKIPRCRENDER;
+    break;
+  case GS_STATEMENU:
+    run_menu();
     goto SKIPRCRENDER;
     break;
   }

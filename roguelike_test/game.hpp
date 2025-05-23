@@ -12,10 +12,6 @@ constexpr uint8_t DIRWEST = 3;
 void cardinal_to_dir(uint8_t cardinal, int8_t *dx, int8_t *dy);
 float cardinal_to_rad(uint8_t cardinal);
 
-// struct prng16_state {
-//   uint16_t a, b, c, d;
-// };
-
 struct prng_state {
   uint8_t a, b, c, d;
 };
@@ -25,8 +21,7 @@ void prng_seed(uint16_t seed);
 prng_state prng_snapshot();
 void prng_restore(prng_state state);
 
-// uint16_t prng16(prng16_state *s);
-// void prng16_init(prng16_state *x, uint16_t seed);
+uint16_t lcg_shuffle(uint16_t lcg_seed, uint16_t iteration);
 
 #define RANDB(x) (prng() % (x))
 
@@ -65,6 +60,7 @@ struct GameState {
   uint8_t total_floor;
   uint8_t stamina;
   uint8_t health;
+  uint8_t menu_pos; // global menu pos from last menu
   // uint8_t buffered_input; // What it says
 };
 
@@ -76,6 +72,8 @@ constexpr uint8_t GS_TURNRIGHT = 8;
 constexpr uint8_t GS_STATEMAIN = 1;
 constexpr uint8_t GS_STATEANIMATE = 2;
 constexpr uint8_t GS_FLOORTRANSITION = 3;
+constexpr uint8_t GS_STATEMENUANIM = 4;
+constexpr uint8_t GS_STATEMENU = 5;
 
 // Attempt certain movement, returning which action was performed. The changes
 // are applied immediately to the state.

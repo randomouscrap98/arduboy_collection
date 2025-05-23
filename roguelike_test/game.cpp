@@ -34,64 +34,42 @@ float cardinal_to_rad(uint8_t cardinal) {
   }
 }
 
-// uint8_t prng() {
-//   // Seed this 8bit manually
-//   static uint8_t s = 0xAA, a = 0;
-//   s ^= s << 3;
-//   s ^= s >> 5;
-//   s ^= a++ >> 2;
-//   return s;
-// }
-
-// uint8_t prng() {
-//   static uint8_t x = 0, y = 0, z = 0, a = 1;
-//   uint8_t t = x ^ (x << 5);
-//   x = y;
-//   y = z;
-//   z = a;
-//   return a = z ^ (z >> 1) ^ t ^ (t << 3);
-// }
-
-struct prng_state __prng_state = {.a = 0xfa, .b = 0xee, .c = 0xee, .d = 0xee};
+static struct prng_state pstate = {.a = 0xfa, .b = 0xee, .c = 0xee, .d = 0xee};
 
 #define rot8(x, k) (((x) << (k)) | ((x) >> (8 - (k))))
 uint8_t prng() { // jsf8, see https://filterpaper.github.io/prng.html#jsf8
-  uint8_t e = __prng_state.a - rot8(__prng_state.b, 1);
-  __prng_state.a = __prng_state.b ^ rot8(__prng_state.c, 4);
-  __prng_state.b = __prng_state.c + __prng_state.d;
-  __prng_state.c = __prng_state.d + e;
-  return __prng_state.d = e + __prng_state.a;
+  uint8_t e = pstate.a - rot8(pstate.b, 1);
+  pstate.a = pstate.b ^ rot8(pstate.c, 4);
+  pstate.b = pstate.c + pstate.d;
+  pstate.c = pstate.d + e;
+  return pstate.d = e + pstate.a;
 }
 
 void prng_seed(uint16_t seed) {
-  __prng_state.a = 0xf1; // From https://filterpaper.github.io/prng.html#jsf8
-  __prng_state.b = 0xee;
+  pstate.a = 0xf1; // From https://filterpaper.github.io/prng.html#jsf8
+  pstate.b = 0xee;
   // Just a handful of seeds out of 65,536 are bad (luckily)
   if (seed == 6332 || seed == 18002 || seed == 19503)
-    __prng_state.b = 0xef;
-  __prng_state.c = (seed >> 8) & 0xff;
-  __prng_state.d = seed & 0xff;
+    pstate.b = 0xef;
+  pstate.c = (seed >> 8) & 0xff;
+  pstate.d = seed & 0xff;
 }
 
-// Copies internal __prng_state (4 bytes only, luckily)
-prng_state prng_snapshot() { return __prng_state; }
-void prng_restore(prng_state state) { __prng_state = state; }
+// Copies internal pstate (4 bytes only, luckily)
+prng_state prng_snapshot() { return pstate; }
+void prng_restore(prng_state state) { pstate = state; }
 
-// void prng16_init(prng16_state *x, uint16_t seed) {
-//   x->a = 0x5eed;
-//   x->b = x->c = x->d = seed;
-// }
-//
-// #define rot16(x, k) (((x) << (k)) | ((x) >> (16 - (k))))
-// // jsf16, see https://filterpaper.github.io/prng.html#jsf16
-// uint16_t prng16(prng16_state *x) {
-//   uint16_t e = x->a - rot16(x->b, 13);
-//   x->a = x->b ^ rot16(x->c, 8);
-//   x->b = x->c + x->d;
-//   x->c = x->d + e;
-//   x->d = e + x->a;
-//   return x->d;
-// }
+// Allows access to a shuffled list of 65,536 values in a unique order per
+// "lcg_seed". Useful for generating a list of further seeds for use in dungeon
+// generation for a given player
+uint16_t lcg_shuffle(uint16_t lcg_seed, uint16_t iteration) {
+  // Player seed doesn't change and sets up a linear congruential generator as a
+  // shuffle (period 2^16)
+  uint16_t a = (lcg_seed & 0xF000) | 0x0805;
+  uint16_t c = 2 * (lcg_seed & 0xFFF) + 1;
+  // Iteration is just the Nth value from lcg:
+  return a * iteration + c;
+}
 
 uint8_t get_player_bestdir(MapPlayer *p, Map m) {
   // uint8_t thi[4] = {0};
