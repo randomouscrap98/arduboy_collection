@@ -29,15 +29,10 @@
 #include "fxdata/fxdata.h"
 
 Arduboy2Base arduboy;
-// bool always_on() { return true; }
 
-ArduboyTones
-    sound(arduboy.audio.enabled); //&always_on); // arduboy.audio.enabled);
-// RoomConfig config;
+ArduboyTones sound(arduboy.audio.enabled);
 Tinyfont tinyfont =
     Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
-
-// prng16_state rngstate;
 
 constexpr uint16_t TINYDIGITS[] PROGMEM = {
     0xF9F, 0xAF8, 0xDDA, 0x9DF, 0x74F, 0xBDD, 0xFDC, 0x11F, 0xFDF, 0x75F,
@@ -157,30 +152,21 @@ void clear_full_rect(MRect r) {
 }
 
 uint16_t menu_animation() {
-  // Load each row from the image, offset each one until they match the bytes
-  // on screen.
   uint16_t pending = 0;
-  // uint8_t row[WIDTH]; // We SHOULD have enough stack for this...
-  for (uint8_t y = 0; y < HEIGHT >> 3; y++) {
-    // for (uint8_t y = 0; y < HEIGHT; y++) {
-    // FX::readDataBytes(titleimg + 4 + y * WIDTH, row, WIDTH);
-    for (uint8_t x = 0; x < WIDTH; x++) {
-      uint16_t pos = x + y * WIDTH;
-      uint8_t b;
-      FX::readDataBytes(titleimg + 4 + pos, &b, 1);
-      if (arduboy.sBuffer[pos] == b) // row[x])
-        continue;
-      // arduboy.sBuffer[pos] = row[x]; // << (prng() & 7);
-      // arduboy.sBuffer[pos] = row[x] << (prng() & 7);
-      arduboy.sBuffer[pos] = b << (prng() & 7);
-      pending++;
-    }
+  uint8_t b;
+  for (uint16_t i = 0; i < 1024; i++) {
+    FX::readDataBytes(titleimg + 4 + i, &b, 1);
+    if (arduboy.sBuffer[i] == b)
+      continue;
+    arduboy.sBuffer[i] = b << (prng() & 7);
+    pending++;
   }
   return pending;
 }
 
 void run_menu() {
-  clear_full_rect({.x = 7, .y = 8, .w = 50, .h = 24});
+  // clear_full_rect({.x = 7, .y = 8, .w = 50, .h = 24});
+  render_fximage(titleimg, arduboy.sBuffer, WIDTH, HEIGHT);
   tinyfont.setCursor(12, 12);
   tinyfont.print("NEW GAME");
   tinyfont.setCursor(12, 18);
@@ -285,18 +271,8 @@ void clear_textarea() {
 
 // Draw a standard 2x16 bar at given x, y chosen by default
 void draw_std_bar(uint8_t x, uint8_t filled, uint8_t max) {
-  // uint8_t bs = 256 / a.h; // let's hope this is SOMETHING...
-  // uint8_t fh = filled / bs + 1 - a.h;
-  // for (uint8_t y = 0; y < a.h; y++) {
-  //   uint8_t col = y < fh ? BLACK : WHITE;
-  //   for (uint8_t x = 0; x < a.w; x++) {
-  //     arduboy.drawPixel(a.x + x, a.y + y, col);
-  //   }
-  // }
-  // uint8_t bs = 256 / a.h; // let's hope this is SOMETHING...
   float ffilled = BARHEIGHT * (float)filled / (float)max;
   uint8_t fh = BARHEIGHT - round(ffilled);
-  // BARHEIGHT - filled / (256 / BARHEIGHT);
   for (uint8_t y = 0; y < BARHEIGHT; y++) {
     uint8_t col = y < fh ? BLACK : WHITE;
     arduboy.drawPixel(x, BARTOP + y, col);
@@ -322,7 +298,6 @@ void setup() {
   arduboy.boot();
   arduboy.flashlight(); // or safeMode(); for an extra 24 bytes wooo
   arduboy.setFrameRate(FRAMERATE);
-  // arduboy.initRandomSeed();
   FX_INIT();
   // NOTE: second value FOV
   // raycast.player.initPlayerDirection(0, 1.0); // 0.75);
@@ -391,7 +366,6 @@ RESTARTSTATE:;
   case GS_STATEMENUANIM:
     if (menu_animation() < 32) {
       gs.state = GS_STATEMENU;
-      render_fximage(titleimg, arduboy.sBuffer, WIDTH, HEIGHT);
     }
     goto SKIPRCRENDER;
     break;
