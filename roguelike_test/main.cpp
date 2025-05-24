@@ -1,5 +1,3 @@
-// TODO: in main menu, add arduboy.exitToBootloader() option
-
 #include "Arduboy2Core.h"
 #include <Arduboy2.h>
 #include <ArduboyTones.h>
@@ -17,6 +15,7 @@
 #define FULLMAP
 #define INSTANTFLOORUP
 // #define PRINTSTAMHEALTH
+#define PRINTSEED
 
 #include <ArduboyFX.h>
 #include <ArduboyRaycastFX.h>
@@ -38,7 +37,7 @@ constexpr uint16_t TINYDIGITS[] PROGMEM = {
     0xF9F, 0xAF8, 0xDDA, 0x9DF, 0x74F, 0xBDD, 0xFDC, 0x11F, 0xFDF, 0x75F,
 };
 
-constexpr uint8_t NUMINTERNALBYTES = 4;
+constexpr uint8_t NUMINTERNALBYTES = 8;
 constexpr uint8_t NUMSPRITES = 16;
 constexpr uint8_t BOTTOMSIZE = 8;
 constexpr uint8_t SIDESIZE = 32;
@@ -67,6 +66,7 @@ RcContainer<NUMSPRITES, NUMINTERNALBYTES, WIDTH - SIDESIZE, HEIGHT - BOTTOMSIZE>
     raycast(tilesheet, NULL, NULL); // spritesheet, spritesheetMask);
 
 GameState gs;
+SaveGame sg;
 
 void initiate_floor_transition() {
   gs.animframes = 0; // begin animation at 0 (?)
@@ -75,6 +75,11 @@ void initiate_floor_transition() {
 }
 
 void begin_game() {
+  if (sg.player_seed == 0) { // Sorry, the 0 seed is reserved I guess...
+    sg.player_seed = (uint16_t)arduboy.generateRandomSeed();
+  }
+  sg.total_runs++;
+  FX::saveGameState(sg);
   gs.region = 1;
   gs.region_floor = 0;
   gs.total_floor = 0;
@@ -86,7 +91,7 @@ void begin_game() {
   // update values on new game, so the frame count is a bit more random.
   // Iteration will start at 0, then increment by 1 on NEW GAME so people can't
   // save scum(?)
-  prng_seed(lcg_shuffle(0, 0)); // change this later
+  prng_seed(lcg_shuffle(sg.player_seed, sg.total_runs)); // change this later
   initiate_floor_transition();
 }
 
@@ -165,19 +170,23 @@ uint16_t menu_animation() {
 }
 
 void run_menu() {
+  constexpr uint8_t MENUOPTIONS = 4;
   // clear_full_rect({.x = 7, .y = 8, .w = 50, .h = 24});
   render_fximage(titleimg, arduboy.sBuffer, WIDTH, HEIGHT);
   tinyfont.setCursor(12, 12);
-  tinyfont.print("NEW GAME");
+  tinyfont.print(F("NEW GAME"));
   tinyfont.setCursor(12, 18);
-  tinyfont.print(arduboy.audio.enabled() ? "SOUND:ON" : "SOUND:OFF");
+  tinyfont.print(arduboy.audio.enabled() ? F("SOUND:ON") : F("SOUND:OFF"));
   tinyfont.setCursor(12, 24);
-  tinyfont.print("QUIT");
-  gs.menu_pos = (gs.menu_pos + 3 + (arduboy.justPressed(DOWN_BUTTON) ? 1 : 0) -
-                 (arduboy.justPressed(UP_BUTTON) ? 1 : 0)) %
-                3;
+  tinyfont.print(F("ABOUT"));
+  tinyfont.setCursor(12, 30);
+  tinyfont.print(F("QUIT"));
+  gs.menu_pos =
+      (gs.menu_pos + MENUOPTIONS + (arduboy.justPressed(DOWN_BUTTON) ? 1 : 0) -
+       (arduboy.justPressed(UP_BUTTON) ? 1 : 0)) %
+      MENUOPTIONS;
   tinyfont.setCursor(7, 12 + 6 * gs.menu_pos);
-  tinyfont.print("#");
+  tinyfont.print(F("#"));
   if (arduboy.justPressed(A_BUTTON)) {
     switch (gs.menu_pos) {
     case 0:
@@ -188,8 +197,9 @@ void run_menu() {
       // Don't save it (for now)
       arduboy.audio.toggle();
       break;
-    case 2:
+    case 3:
       // Can exit immediately
+      arduboy.audio.saveOnOff(); // Might as well
       arduboy.exitToBootloader();
       break;
     }
@@ -288,6 +298,11 @@ void draw_runtime_data() {
   print_tinynumber(gs.health, 3, 0, HEIGHT - 5);
   print_tinynumber(gs.stamina, 3, 16, HEIGHT - 5);
 #endif
+#ifdef PRINTSEED
+  clear_textarea();
+  print_tinynumber(sg.player_seed, 5, 0, HEIGHT - 5);
+  print_tinynumber(sg.total_runs, 5, 24, HEIGHT - 5);
+#endif
   gs_draw_map_player(&gs, &arduboy, MAPX, MAPY,
                      arduboy.frameCount & MAPFLASH ? BLACK : WHITE);
 }
@@ -298,7 +313,7 @@ void setup() {
   arduboy.boot();
   arduboy.flashlight(); // or safeMode(); for an extra 24 bytes wooo
   arduboy.setFrameRate(FRAMERATE);
-  FX_INIT();
+  FX::begin(FX_DATA_PAGE, FX_SAVE_PAGE);
   // NOTE: second value FOV
   // raycast.player.initPlayerDirection(0, 1.0); // 0.75);
   raycast.render.spritescaling[2] = 0.75;
@@ -307,6 +322,9 @@ void setup() {
   gs.map.map = raycast.worldMap.map;
   gs.animend = DEFAULTANIMFRAMES;
   gs.state = GS_STATEMENUANIM;
+  if (!FX::loadGameState(sg)) {
+    memset(&sg, 0, sizeof(sg));
+  }
   // begin_game();
 }
 

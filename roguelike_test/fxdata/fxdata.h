@@ -2,7 +2,7 @@
 
 using uint24_t = __uint24;
 
-// Generated with ardugotools on 2025-05-23T04:41:49-04:00
+// Generated with ardugotools on 2025-05-23T23:42:42-04:00
 
 // Image info for "tilesheet"
 // Raycast frame bytes: 172, mipmap widths: 32,16,8,4
@@ -25,8 +25,11 @@ constexpr uint16_t titleimgWidth  = 128;
 constexpr uint16_t titleimgHeight = 64;
 
 // FX addresses (only really used for initialization)
-constexpr uint16_t FX_DATA_PAGE = 0xFF49;
+constexpr uint16_t FX_DATA_PAGE = 0xFF39;
 constexpr uint24_t FX_DATA_BYTES = 46764;
 
+constexpr uint16_t FX_SAVE_PAGE = 0xFFF0;
+constexpr uint24_t FX_SAVE_BYTES = 0;
+
 // Helper macro to initialize fx, call in setup()
-#define FX_INIT() FX::begin(FX_DATA_PAGE)
+#define FX_INIT() FX::begin(FX_DATA_PAGE, FX_DATA_SAVE)
