@@ -4,6 +4,9 @@
 
 constexpr uint8_t TILEEMPTY = 0;
 constexpr uint8_t TILEEXIT = 15;
+constexpr uint8_t MAXITEMS = 30;
+constexpr uint8_t BASESTAMHEALTH = 255;
+constexpr uint8_t STARTSTAMHEALTH = 1;
 
 struct Map {
   uint8_t *map;
@@ -47,6 +50,7 @@ struct GameState {
   uint8_t stamina;
   uint8_t health;
   uint8_t menu_pos; // global menu pos from last menu
+  uint8_t inventory[MAXITEMS];
   // uint8_t buffered_input; // What it says
 };
 
@@ -60,15 +64,19 @@ constexpr uint8_t GS_STATEANIMATE = 2;
 constexpr uint8_t GS_FLOORTRANSITION = 3;
 constexpr uint8_t GS_STATEMENUANIM = 4;
 constexpr uint8_t GS_STATEMENU = 5;
+constexpr uint8_t GS_STATEGAMEOVER = 6;
 
 // Attempt certain movement, returning which action was performed. The changes
 // are applied immediately to the state.
 uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy);
 
+void gs_restart(GameState *gs);
+
 // Drain stamina, heal health or hurt it.
 void gs_tickstamina(GameState *gs);
 
 bool gs_exiting(GameState *gs);
+bool gs_dead(GameState *gs);
 
 // Draw very simple 1:1 map at given location. Does not check if out of bounds
 void gs_draw_map(GameState *gs, Arduboy2Base *arduboy, uint8_t x, uint8_t y);

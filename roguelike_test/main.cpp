@@ -14,7 +14,7 @@
 
 // #define FULLMAP
 // #define INSTANTFLOORUP
-// #define PRINTSTAMHEALTH
+#define PRINTSTAMHEALTH
 // #define PRINTSEED
 
 #include <ArduboyFX.h>
@@ -30,7 +30,6 @@
 #include "fxdata/fxdata.h"
 
 Arduboy2Base arduboy;
-
 ArduboyTones sound(arduboy.audio.enabled);
 Tinyfont tinyfont =
     Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
@@ -48,7 +47,6 @@ constexpr uint8_t BARHEIGHT = 16;
 constexpr uint8_t BARTOP = 2;
 constexpr uint8_t HEALTHBARX = 99;
 constexpr uint8_t STAMINABARX = 104;
-constexpr uint8_t BASESTAMHEALTH = 255;
 
 constexpr float FOV = 1.0f;
 constexpr uint8_t FRAMERATE = 30;
@@ -57,6 +55,7 @@ constexpr float ROTSPEED = 3.0f / FRAMERATE;
 
 constexpr uint8_t DEFAULTANIMFRAMES = ((float)FRAMERATE) * 0.34;
 constexpr uint8_t DEFAULTANIMEXITFRAMES = ((float)FRAMERATE) * 0.6;
+constexpr uint8_t DEFAULTANIMGAMEOVERFRAMES = ((float)FRAMERATE);
 
 // Once again we pick 16 sprites just in case we need them. 16 is a decent
 // number to not take up all the memory but still have enough to work with.
@@ -72,6 +71,27 @@ void initiate_floor_transition() {
   gs.animend = DEFAULTANIMEXITFRAMES;
 }
 
+void initiate_animation() {
+  gs.animframes = 0; // begin animation at 0 (?)
+  gs.state = GS_STATEANIMATE;
+  gs.animend = DEFAULTANIMFRAMES;
+}
+
+void initiate_gameover() {
+  // Save current game state on game over
+  FX::saveGameState(sg);
+  gs.animframes = 0; // begin animation at 0 (?)
+  gs.state = GS_STATEGAMEOVER;
+  gs.animend = DEFAULTANIMGAMEOVERFRAMES; // Reuse exit frames
+  raycast.render.setLightIntensity(2.0);
+}
+
+void initiate_mainmenu() {
+  gs.animframes = 0; // begin animation at 0 (?)
+  gs.animend = DEFAULTANIMFRAMES;
+  gs.state = GS_STATEMENUANIM;
+}
+
 void begin_game() {
   // void __attribute__((noinline)) begin_game() {
   //  This indicates the game started without a save game. We separate this from
@@ -82,12 +102,7 @@ void begin_game() {
   }
   sg.total_runs++;
   FX::saveGameState(sg);
-  gs.region = 1;
-  gs.region_floor = 0;
-  gs.total_floor = 0;
-  gs.stamina = BASESTAMHEALTH;
-  gs.health = BASESTAMHEALTH;
-  gs.menu_pos = 0;
+  gs_restart(&gs);
   prng_seed(lcg_shuffle(sg.player_seed, sg.total_runs)); // change this later
   initiate_floor_transition();
 }
@@ -260,19 +275,37 @@ void draw_runtime_data() {
   draw_std_bar(STAMINABARX, gs.stamina, BASESTAMHEALTH);
 #ifdef PRINTSTAMHEALTH
   clear_textarea();
-  print_tinynumber(gs.health, 3, 0, HEIGHT - 5);
-  print_tinynumber(gs.stamina, 3, 16, HEIGHT - 5);
+  print_tinynumber(arduboy.sBuffer, gs.health, 3, 0, HEIGHT - 5);
+  print_tinynumber(arduboy.sBuffer, gs.stamina, 3, 16, HEIGHT - 5);
 #endif
 #ifdef PRINTSEED
   clear_textarea();
-  print_tinynumber(sg.player_seed, 5, 0, HEIGHT - 5);
-  print_tinynumber(sg.total_runs, 5, 24, HEIGHT - 5);
+  print_tinynumber(arduboy.sBuffer, sg.player_seed, 5, 0, HEIGHT - 5);
+  print_tinynumber(arduboy.sBuffer, sg.total_runs, 5, 24, HEIGHT - 5);
 #endif
   gs_draw_map_player(&gs, &arduboy, MAPX, MAPY,
                      arduboy.frameCount & MAPFLASH ? BLACK : WHITE);
 }
 
-void runAction() { gs_tickstamina(&gs); }
+bool run_movement(uint8_t movement) {
+  bool setstate = false;
+  if (movement & (GS_MOVEBACKWARD | GS_MOVEFORWARD)) {
+    // Run sim here? Some kind of "action"?
+    gs_tickstamina(&gs);
+    if (gs_dead(&gs)) {
+      initiate_gameover();
+      setstate = true;
+    }
+    if (gs_exiting(&gs)) {
+      initiate_floor_transition();
+      setstate = true;
+    }
+  }
+  if (!setstate) {
+    initiate_animation();
+  }
+  return setstate;
+}
 
 void setup() {
   arduboy.boot();
@@ -283,8 +316,7 @@ void setup() {
   gs.map.width = RCMAXMAPDIMENSION;
   gs.map.height = RCMAXMAPDIMENSION;
   gs.map.map = raycast.worldMap.map;
-  gs.animend = DEFAULTANIMFRAMES;
-  gs.state = GS_STATEMENUANIM;
+  initiate_mainmenu();
   if (!FX::loadGameState(sg)) {
     memset(&sg, 0, sizeof(sg));
   }
@@ -309,17 +341,7 @@ RESTARTSTATE:;
     draw_runtime_data();
     movement = gs_move(&gs, &arduboy);
     if (movement) {
-      // Run sim here? Some kind of "action"?
-      if (movement & (GS_MOVEBACKWARD | GS_MOVEFORWARD)) {
-        runAction();
-      }
-      if (gs_exiting(&gs)) {
-        initiate_floor_transition();
-      } else {
-        gs.animframes = 0; // begin animation at 0 (?)
-        gs.state = GS_STATEANIMATE;
-        gs.animend = DEFAULTANIMFRAMES;
-      }
+      run_movement(movement);
       goto RESTARTSTATE; // Eliminate pause: do animation first frame
     }
     break;
@@ -352,6 +374,21 @@ RESTARTSTATE:;
   case GS_STATEMENU:
     run_menu();
     goto SKIPRCRENDER;
+    break;
+  case GS_STATEGAMEOVER:
+    if (gs.animframes >= gs.animend) {
+      // raycast.setLightIntensity(0);
+      tinyfont.setCursor(27, 24);
+      tinyfont.print(F("GAME OVER"));
+      if (arduboy.justPressed(A_BUTTON)) {
+        initiate_mainmenu();
+      }
+      goto SKIPRCRENDER;
+    } else {
+      gs.animframes++;
+      raycast.render.setLightIntensity(
+          2.0 * (1.0 - (float)gs.animframes / (float)gs.animend));
+    }
     break;
   }
 

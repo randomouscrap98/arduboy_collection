@@ -87,6 +87,15 @@ uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy) {
   return move;
 }
 
+void gs_restart(GameState *gs) {
+  gs->region = 1;
+  gs->region_floor = 0;
+  gs->total_floor = 0;
+  gs->stamina = STARTSTAMHEALTH;
+  gs->health = STARTSTAMHEALTH;
+  gs->menu_pos = 0;
+}
+
 void gs_tickstamina(GameState *gs) {
   if (gs->stamina) {
     gs->stamina--;
@@ -103,6 +112,8 @@ bool gs_exiting(GameState *gs) {
   return (MAPT(gs->map, gs->next_player.posX, gs->next_player.posY) &
           TILEEXIT) == TILEEXIT;
 }
+
+bool gs_dead(GameState *gs) { return gs->health == 0; }
 
 void gs_draw_map(GameState *gs, Arduboy2Base *arduboy, uint8_t xs, uint8_t ys) {
   arduboy->fillRect(xs, ys, gs->map.width, gs->map.height, BLACK);
