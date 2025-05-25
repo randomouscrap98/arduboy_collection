@@ -1,4 +1,5 @@
 #include "Arduboy2Core.h"
+#include "WString.h"
 #include <Arduboy2.h>
 #include <ArduboyTones.h>
 #include <Tinyfont.h>
@@ -92,6 +93,8 @@ void initiate_mainmenu() {
   gs.state = GS_STATEMENUANIM;
 }
 
+void initiate_about() { gs.state = GS_STATEABOUT; }
+
 void begin_game() {
   // void __attribute__((noinline)) begin_game() {
   //  This indicates the game started without a save game. We separate this from
@@ -110,13 +113,19 @@ void begin_game() {
 // Update animation rotation/position based on given delta between current
 // position and new player position. Will NOT be extended to enemies, since
 // they don't have rotation and their position is different
-void update_visual_position(float delta) {
-  raycast.player.posX = 0.5f + ((float)gs.player.posX * (1 - delta) +
-                                (float)gs.next_player.posX * delta);
-  raycast.player.posY = 0.5f + ((float)gs.player.posY * (1 - delta) +
-                                (float)gs.next_player.posY * delta);
-  float c1 = cardinal_to_rad(gs.player.cardinal);
-  float c2 = cardinal_to_rad(gs.next_player.cardinal);
+void update_visual_position(uflot delta) {
+  constexpr uflot HALF = 0.5f;
+  uflot indelt = 1 - delta;
+  uflot baseX = HALF + gs.player.posX * (indelt);
+  uflot baseY = HALF + gs.player.posY * (indelt);
+  raycast.player.posX = baseX + delta * gs.next_player.posX;
+  raycast.player.posY = baseY + delta * gs.next_player.posY;
+  // 0.5f + ((float)gs.player.posX * (1 - delta) +
+  //(float)gs.next_player.posX * delta);
+  // raycast.player.posY = 0.5f + ((float)gs.player.posY * (1 - delta) +
+  //(float)gs.next_player.posY * delta);
+  float c1 = cardinal_to_rad(gs.player.cardinal);      //+ 2 * PI;
+  float c2 = cardinal_to_rad(gs.next_player.cardinal); // + 2 * PI;
   // There are certain turns which go the long way. Fix that.
   if (fabs(c2 - c1) > 2) {
     if (c2 > c1) {
@@ -125,7 +134,8 @@ void update_visual_position(float delta) {
       c1 -= 2 * PI;
     }
   }
-  raycast.player.initPlayerDirection((1 - delta) * c1 + delta * c2, FOV);
+  raycast.player.initPlayerDirection((float)indelt * c1 + (float)delta * c2,
+                                     FOV);
 }
 
 // very optimized render image at specific address byte chunks only
@@ -177,12 +187,53 @@ void run_menu() {
       // Don't save it (for now)
       arduboy.audio.toggle();
       break;
+    case 2:
+      // Don't save it (for now)
+      initiate_about();
+      break;
     case 3:
       // Can exit immediately
       arduboy.audio.saveOnOff(); // Might as well
       arduboy.exitToBootloader();
       break;
     }
+  }
+}
+
+void print_stat(uint8_t pos, const __FlashStringHelper *name, uint16_t val) {
+  // char outstr[24];
+  // strcpy(outstr, name);
+  // itoa(val, outstr + strlen(outstr), 10);
+  uint8_t xs = 8 + (pos & 1) * 57;
+  uint8_t ys = 8 + (pos >> 1) * 6;
+  tinyfont.setCursor(xs, ys);
+  tinyfont.print(name);
+  tinyfont.setCursor(xs + 30, ys);
+  tinyfont.print(val);
+}
+
+void run_about() {
+  render_fximage(blankimg, arduboy.sBuffer, WIDTH, HEIGHT);
+  tinyfont.setCursor(48, 54);
+  tinyfont.print(F("haloopdy - 2025"));
+  print_stat(0, F("RUNS"), sg.total_runs);
+  print_stat(1, F("WINS"), sg.total_wins);
+  print_stat(2, F("ROOMS"), sg.total_rooms);
+  print_stat(3, F("ENMY"), sg.total_kills);
+  print_stat(4, F("ITEMS"), sg.total_items);
+  print_stat(5, F("USED"), sg.total_used);
+  const __FlashStringHelper *rgns[] = {
+      F("RGN0"),
+      F("RGN1"),
+      F("RGN2"),
+      F("RGN3"),
+  };
+  for (uint8_t i = 0; i < 4; i++) {
+    print_stat(6 + i, rgns[i], sg.completed_region[i]);
+  }
+  print_stat(10, F("MTIME"), sg.total_seconds / 60);
+  if (arduboy.justPressed(A_BUTTON)) {
+    initiate_mainmenu();
   }
 }
 
@@ -347,7 +398,7 @@ RESTARTSTATE:;
     break;
   case GS_STATEANIMATE:
     gs.animframes++;
-    update_visual_position((float)gs.animframes / (float)gs.animend);
+    update_visual_position((uflot)gs.animframes / gs.animend);
     if (gs.animframes >= gs.animend) {
       gs.state = GS_STATEMAIN;
       gs.player = gs.next_player;
@@ -389,6 +440,10 @@ RESTARTSTATE:;
       raycast.render.setLightIntensity(
           2.0 * (1.0 - (float)gs.animframes / (float)gs.animend));
     }
+    break;
+  case GS_STATEABOUT:
+    run_about();
+    goto SKIPRCRENDER;
     break;
   }
 

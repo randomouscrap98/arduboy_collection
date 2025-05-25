@@ -28,13 +28,14 @@ uint8_t get_player_bestdir(MapPlayer *p, Map m);
 
 struct SaveGame {
   uint16_t player_seed;
-  uint32_t total_runs;
-  uint32_t total_rooms;
-  uint32_t total_items; // picked up
-  uint32_t total_used;  // items
-  uint32_t total_kills;
+  uint16_t total_runs;
+  uint16_t total_wins;
+  uint16_t total_rooms; // may run out? nobody will play it that much...
+  uint16_t total_items; // picked up
+  uint16_t total_used;  // items
+  uint16_t total_kills;
   uint32_t total_seconds; // played in dungeon
-  uint32_t completed_region[4];
+  uint16_t completed_region[4];
 };
 
 struct GameState {
@@ -65,6 +66,7 @@ constexpr uint8_t GS_FLOORTRANSITION = 3;
 constexpr uint8_t GS_STATEMENUANIM = 4;
 constexpr uint8_t GS_STATEMENU = 5;
 constexpr uint8_t GS_STATEGAMEOVER = 6;
+constexpr uint8_t GS_STATEABOUT = 7;
 
 // Attempt certain movement, returning which action was performed. The changes
 // are applied immediately to the state.

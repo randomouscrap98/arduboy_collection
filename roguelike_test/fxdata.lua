@@ -15,6 +15,7 @@ raycast_helper("tilesheet", false, {
 image_helper("menu", image("resources/menu.png"))
 image_helper("bg", image("resources/bg_96x56.png"))
 image_helper("titleimg", image("resources/title.png"))
+image_helper("blankimg", image("resources/blank.png"))
 
 -- Sprites (use manual mipmapping) --
 -- function loadss(swidth)
