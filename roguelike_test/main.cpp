@@ -230,6 +230,7 @@ void run_about() {
     print_stat(6 + i, rgns[i], sg.completed_region[i]);
   }
   print_stat(10, F("MTIME"), sg.total_seconds / 60);
+  print_stat(11, F("SEED"), sg.player_seed);
   if (arduboy.justPressed(A_BUTTON)) {
     initiate_mainmenu();
   }
