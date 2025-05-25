@@ -3,6 +3,7 @@
 #include <Arduboy2.h>
 
 #include "game.hpp"
+#include "mymath.hpp"
 
 // #define RANDROOMDIM(config)                                                    \
 //   (config->room_min + random(1 + config->room_max - config->room_min))

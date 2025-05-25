@@ -12,17 +12,19 @@
 #define __uint24 uint32_t
 #endif
 
-#define FULLMAP
-#define INSTANTFLOORUP
+// #define FULLMAP
+// #define INSTANTFLOORUP
 // #define PRINTSTAMHEALTH
-#define PRINTSEED
+// #define PRINTSEED
 
 #include <ArduboyFX.h>
 #include <ArduboyRaycastFX.h>
 
 #include "ArduboyRaycast_Map.h"
 #include "game.hpp"
+#include "graphics.hpp"
 #include "map.hpp"
+#include "mymath.hpp"
 
 // Resources
 #include "fxdata/fxdata.h"
@@ -32,10 +34,6 @@ Arduboy2Base arduboy;
 ArduboyTones sound(arduboy.audio.enabled);
 Tinyfont tinyfont =
     Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
-
-constexpr uint16_t TINYDIGITS[] PROGMEM = {
-    0xF9F, 0xAF8, 0xDDA, 0x9DF, 0x74F, 0xBDD, 0xFDC, 0x11F, 0xFDF, 0x75F,
-};
 
 constexpr uint8_t NUMINTERNALBYTES = 8;
 constexpr uint8_t NUMSPRITES = 16;
@@ -75,6 +73,10 @@ void initiate_floor_transition() {
 }
 
 void begin_game() {
+  // void __attribute__((noinline)) begin_game() {
+  //  This indicates the game started without a save game. We separate this from
+  //  the point of checking for the save because we apparently need some
+  //  randomness to the time before calling generateRandomSeed
   if (sg.player_seed == 0) { // Sorry, the 0 seed is reserved I guess...
     sg.player_seed = (uint16_t)arduboy.generateRandomSeed();
   }
@@ -86,11 +88,6 @@ void begin_game() {
   gs.stamina = BASESTAMHEALTH;
   gs.health = BASESTAMHEALTH;
   gs.menu_pos = 0;
-  // TODO: will need to generate a player seed based on what... frame count(?)
-  // and have iteration be their current run count. Will generate save and
-  // update values on new game, so the frame count is a bit more random.
-  // Iteration will start at 0, then increment by 1 on NEW GAME so people can't
-  // save scum(?)
   prng_seed(lcg_shuffle(sg.player_seed, sg.total_runs)); // change this later
   initiate_floor_transition();
 }
@@ -121,38 +118,6 @@ void render_fximage(uint24_t addr, uint8_t *at, uint8_t width, uint8_t height) {
   height = height >> 3; // it's actually per byte ofc
   for (uint8_t i = 0; i < height; i++) {
     FX::readDataBytes(addr + 4 + i * width, at + i * WIDTH, width);
-  }
-}
-
-// Print tiny digits at given location
-void print_tinydigit(uint8_t v, uint8_t x, uint8_t y) {
-  for (uint8_t i = 0; i < 3; i++) {
-    uint8_t dig = ((pgm_read_word(TINYDIGITS + v)) >> ((2 - i) * 4)) & 0xF;
-    arduboy.sBuffer[x + i + (y >> 3) * WIDTH] |= (dig << (y & 7));
-  }
-}
-
-// Print a number to the given amount of digits
-void print_tinynumber(uint16_t v, uint8_t w, uint8_t x, uint8_t y) {
-  for (uint8_t i = 0; i < w; i++) {
-    print_tinydigit(v % 10, x + 4 * (w - i - 1), y);
-    v /= 10;
-  }
-}
-
-void faze_screen() {
-  for (uint16_t i = 0; i < 1024; i++) {
-    arduboy.sBuffer[i] <<= prng() & 3;
-  }
-}
-
-void clear_full_rect(MRect r) {
-  r.y >>= 3;
-  r.h >>= 3;
-  for (uint8_t y = 0; y < r.h; y++) {
-    for (uint8_t x = 0; x < r.w; x++) {
-      arduboy.sBuffer[x + r.x + (y + r.y) * WIDTH] = 0;
-    }
   }
 }
 
@@ -240,8 +205,8 @@ void gen_region(uint8_t region) {
 // around the player.
 void refresh_screen_full() {
   render_fximage(menu, arduboy.sBuffer, WIDTH, HEIGHT);
-  print_tinydigit(gs.region, 113, 20);
-  print_tinynumber(gs.region_floor, 2, 120, 20);
+  print_tinydigit(arduboy.sBuffer, gs.region, 113, 20);
+  print_tinynumber(arduboy.sBuffer, gs.region_floor, 2, 120, 20);
 #ifdef FULLMAP
   gs_draw_map(&gs, &arduboy, MAPX, MAPY);
 #else
@@ -314,8 +279,6 @@ void setup() {
   arduboy.flashlight(); // or safeMode(); for an extra 24 bytes wooo
   arduboy.setFrameRate(FRAMERATE);
   FX::begin(FX_DATA_PAGE, FX_SAVE_PAGE);
-  // NOTE: second value FOV
-  // raycast.player.initPlayerDirection(0, 1.0); // 0.75);
   raycast.render.spritescaling[2] = 0.75;
   gs.map.width = RCMAXMAPDIMENSION;
   gs.map.height = RCMAXMAPDIMENSION;
@@ -325,7 +288,6 @@ void setup() {
   if (!FX::loadGameState(sg)) {
     memset(&sg, 0, sizeof(sg));
   }
-  // begin_game();
 }
 
 void loop() {
@@ -371,7 +333,7 @@ RESTARTSTATE:;
     }
     break;
   case GS_FLOORTRANSITION:
-    faze_screen();
+    faze_screen(arduboy.sBuffer);
     gs.animframes++;
     if (gs.animframes >= gs.animend) {
       gs.state = GS_STATEMAIN;
