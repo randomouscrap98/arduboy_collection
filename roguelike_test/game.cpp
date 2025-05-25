@@ -2,7 +2,6 @@
 #include "mymath.hpp"
 
 uint8_t get_player_bestdir(MapPlayer *p, Map m) {
-  // uint8_t thi[4] = {0};
   uint8_t max_count = 0;
   uint8_t max_dir = 0;
   uint8_t x, y;

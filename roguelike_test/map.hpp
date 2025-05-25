@@ -52,13 +52,18 @@ struct TileConfig {
 };
 
 struct Type2Config {
-  // prng16_state *state;
-  uint8_t stops = 10;
   // uint8_t turn_unlikely = 3;
-  uint8_t room_unlikely = 6; // How unlikely a room is to spawn at a stop.
-  uint8_t room_min = 2;      // min room size
-  uint8_t room_max = 4;      // max room size
-  uint8_t turn_unlikely = 255;
+  // prng16_state *state;
+  // uint8_t stops = 10;
+  // uint8_t room_unlikely = 6; // How unlikely a room is to spawn at a stop.
+  // uint8_t room_min = 2;      // min room size
+  // uint8_t room_max = 4;      // max room size
+  // uint8_t turn_unlikely = 255;
+  uint8_t stops;
+  uint8_t room_unlikely; // How unlikely a room is to spawn at a stop.
+  uint8_t room_min;      // min room size
+  uint8_t room_max;      // max room size
+  uint8_t turn_unlikely;
   TileConfig tiles;
 };
 

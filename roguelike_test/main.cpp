@@ -163,7 +163,6 @@ uint16_t menu_animation() {
 
 void run_menu() {
   constexpr uint8_t MENUOPTIONS = 4;
-  // clear_full_rect({.x = 7, .y = 8, .w = 50, .h = 24});
   render_fximage(titleimg, arduboy.sBuffer, WIDTH, HEIGHT);
   tinyfont.setCursor(12, 12);
   tinyfont.print(F("NEW GAME"));
@@ -203,9 +202,6 @@ void run_menu() {
 }
 
 void print_stat(uint8_t pos, const __FlashStringHelper *name, uint16_t val) {
-  // char outstr[24];
-  // strcpy(outstr, name);
-  // itoa(val, outstr + strlen(outstr), 10);
   uint8_t xs = 8 + (pos & 1) * 57;
   uint8_t ys = 8 + (pos >> 1) * 6;
   tinyfont.setCursor(xs, ys);
@@ -239,6 +235,48 @@ void run_about() {
   }
 }
 
+/* clang-format off */
+/* constexpr Type2Config REGION_DUNGEON PROGMEM = {
+    .stops = 10,
+    .room_unlikely = 3,
+    .room_min = 2,
+    .room_max = 4,
+    .turn_unlikely = 255,
+    .tiles = {
+      .main = 1,
+      .perimeter = 7,
+      .exit = 15,
+      .extras_count = 3,
+      .extras = {
+        {
+          .tile = 2,
+          .type = TILEEXTRATYPE_NORMAL,
+          .unlikely = 10
+        },
+        {
+          .tile = 3,
+          .type = TILEEXTRATYPE_NOCORNER,
+          .unlikely = 2
+        },
+        {
+          .tile = 4,
+          .type = TILEEXTRATYPE_PILLAR,
+          .unlikely = 20
+        },
+    // .tiles.extras[0].tile = 2;
+    // .tiles.extras[0].type = TILEEXTRATYPE_NORMAL;
+    // .tiles.extras[0].unlikely = 10;
+    // .tiles.extras[1].tile = 3;
+    // .tiles.extras[1].type = TILEEXTRATYPE_NOCORNER;
+    // .tiles.extras[1].unlikely = 2; // It's fun to have a lot of these?
+    // .tiles.extras[2].tile = 4;
+    // .tiles.extras[2].type = TILEEXTRATYPE_PILLAR;
+    // .tiles.extras[2].unlikely = 20;
+      }
+    }
+}; */
+/* clang-format on */
+
 void gen_region(uint8_t region) {
   Type2Config c;
   // c.state = &rngstate;
@@ -248,9 +286,13 @@ void gen_region(uint8_t region) {
   switch (region) {
   case 1:
   default:
-    c.room_min = 2;
+    // memcpy_P(&c, &REGION_DUNGEON, sizeof(Type2Config));
+    // c = memcpy_P();
     c.stops = 10;
     c.room_unlikely = 3;
+    c.room_min = 2;
+    c.room_max = 4;
+    c.turn_unlikely = 255;
     c.tiles.main = 1;
     c.tiles.perimeter = 7;
     c.tiles.exit = 15;
@@ -369,10 +411,10 @@ void setup() {
   gs.map.width = RCMAXMAPDIMENSION;
   gs.map.height = RCMAXMAPDIMENSION;
   gs.map.map = raycast.worldMap.map;
-  initiate_mainmenu();
   if (!FX::loadGameState(sg)) {
     memset(&sg, 0, sizeof(sg));
   }
+  initiate_mainmenu();
 }
 
 void loop() {
@@ -382,6 +424,7 @@ void loop() {
   arduboy.pollButtons();
 
   uint8_t movement;
+  uint24_t raycast_bg = bg;
 RESTARTSTATE:;
 
   switch (gs.state) {
@@ -429,9 +472,10 @@ RESTARTSTATE:;
     goto SKIPRCRENDER;
     break;
   case GS_STATEGAMEOVER:
+    raycast_bg = 0;
     if (gs.animframes >= gs.animend) {
-      // raycast.setLightIntensity(0);
-      tinyfont.setCursor(27, 24);
+      clear_full_rect(arduboy.sBuffer, {.x = 26, .y = 24, .w = 47, .h = 8});
+      tinyfont.setCursor(27, 26);
       tinyfont.print(F("GAME OVER"));
       if (arduboy.justPressed(A_BUTTON)) {
         initiate_mainmenu();
@@ -440,7 +484,7 @@ RESTARTSTATE:;
     } else {
       gs.animframes++;
       raycast.render.setLightIntensity(
-          2.0 * (1.0 - (float)gs.animframes / (float)gs.animend));
+          2.0 * (1.0 - (float)gs.animframes / gs.animend));
     }
     break;
   case GS_STATEABOUT:
@@ -450,8 +494,10 @@ RESTARTSTATE:;
   }
 
   // Draw the correct background for the area.
-  render_fximage(bg, arduboy.sBuffer, raycast.render.VIEWWIDTH,
-                 raycast.render.VIEWHEIGHT);
+  if (raycast_bg) {
+    render_fximage(raycast_bg, arduboy.sBuffer, raycast.render.VIEWWIDTH,
+                   raycast.render.VIEWHEIGHT);
+  }
   raycast.runIteration(&arduboy);
 
 SKIPRCRENDER:;
