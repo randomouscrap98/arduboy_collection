@@ -94,6 +94,7 @@ void gs_restart(GameState *gs) {
   gs->stamina = STARTSTAMHEALTH;
   gs->health = STARTSTAMHEALTH;
   gs->menu_pos = 0;
+  gs->millis_start = millis();
 }
 
 void gs_tickstamina(GameState *gs) {

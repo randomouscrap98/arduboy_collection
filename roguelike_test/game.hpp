@@ -52,6 +52,7 @@ struct GameState {
   uint8_t health;
   uint8_t menu_pos; // global menu pos from last menu
   uint8_t inventory[MAXITEMS];
+  unsigned long millis_start;
   // uint8_t buffered_input; // What it says
 };
 

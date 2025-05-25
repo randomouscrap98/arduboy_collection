@@ -67,6 +67,7 @@ GameState gs;
 SaveGame sg;
 
 void initiate_floor_transition() {
+  sg.total_rooms++;
   gs.animframes = 0; // begin animation at 0 (?)
   gs.state = GS_FLOORTRANSITION;
   gs.animend = DEFAULTANIMEXITFRAMES;
@@ -79,6 +80,7 @@ void initiate_animation() {
 }
 
 void initiate_gameover() {
+  sg.total_seconds += (millis() - gs.millis_start) / 1000;
   // Save current game state on game over
   FX::saveGameState(sg);
   gs.animframes = 0; // begin animation at 0 (?)
