@@ -99,6 +99,11 @@ void gs_restart(GameState *gs) {
   gs->max_items = STARTITEMS;
   gs->millis_start = millis();
   memset(gs->inventory, 0, sizeof(gs->inventory));
+  gs->inventory[0].count = 1;
+  gs->inventory[0].item = 1;
+  // Just a test
+  gs->inventory[5].count = 1;
+  gs->inventory[5].item = 2;
 }
 
 void gs_tickstamina(GameState *gs) {
@@ -119,6 +124,31 @@ bool gs_exiting(GameState *gs) {
 }
 
 bool gs_dead(GameState *gs) { return gs->health == 0; }
+
+uint8_t gs_item_cursor(GameState *gs, Arduboy2Base *arduboy) {
+  int8_t mod = 0;
+  if (arduboy->justPressed(DOWN_BUTTON)) {
+    mod += ITEMSACROSS;
+  }
+  if (arduboy->justPressed(UP_BUTTON)) {
+    mod -= ITEMSACROSS;
+  }
+  if (arduboy->justPressed(RIGHT_BUTTON)) {
+    mod += 1;
+  }
+  if (arduboy->justPressed(LEFT_BUTTON)) {
+    mod -= 1;
+  }
+  // The itempos ALWAYS moves
+  gs->item_pos = (gs->item_pos + mod + gs->max_items) % gs->max_items;
+  // The top moves based on if the cursor is outside the range
+  if (gs->item_pos < gs->item_top)
+    gs->item_top = ITEMSACROSS * (gs->item_pos / ITEMSACROSS);
+  if (gs->item_pos >= gs->item_top + ITEMSPAGE)
+    gs->item_top =
+        ITEMSACROSS * (gs->item_pos / ITEMSACROSS) - (ITEMSPAGE - ITEMSACROSS);
+  return gs->item_pos - gs->item_top;
+}
 
 void gs_draw_map(GameState *gs, Arduboy2Base *arduboy, uint8_t xs, uint8_t ys) {
   arduboy->fillRect(xs, ys, gs->map.width, gs->map.height, BLACK);

@@ -15,7 +15,7 @@
 
 // #define FULLMAP
 // #define INSTANTFLOORUP
-// #define PRINTSTAMHEALTH
+#define PRINTSTAMHEALTH
 // #define PRINTSEED
 
 #include <ArduboyFX.h>
@@ -239,54 +239,60 @@ void run_about() {
   }
 }
 
-void run_itemmenu() {
-  // NOTE: this keeps the item position from before...
-  if (arduboy.justPressed(B_BUTTON)) {
-    initiate_gamemain();
+// Visual only?
+constexpr uint8_t ITEMMENUEDGE = 97;
+constexpr uint8_t ITEMMENUTOP = 26;
+constexpr uint8_t ITEMMENUHEIGHT = 30;
+constexpr uint8_t ITEMCURSORSTARTX = 98;
+constexpr uint8_t ITEMCURSORSTARTY = 27;
+constexpr uint8_t ITEMCURSORMOVEX = 9;
+constexpr uint8_t ITEMCURSORMOVEY = 9;
+
+constexpr uint8_t ITEMSTARTX = 99;
+constexpr uint8_t ITEMSTARTY = 28;
+// constexpr uint8_t ITEMMOVEX = 9;
+// constexpr uint8_t ITEMMOVEY = 9;
+
+// Clear ONLY the items menu quickly
+void clear_items_menu() {
+  arduboy.fillRect(ITEMMENUEDGE, ITEMMENUTOP, WIDTH - ITEMMENUEDGE,
+                   ITEMMENUHEIGHT, BLACK);
+  // // Fill the top with a bar
+  // memset(arduboy.sBuffer + (ITEMMENUTOP >> 3) * WIDTH + ITEMMENUEDGE, 2,
+  //        WIDTH - ITEMMENUEDGE);
+  // // Trivially clear the rest
+  // clear_full_rect(
+  //     arduboy.sBuffer,
+  //     {.x = ITEMMENUEDGE, .y = ITEMMENUTOP, .w = WIDTH - ITEMMENUEDGE, .h =
+  //     });
+}
+
+// Draw ONLY the items in the menu right now
+void draw_items_menu() {
+  for (uint8_t i = 0; i < ITEMSPAGE; i++) {
+    uint8_t item = gs.inventory[gs.item_top + i].item;
+    FX::drawBitmap(ITEMSTARTX + ITEMCURSORMOVEX * (i % ITEMSACROSS),
+                   ITEMSTARTY + ITEMCURSORMOVEY * (i / ITEMSDOWN), itemsheet,
+                   item, dbmOverwrite);
   }
 }
 
-/* clang-format off */
-/* constexpr Type2Config REGION_DUNGEON PROGMEM = {
-    .stops = 10,
-    .room_unlikely = 3,
-    .room_min = 2,
-    .room_max = 4,
-    .turn_unlikely = 255,
-    .tiles = {
-      .main = 1,
-      .perimeter = 7,
-      .exit = 15,
-      .extras_count = 3,
-      .extras = {
-        {
-          .tile = 2,
-          .type = TILEEXTRATYPE_NORMAL,
-          .unlikely = 10
-        },
-        {
-          .tile = 3,
-          .type = TILEEXTRATYPE_NOCORNER,
-          .unlikely = 2
-        },
-        {
-          .tile = 4,
-          .type = TILEEXTRATYPE_PILLAR,
-          .unlikely = 20
-        },
-    // .tiles.extras[0].tile = 2;
-    // .tiles.extras[0].type = TILEEXTRATYPE_NORMAL;
-    // .tiles.extras[0].unlikely = 10;
-    // .tiles.extras[1].tile = 3;
-    // .tiles.extras[1].type = TILEEXTRATYPE_NOCORNER;
-    // .tiles.extras[1].unlikely = 2; // It's fun to have a lot of these?
-    // .tiles.extras[2].tile = 4;
-    // .tiles.extras[2].type = TILEEXTRATYPE_PILLAR;
-    // .tiles.extras[2].unlikely = 20;
-      }
-    }
-}; */
-/* clang-format on */
+void run_itemmenu() {
+  clear_items_menu();
+  if (arduboy.justPressed(B_BUTTON)) {
+    // Draw items WITHOUT cursor, then jump to main
+    draw_items_menu();
+    initiate_gamemain();
+    return;
+  }
+  // NOTE: this keeps the item position from before...
+  uint8_t vpos = gs_item_cursor(&gs, &arduboy);
+  // Must draw cursor first, then items. Ah well, could fix it maybe
+  FX::drawBitmap(ITEMCURSORSTARTX + ITEMCURSORMOVEX * (vpos % ITEMSACROSS),
+                 ITEMCURSORSTARTY + ITEMCURSORMOVEY * (vpos / ITEMSDOWN),
+                 cursorimg, 0, dbmOverwrite);
+  draw_items_menu();
+}
 
 void gen_region(uint8_t region) {
   Type2Config c;
@@ -330,9 +336,8 @@ void refresh_screen_full() {
   print_tinynumber(arduboy.sBuffer, gs.region_floor, 2, 120, 20);
 #ifdef FULLMAP
   gs_draw_map(&gs, &arduboy, MAPX, MAPY);
-// #else
-// gs_draw_map_near(&gs, &arduboy, MAPX, MAPY, MAPRANGE);
 #endif
+  draw_items_menu();
 }
 
 void goto_next_floor() {
@@ -363,18 +368,21 @@ void goto_next_floor() {
 // ASSUMING THE TEXT AREA DECORATION IS KNOWN, this will very VERY quickly clear
 // JUST the text area fully. It's very fast and very little code...
 void clear_textarea() {
+  // arduboy.fillRect(0, HEIGHT - 7, WIDTH, 7, BLACK);
   memset(arduboy.sBuffer + (WIDTH * ((HEIGHT >> 3) - 1)), 1, WIDTH);
 }
 
 // Draw a standard 2x16 bar at given x, y chosen by default
 void draw_std_bar(uint8_t x, uint8_t filled, uint8_t max) {
-  float ffilled = BARHEIGHT * (float)filled / (float)max;
-  uint8_t fh = BARHEIGHT - round(ffilled);
-  for (uint8_t y = 0; y < BARHEIGHT; y++) {
-    uint8_t col = y < fh ? BLACK : WHITE;
-    arduboy.drawPixel(x, BARTOP + y, col);
-    arduboy.drawPixel(x + 1, BARTOP + y, col);
-  }
+  uint8_t fh = round(BARHEIGHT * (float)filled / (float)max);
+  // uint8_t fh = round(ffilled); //BARHEIGHT - round(ffilled);
+  arduboy.fillRect(x, BARTOP, 2, BARHEIGHT, BLACK);
+  arduboy.fillRect(x, BARTOP + BARHEIGHT - fh, 2, fh, WHITE);
+  // for (uint8_t y = 0; y < BARHEIGHT; y++) {
+  //   uint8_t col = y < fh ? BLACK : WHITE;
+  //   arduboy.drawPixel(x, BARTOP + y, col);
+  //   arduboy.drawPixel(x + 1, BARTOP + y, col);
+  // }
 }
 
 void draw_runtime_data() {
@@ -415,18 +423,6 @@ bool run_movement(uint8_t movement) {
   return setstate;
 }
 
-// void check_exit() {
-//   static uint8_t exit_timer = 0;
-//   if (arduboy.buttonsState() == (DOWN_BUTTON | UP_BUTTON)) {
-//     exit_timer++;
-//   } else {
-//     exit_timer = 0;
-//   }
-//   if (exit_timer > FRAMERATE * 4) {
-//     arduboy.exitToBootloader();
-//   }
-// }
-
 void setup() {
   arduboy.boot();
   arduboy.flashlight(); // or safeMode(); for an extra 24 bytes wooo
@@ -450,8 +446,6 @@ void loop() {
 
   uint8_t movement;
   uint24_t raycast_bg = bg;
-
-  // check_exit();
 
 RESTARTSTATE:;
 
@@ -479,7 +473,6 @@ RESTARTSTATE:;
     if (gs.animframes >= gs.animend) {
       gs.player = gs.next_player;
       initiate_gamemain();
-      // refresh_screen_full();
     }
     break;
   case GS_FLOORTRANSITION:
@@ -505,7 +498,8 @@ RESTARTSTATE:;
   case GS_STATEGAMEOVER:
     raycast_bg = 0;
     if (gs.animframes >= gs.animend) {
-      clear_full_rect(arduboy.sBuffer, {.x = 26, .y = 24, .w = 47, .h = 8});
+      arduboy.fillRect(26, 24, 47, 8, BLACK);
+      // clear_full_rect(arduboy.sBuffer, {.x = 26, .y = 24, .w = 47, .h = 8});
       tinyfont.setCursor(27, 26);
       tinyfont.print(F("GAME OVER"));
       if (arduboy.justPressed(A_BUTTON)) {

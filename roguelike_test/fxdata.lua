@@ -16,13 +16,14 @@ image_helper("menu", image("resources/menu.png"))
 image_helper("bg", image("resources/bg_96x56.png"))
 image_helper("titleimg", image("resources/title.png"))
 image_helper("blankimg", image("resources/blank.png"))
-image_helper("cursor", image("resources/cursor.png"))
+image_helper("cursorimg", image("resources/cursor.png"))
 image_helper(
-	"items",
+	"itemsheet",
 	image({
 		filename = "resources/items.png",
-		width = 10,
-		height = 10,
+		width = 8,
+		height = 8,
+		spacing = 2,
 	})
 )
 

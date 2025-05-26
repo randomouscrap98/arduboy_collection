@@ -2,7 +2,7 @@
 
 using uint24_t = __uint24;
 
-// Generated with ardugotools on 2025-05-26T17:55:59-04:00
+// Generated with ardugotools on 2025-05-26T19:37:14-04:00
 
 // Image info for "tilesheet"
 // Raycast frame bytes: 172, mipmap widths: 32,16,8,4
@@ -28,20 +28,20 @@ constexpr uint24_t blankimg       = 0x00B6AC;
 constexpr uint8_t  blankimgFrames = 1;
 constexpr uint16_t blankimgWidth  = 128;
 constexpr uint16_t blankimgHeight = 64;
-// Image info for "cursor"
-constexpr uint24_t cursor       = 0x00BAB0;
-constexpr uint8_t  cursorFrames = 1;
-constexpr uint16_t cursorWidth  = 10;
-constexpr uint16_t cursorHeight = 10;
-// Image info for "items"
-constexpr uint24_t items       = 0x00BAC8;
-constexpr uint8_t  itemsFrames = 256;
-constexpr uint16_t itemsWidth  = 10;
-constexpr uint16_t itemsHeight = 10;
+// Image info for "cursorimg"
+constexpr uint24_t cursorimg       = 0x00BAB0;
+constexpr uint8_t  cursorimgFrames = 1;
+constexpr uint16_t cursorimgWidth  = 10;
+constexpr uint16_t cursorimgHeight = 10;
+// Image info for "itemsheet"
+constexpr uint24_t itemsheet       = 0x00BAC8;
+constexpr uint8_t  itemsheetFrames = 256;
+constexpr uint16_t itemsheetWidth  = 8;
+constexpr uint16_t itemsheetHeight = 8;
 
 // FX addresses (only really used for initialization)
-constexpr uint16_t FX_DATA_PAGE = 0xFF21;
-constexpr uint24_t FX_DATA_BYTES = 52940;
+constexpr uint16_t FX_DATA_PAGE = 0xFF2D;
+constexpr uint24_t FX_DATA_BYTES = 49868;
 
 constexpr uint16_t FX_SAVE_PAGE = 0xFFF0;
 constexpr uint24_t FX_SAVE_BYTES = 0;

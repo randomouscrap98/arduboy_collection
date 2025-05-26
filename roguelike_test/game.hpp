@@ -7,7 +7,11 @@ constexpr uint8_t TILEEXIT = 15;
 constexpr uint8_t MAXITEMS = 27;
 constexpr uint8_t BASESTAMHEALTH = 255;
 constexpr uint8_t STARTSTAMHEALTH = 255;
-constexpr uint8_t STARTITEMS = 9;
+constexpr uint8_t STARTITEMS = 12;
+
+constexpr uint8_t ITEMSACROSS = 3;
+constexpr uint8_t ITEMSDOWN = 3;
+constexpr uint8_t ITEMSPAGE = ITEMSACROSS * ITEMSDOWN;
 
 struct Map {
   uint8_t *map;
@@ -90,6 +94,10 @@ void gs_tickstamina(GameState *gs);
 
 bool gs_exiting(GameState *gs);
 bool gs_dead(GameState *gs);
+
+// Compute new cursor based on button presses. Returns relative 1d pos "on
+// screen". Top left = 0, bottom right = ITEMSPAGE - 1
+uint8_t gs_item_cursor(GameState *gs, Arduboy2Base *arduboy);
 
 // Draw very simple 1:1 map at given location. Does not check if out of bounds
 void gs_draw_map(GameState *gs, Arduboy2Base *arduboy, uint8_t x, uint8_t y);
