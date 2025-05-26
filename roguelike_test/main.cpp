@@ -15,7 +15,7 @@
 
 // #define FULLMAP
 // #define INSTANTFLOORUP
-#define PRINTSTAMHEALTH
+// #define PRINTSTAMHEALTH
 // #define PRINTSEED
 
 #include <ArduboyFX.h>
@@ -99,6 +99,7 @@ void initiate_mainmenu() {
 
 void initiate_about() { gs.state = GS_STATEABOUT; }
 void initiate_itemmenu() { gs.state = GS_STATEITEMMENU; }
+void initiate_gamemain() { gs.state = GS_STATEMAIN; }
 
 void begin_game() {
   // void __attribute__((noinline)) begin_game() {
@@ -239,7 +240,10 @@ void run_about() {
 }
 
 void run_itemmenu() {
-  // NOTE: this keeps the menu position from before...
+  // NOTE: this keeps the item position from before...
+  if (arduboy.justPressed(B_BUTTON)) {
+    initiate_gamemain();
+  }
 }
 
 /* clang-format off */
@@ -326,8 +330,8 @@ void refresh_screen_full() {
   print_tinynumber(arduboy.sBuffer, gs.region_floor, 2, 120, 20);
 #ifdef FULLMAP
   gs_draw_map(&gs, &arduboy, MAPX, MAPY);
-#else
-  gs_draw_map_near(&gs, &arduboy, MAPX, MAPY, MAPRANGE);
+// #else
+// gs_draw_map_near(&gs, &arduboy, MAPX, MAPY, MAPRANGE);
 #endif
 }
 
@@ -337,6 +341,7 @@ void goto_next_floor() {
   // gs.total_floor++;
   gs.region_floor++;
   update_visual_position(0);
+  sound.tone(300, 30);
 }
 
 // void gen_mymap() {
@@ -385,6 +390,7 @@ void draw_runtime_data() {
   print_tinynumber(arduboy.sBuffer, sg.player_seed, 5, 0, HEIGHT - 5);
   print_tinynumber(arduboy.sBuffer, sg.total_runs, 5, 24, HEIGHT - 5);
 #endif
+  gs_draw_map_near(&gs, &arduboy, MAPX, MAPY, MAPRANGE);
   gs_draw_map_player(&gs, &arduboy, MAPX, MAPY,
                      arduboy.frameCount & MAPFLASH ? BLACK : WHITE);
 }
@@ -459,6 +465,7 @@ RESTARTSTATE:;
     draw_runtime_data();
     // Check for menu button first
     if (arduboy.justPressed(B_BUTTON)) {
+      initiate_itemmenu();
     }
     movement = gs_move(&gs, &arduboy);
     if (movement) {
@@ -470,19 +477,18 @@ RESTARTSTATE:;
     gs.animframes++;
     update_visual_position((uflot)gs.animframes / gs.animend);
     if (gs.animframes >= gs.animend) {
-      gs.state = GS_STATEMAIN;
       gs.player = gs.next_player;
-      gs_draw_map_near(&gs, &arduboy, MAPX, MAPY, MAPRANGE);
+      initiate_gamemain();
+      // refresh_screen_full();
     }
     break;
   case GS_FLOORTRANSITION:
     faze_screen(arduboy.sBuffer);
     gs.animframes++;
     if (gs.animframes >= gs.animend) {
-      gs.state = GS_STATEMAIN;
       goto_next_floor();
+      initiate_gamemain();
       refresh_screen_full();
-      sound.tone(300, 30);
     }
     goto SKIPRCRENDER;
     break;
@@ -517,6 +523,7 @@ RESTARTSTATE:;
     goto SKIPRCRENDER;
     break;
   case GS_STATEITEMMENU:
+    draw_runtime_data();
     run_itemmenu();
     break;
   }

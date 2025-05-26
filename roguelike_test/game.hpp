@@ -6,7 +6,7 @@ constexpr uint8_t TILEEMPTY = 0;
 constexpr uint8_t TILEEXIT = 15;
 constexpr uint8_t MAXITEMS = 27;
 constexpr uint8_t BASESTAMHEALTH = 255;
-constexpr uint8_t STARTSTAMHEALTH = 3;
+constexpr uint8_t STARTSTAMHEALTH = 255;
 constexpr uint8_t STARTITEMS = 9;
 
 struct Map {
