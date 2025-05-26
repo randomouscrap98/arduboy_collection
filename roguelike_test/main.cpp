@@ -15,7 +15,7 @@
 
 // #define FULLMAP
 // #define INSTANTFLOORUP
-#define PRINTSTAMHEALTH
+// #define PRINTSTAMHEALTH
 // #define PRINTSEED
 
 #include <ArduboyFX.h>
@@ -247,24 +247,16 @@ constexpr uint8_t ITEMCURSORSTARTX = 98;
 constexpr uint8_t ITEMCURSORSTARTY = 27;
 constexpr uint8_t ITEMCURSORMOVEX = 9;
 constexpr uint8_t ITEMCURSORMOVEY = 9;
-
 constexpr uint8_t ITEMSTARTX = 99;
 constexpr uint8_t ITEMSTARTY = 28;
-// constexpr uint8_t ITEMMOVEX = 9;
-// constexpr uint8_t ITEMMOVEY = 9;
+constexpr uint8_t ITEMSCROLLBARHEIGHT = 8;
+constexpr uint8_t ITEMSCROLLTOP = ITEMMENUTOP + 1;
+constexpr uint8_t ITEMSCROLLHEIGHT = ITEMMENUHEIGHT - 2;
 
 // Clear ONLY the items menu quickly
 void clear_items_menu() {
   arduboy.fillRect(ITEMMENUEDGE, ITEMMENUTOP, WIDTH - ITEMMENUEDGE,
                    ITEMMENUHEIGHT, BLACK);
-  // // Fill the top with a bar
-  // memset(arduboy.sBuffer + (ITEMMENUTOP >> 3) * WIDTH + ITEMMENUEDGE, 2,
-  //        WIDTH - ITEMMENUEDGE);
-  // // Trivially clear the rest
-  // clear_full_rect(
-  //     arduboy.sBuffer,
-  //     {.x = ITEMMENUEDGE, .y = ITEMMENUTOP, .w = WIDTH - ITEMMENUEDGE, .h =
-  //     });
 }
 
 // Draw ONLY the items in the menu right now
@@ -274,6 +266,15 @@ void draw_items_menu() {
     FX::drawBitmap(ITEMSTARTX + ITEMCURSORMOVEX * (i % ITEMSACROSS),
                    ITEMSTARTY + ITEMCURSORMOVEY * (i / ITEMSDOWN), itemsheet,
                    item, dbmOverwrite);
+  }
+  // Don't forget to draw the scrollbar
+  uint8_t range = gs.max_items - ITEMSPAGE;
+  if (range != 0) {
+    float fscrollpos = (float)gs.item_top / range;
+    arduboy.fillRect(WIDTH - 1,
+                     ITEMSCROLLTOP +
+                         (ITEMSCROLLHEIGHT - ITEMSCROLLBARHEIGHT) * fscrollpos,
+                     1, ITEMSCROLLBARHEIGHT);
   }
 }
 

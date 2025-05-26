@@ -2,16 +2,16 @@
 
 #include <Arduboy2.h>
 
+constexpr uint8_t ITEMSACROSS = 3;
+constexpr uint8_t ITEMSDOWN = 3;
+constexpr uint8_t ITEMSPAGE = ITEMSACROSS * ITEMSDOWN;
+
 constexpr uint8_t TILEEMPTY = 0;
 constexpr uint8_t TILEEXIT = 15;
 constexpr uint8_t MAXITEMS = 27;
 constexpr uint8_t BASESTAMHEALTH = 255;
 constexpr uint8_t STARTSTAMHEALTH = 255;
-constexpr uint8_t STARTITEMS = 12;
-
-constexpr uint8_t ITEMSACROSS = 3;
-constexpr uint8_t ITEMSDOWN = 3;
-constexpr uint8_t ITEMSPAGE = ITEMSACROSS * ITEMSDOWN;
+constexpr uint8_t STARTITEMS = ITEMSPAGE;
 
 struct Map {
   uint8_t *map;
