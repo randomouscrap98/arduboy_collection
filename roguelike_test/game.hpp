@@ -4,9 +4,10 @@
 
 constexpr uint8_t TILEEMPTY = 0;
 constexpr uint8_t TILEEXIT = 15;
-constexpr uint8_t MAXITEMS = 30;
+constexpr uint8_t MAXITEMS = 27;
 constexpr uint8_t BASESTAMHEALTH = 255;
 constexpr uint8_t STARTSTAMHEALTH = 3;
+constexpr uint8_t STARTITEMS = 9;
 
 struct Map {
   uint8_t *map;
@@ -38,6 +39,11 @@ struct SaveGame {
   uint16_t completed_region[4];
 };
 
+struct InventorySlot {
+  uint8_t item;
+  uint8_t count;
+};
+
 struct GameState {
   Map map;
   MapPlayer player;
@@ -47,11 +53,14 @@ struct GameState {
   uint8_t animframes; // remaining animation frames
   uint8_t region;
   uint8_t region_floor;
-  uint8_t total_floor;
+  // uint8_t total_floor;
   uint8_t stamina;
   uint8_t health;
-  uint8_t menu_pos; // global menu pos from last menu
-  uint8_t inventory[MAXITEMS];
+  uint8_t menu_pos;  // global menu pos from last menu
+  uint8_t item_top;  // top of visible item window in item count
+  uint8_t item_pos;  // actual position within inventory
+  uint8_t max_items; // Max items for current run (can increase)
+  InventorySlot inventory[MAXITEMS];
   unsigned long millis_start;
   // uint8_t buffered_input; // What it says
 };
@@ -68,6 +77,7 @@ constexpr uint8_t GS_STATEMENUANIM = 4;
 constexpr uint8_t GS_STATEMENU = 5;
 constexpr uint8_t GS_STATEGAMEOVER = 6;
 constexpr uint8_t GS_STATEABOUT = 7;
+constexpr uint8_t GS_STATEITEMMENU = 8;
 
 // Attempt certain movement, returning which action was performed. The changes
 // are applied immediately to the state.

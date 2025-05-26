@@ -49,6 +49,8 @@ constexpr uint8_t BARTOP = 2;
 constexpr uint8_t HEALTHBARX = 99;
 constexpr uint8_t STAMINABARX = 104;
 
+constexpr uflot HALF = 0.5f; // IDK
+
 constexpr float FOV = 1.0f;
 constexpr uint8_t FRAMERATE = 30;
 constexpr float MOVESPEED = 4.25f / FRAMERATE;
@@ -96,6 +98,7 @@ void initiate_mainmenu() {
 }
 
 void initiate_about() { gs.state = GS_STATEABOUT; }
+void initiate_itemmenu() { gs.state = GS_STATEITEMMENU; }
 
 void begin_game() {
   // void __attribute__((noinline)) begin_game() {
@@ -116,7 +119,6 @@ void begin_game() {
 // position and new player position. Will NOT be extended to enemies, since
 // they don't have rotation and their position is different
 void update_visual_position(uflot delta) {
-  constexpr uflot HALF = 0.5f;
   uflot indelt = 1 - delta;
   uflot baseX = HALF + gs.player.posX * (indelt);
   uflot baseY = HALF + gs.player.posY * (indelt);
@@ -236,6 +238,10 @@ void run_about() {
   }
 }
 
+void run_itemmenu() {
+  // NOTE: this keeps the menu position from before...
+}
+
 /* clang-format off */
 /* constexpr Type2Config REGION_DUNGEON PROGMEM = {
     .stops = 10,
@@ -328,7 +334,7 @@ void refresh_screen_full() {
 void goto_next_floor() {
   gen_region(gs.region);
   gs.next_player = gs.player;
-  gs.total_floor++;
+  // gs.total_floor++;
   gs.region_floor++;
   update_visual_position(0);
 }
@@ -403,6 +409,18 @@ bool run_movement(uint8_t movement) {
   return setstate;
 }
 
+// void check_exit() {
+//   static uint8_t exit_timer = 0;
+//   if (arduboy.buttonsState() == (DOWN_BUTTON | UP_BUTTON)) {
+//     exit_timer++;
+//   } else {
+//     exit_timer = 0;
+//   }
+//   if (exit_timer > FRAMERATE * 4) {
+//     arduboy.exitToBootloader();
+//   }
+// }
+
 void setup() {
   arduboy.boot();
   arduboy.flashlight(); // or safeMode(); for an extra 24 bytes wooo
@@ -426,6 +444,9 @@ void loop() {
 
   uint8_t movement;
   uint24_t raycast_bg = bg;
+
+  // check_exit();
+
 RESTARTSTATE:;
 
   switch (gs.state) {
@@ -436,6 +457,9 @@ RESTARTSTATE:;
     }
 #endif
     draw_runtime_data();
+    // Check for menu button first
+    if (arduboy.justPressed(B_BUTTON)) {
+    }
     movement = gs_move(&gs, &arduboy);
     if (movement) {
       run_movement(movement);
@@ -491,6 +515,9 @@ RESTARTSTATE:;
   case GS_STATEABOUT:
     run_about();
     goto SKIPRCRENDER;
+    break;
+  case GS_STATEITEMMENU:
+    run_itemmenu();
     break;
   }
 

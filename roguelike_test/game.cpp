@@ -86,14 +86,19 @@ uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy) {
   return move;
 }
 
+// FULL game restart, reset region, inventory, etc
 void gs_restart(GameState *gs) {
   gs->region = 1;
   gs->region_floor = 0;
-  gs->total_floor = 0;
+  // gs->total_floor = 0;
   gs->stamina = STARTSTAMHEALTH;
   gs->health = STARTSTAMHEALTH;
   gs->menu_pos = 0;
+  gs->item_pos = 0;
+  gs->item_top = 0;
+  gs->max_items = STARTITEMS;
   gs->millis_start = millis();
+  memset(gs->inventory, 0, sizeof(gs->inventory));
 }
 
 void gs_tickstamina(GameState *gs) {
