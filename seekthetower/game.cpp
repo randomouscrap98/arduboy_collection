@@ -99,11 +99,11 @@ void gs_restart(GameState *gs) {
   gs->max_items = STARTITEMS;
   gs->millis_start = millis();
   memset(gs->inventory, 0, sizeof(gs->inventory));
-  gs->inventory[0].count = 1;
-  gs->inventory[0].item = 1;
-  // Just a test
-  gs->inventory[5].count = 1;
-  gs->inventory[5].item = 2;
+  // gs->inventory[0].count = 1;
+  // gs->inventory[0].item = 1;
+  // // Just a test
+  // gs->inventory[5].count = 1;
+  // gs->inventory[5].item = 2;
 }
 
 void gs_tickstamina(GameState *gs) {
