@@ -15,6 +15,9 @@ constexpr uint8_t BASESTAMHEALTH = 255;
 constexpr uint8_t STARTSTAMHEALTH = 255;
 constexpr uint8_t STARTITEMS = ITEMSPAGE;
 
+// constexpr uint8_t ITEMS_SWAPBTN = A_BUTTON | B_BUTTON;
+constexpr uint8_t ITEMS_SWAPBTN = B_BUTTON;
+
 struct Map {
   uint8_t *map;
   uint8_t width;
@@ -66,6 +69,7 @@ struct GameState {
   uint8_t item_top;  // top of visible item window in item count
   uint8_t item_pos;  // actual position within inventory
   uint8_t max_items; // Max items for current run (can increase)
+  uint8_t tempstate1;
   InventorySlot inventory[MAXITEMS];
   unsigned long millis_start;
   // uint8_t buffered_input; // What it says
@@ -99,7 +103,7 @@ bool gs_dead(GameState *gs);
 
 // Compute new cursor based on button presses. Returns relative 1d pos "on
 // screen". Top left = 0, bottom right = ITEMSPAGE - 1
-uint8_t gs_item_cursor(GameState *gs, Arduboy2Base *arduboy);
+uint8_t gs_item_cursor(GameState *gs, Arduboy2Base *arduboy, uint8_t *swapped);
 
 // Draw very simple 1:1 map at given location. Does not check if out of bounds
 void gs_draw_map(GameState *gs, Arduboy2Base *arduboy, uint8_t x, uint8_t y);

@@ -34,7 +34,6 @@ Arduboy2Base arduboy;
 ArduboyTones sound(arduboy.audio.enabled);
 Tinyfont tinyfont =
     Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
-prng_state gen_state;
 
 constexpr uint8_t NUMINTERNALBYTES = 8;
 constexpr uint8_t NUMSPRITES = 16;
@@ -65,13 +64,14 @@ constexpr uint8_t DEFAULTANIMGAMEOVERFRAMES = ((float)FRAMERATE);
 // Once again we pick 16 sprites just in case we need them. 16 is a decent
 // number to not take up all the memory but still have enough to work with.
 RcContainer<NUMSPRITES, NUMINTERNALBYTES, WIDTH - SIDESIZE, HEIGHT - BOTTOMSIZE>
-    // 128, 64>
-    //  48> // WIDTH - SIDESIZE, HEIGHT - BOTTOMSIZE>
     raycast(tilesheet, spritesheet, spritesheetMask);
+// 128, 64>
+//  48> // WIDTH - SIDESIZE, HEIGHT - BOTTOMSIZE>
 // spritesheet, spritesheetMask);
 
 GameState gs;
 SaveGame sg;
+prng_state gen_state;
 
 void initiate_floor_transition() {
   sg.total_rooms++;
@@ -103,7 +103,10 @@ void initiate_mainmenu() {
 }
 
 void initiate_about() { gs.state = GS_STATEABOUT; }
-void initiate_itemmenu() { gs.state = GS_STATEITEMMENU; }
+void initiate_itemmenu() {
+  gs.tempstate1 = 1;
+  gs.state = GS_STATEITEMMENU;
+}
 void initiate_gamemain() { gs.state = GS_STATEMAIN; }
 
 void begin_game() {
@@ -286,18 +289,26 @@ void draw_items_menu() {
 
 void run_itemmenu() {
   clear_items_menu();
-  if (arduboy.justPressed(B_BUTTON)) {
-    // Draw items WITHOUT cursor, then jump to main
-    draw_items_menu();
-    initiate_gamemain();
-    return;
+  if (arduboy.justReleased(B_BUTTON)) {
+    if (gs.tempstate1) {
+      gs.tempstate1 = 0;
+    } else {
+      // Draw items WITHOUT cursor, then jump to main
+      draw_items_menu();
+      initiate_gamemain();
+      return;
+    }
   }
   // NOTE: this keeps the item position from before...
-  uint8_t vpos = gs_item_cursor(&gs, &arduboy);
+  uint8_t vpos = gs_item_cursor(&gs, &arduboy, &gs.tempstate1);
   // Must draw cursor first, then items. Ah well, could fix it maybe
   FX::drawBitmap(ITEMCURSORSTARTX + ITEMCURSORMOVEX * (vpos % ITEMSACROSS),
                  ITEMCURSORSTARTY + ITEMCURSORMOVEY * (vpos / ITEMSDOWN),
-                 cursorimg, 0, dbmOverwrite);
+                 ((arduboy.buttonsState() & ITEMS_SWAPBTN) == ITEMS_SWAPBTN)
+                     ? cursorselectimg
+                     : cursorimg,
+                 0, dbmOverwrite);
+  //((arduboy.buttonsState() & ITEMS_SWAPBTN) == ITEMS_SWAPBTN)
   draw_items_menu();
 }
 
@@ -473,7 +484,8 @@ void setup() {
   arduboy.boot();
   arduboy.flashlight(); // or safeMode(); for an extra 24 bytes wooo
   arduboy.setFrameRate(FRAMERATE);
-  FX::begin(FX_DATA_PAGE, FX_SAVE_PAGE);
+  FX_INIT();
+  // FX::begin(FX_DATA_PAGE, FX_SAVE_PAGE);
   raycast.render.spritescaling[2] = 0.75f;
   raycast.render.spritescaling[3] = 0.5f;
   gs.map.width = RCMAXMAPDIMENSION;

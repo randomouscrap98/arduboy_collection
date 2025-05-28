@@ -1,8 +1,9 @@
 #pragma once
 
+#include <Arduboy2.h>
 using uint24_t = __uint24;
 
-// Generated with ardugotools on 2025-05-28T03:28:29-04:00
+// Generated with ardugotools on 2025-05-28T19:17:03-04:00
 
 // Image info for "tilesheet"
 // Raycast frame bytes: 172, mipmap widths: 32,16,8,4
@@ -38,18 +39,23 @@ constexpr uint24_t cursorimg       = 0x0212B0;
 constexpr uint8_t  cursorimgFrames = 1;
 constexpr uint16_t cursorimgWidth  = 10;
 constexpr uint16_t cursorimgHeight = 10;
+// Image info for "cursorselectimg"
+constexpr uint24_t cursorselectimg       = 0x0212C8;
+constexpr uint8_t  cursorselectimgFrames = 1;
+constexpr uint16_t cursorselectimgWidth  = 10;
+constexpr uint16_t cursorselectimgHeight = 10;
 // Image info for "itemsheet"
-constexpr uint24_t itemsheet       = 0x0212C8;
+constexpr uint24_t itemsheet       = 0x0212E0;
 constexpr uint8_t  itemsheetFrames = 256;
 constexpr uint16_t itemsheetWidth  = 8;
 constexpr uint16_t itemsheetHeight = 8;
 
 // FX addresses (only really used for initialization)
 constexpr uint16_t FX_DATA_PAGE = 0xFDD5;
-constexpr uint24_t FX_DATA_BYTES = 137932;
+constexpr uint24_t FX_DATA_BYTES = 137956;
 
 constexpr uint16_t FX_SAVE_PAGE = 0xFFF0;
 constexpr uint24_t FX_SAVE_BYTES = 0;
 
 // Helper macro to initialize fx, call in setup()
-#define FX_INIT() FX::begin(FX_DATA_PAGE, FX_DATA_SAVE)
+#define FX_INIT() FX::begin(FX_DATA_PAGE, FX_SAVE_PAGE)
