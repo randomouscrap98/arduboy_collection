@@ -12,6 +12,21 @@ raycast_helper("tilesheet", false, {
 	["4"] = image_resize(tiles, width, height, 4, 4),
 })
 
+-- TODO: sprites will use manual mipmapping later
+tiles, frames, width, height = image({
+	filename = "resources/spritesheet.png",
+	width = 32,
+	height = 32,
+	rawtiles = true,
+})
+-- NOTE: true here is use mask!!
+raycast_helper("spritesheet", true, {
+	["32"] = tiles,
+	["16"] = image_resize(tiles, width, height, 16, 16),
+	["8"] = image_resize(tiles, width, height, 8, 8),
+	["4"] = image_resize(tiles, width, height, 4, 4),
+})
+
 image_helper("menu", image("resources/menu.png"))
 image_helper("bg", image("resources/bg_96x56.png"))
 image_helper("titleimg", image("resources/title.png"))

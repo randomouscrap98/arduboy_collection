@@ -75,7 +75,7 @@ uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy) {
     gs->next_player.posX += pmod * dx;
     gs->next_player.posY += pmod * dy;
     uint8_t mt = MAPT(gs->map, gs->next_player.posX, gs->next_player.posY);
-    if (!(mt == TILEEMPTY || (mt & TILEEXIT) == TILEEXIT)) {
+    if (!(mt == TILEEMPTY || (mt & TILEEXITBITS) == TILEEXITBITS)) {
       move &= ~(GS_MOVEBACKWARD | GS_MOVEFORWARD);
       gs->next_player = gs->player; // Undo what we did before
     }
@@ -120,7 +120,7 @@ void gs_tickstamina(GameState *gs) {
 
 bool gs_exiting(GameState *gs) {
   return (MAPT(gs->map, gs->next_player.posX, gs->next_player.posY) &
-          TILEEXIT) == TILEEXIT;
+          TILEEXITBITS) == TILEEXITBITS;
 }
 
 bool gs_dead(GameState *gs) { return gs->health == 0; }

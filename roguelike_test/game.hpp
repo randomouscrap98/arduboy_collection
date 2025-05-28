@@ -7,7 +7,9 @@ constexpr uint8_t ITEMSDOWN = 3;
 constexpr uint8_t ITEMSPAGE = ITEMSACROSS * ITEMSDOWN;
 
 constexpr uint8_t TILEEMPTY = 0;
-constexpr uint8_t TILEEXIT = 15;
+constexpr uint8_t TILEEXITBITS = 15;
+constexpr uint8_t TILERESERVED = 254;
+// tile that's unusable, used for special things
 constexpr uint8_t MAXITEMS = 27;
 constexpr uint8_t BASESTAMHEALTH = 255;
 constexpr uint8_t STARTSTAMHEALTH = 255;

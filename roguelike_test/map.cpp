@@ -1,4 +1,5 @@
 #include "map.hpp"
+#include "game.hpp"
 
 void set_filled_map(Map m, TileConfig tiles) {
   memset(m.map, tiles.main, m.width * m.height);
@@ -20,6 +21,37 @@ bool clear_rect_map(Map m, MRect room) {
     }
     return true;
   }
+  return false;
+}
+
+// Remove any tiles that are "reserved"
+void remove_reserved_map(Map m) {
+  for (uint16_t i = 0; i < m.width * m.height; i++) {
+    if (m.map[i] == TILERESERVED)
+      m.map[i] = 0;
+  }
+}
+
+bool has_2x2_box_around(Map m, uint8_t x, uint8_t y) {
+  if (x < 1 || y < 1 || x >= m.width - 1 || y >= m.height - 1)
+    return false;
+
+  // Start at top left box
+  for (int8_t yi = -1; yi <= 0; yi++) {
+    for (int8_t xi = -1; xi <= 0; xi++) {
+      // Scan a 2x2 box at current offset from real x/y
+      for (int8_t yb = 0; yb < 2; yb++) {
+        for (int8_t xb = 0; xb < 2; xb++) {
+          if (MAPT(m, x + xi + xb, y + yi + yb)) {
+            goto BOXAROUND_NOTFOUND;
+          }
+        }
+      }
+      return true;
+    BOXAROUND_NOTFOUND:;
+    }
+  }
+
   return false;
 }
 

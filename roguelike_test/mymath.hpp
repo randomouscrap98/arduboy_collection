@@ -23,6 +23,11 @@ uint16_t lcg_shuffle(uint16_t lcg_seed, uint16_t iteration);
 
 #define RANDB(x) (prng() % (x))
 
+// Random chance out of given. If given 1, always true. If given
+// 2, one out of 2 chance, etc. May be inaccurate! Should be faster
+// and less code than RANDB
+#define RANDOF(c) (prng() < (256 / c))
+
 // A rectangle starting at x, y and having side w, h
 struct MRect {
   uint8_t x, y, w, h;

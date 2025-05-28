@@ -34,6 +34,7 @@ Arduboy2Base arduboy;
 ArduboyTones sound(arduboy.audio.enabled);
 Tinyfont tinyfont =
     Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
+prng_state gen_state;
 
 constexpr uint8_t NUMINTERNALBYTES = 8;
 constexpr uint8_t NUMSPRITES = 16;
@@ -49,7 +50,8 @@ constexpr uint8_t BARTOP = 2;
 constexpr uint8_t HEALTHBARX = 99;
 constexpr uint8_t STAMINABARX = 104;
 
-constexpr uflot HALF = 0.5f; // IDK
+constexpr uflot HALF = 0.5f;   // IDK
+constexpr muflot MHALF = 0.5f; // IDK
 
 constexpr float FOV = 1.0f;
 constexpr uint8_t FRAMERATE = 30;
@@ -63,7 +65,8 @@ constexpr uint8_t DEFAULTANIMGAMEOVERFRAMES = ((float)FRAMERATE);
 // Once again we pick 16 sprites just in case we need them. 16 is a decent
 // number to not take up all the memory but still have enough to work with.
 RcContainer<NUMSPRITES, NUMINTERNALBYTES, WIDTH - SIDESIZE, HEIGHT - BOTTOMSIZE>
-    raycast(tilesheet, NULL, NULL); // spritesheet, spritesheetMask);
+    raycast(tilesheet, spritesheet, spritesheetMask);
+// spritesheet, spritesheetMask);
 
 GameState gs;
 SaveGame sg;
@@ -113,6 +116,7 @@ void begin_game() {
   FX::saveGameState(sg);
   gs_restart(&gs);
   prng_seed(lcg_shuffle(sg.player_seed, sg.total_runs)); // change this later
+  gen_state = prng_snapshot();
   initiate_floor_transition();
 }
 
@@ -341,8 +345,39 @@ void refresh_screen_full() {
   draw_items_menu();
 }
 
+constexpr uint8_t ITEMSPRITE = 1;
+
+// TODO: this will need to be a very complex function maybe...
+void generate_sprites() {
+  // Remove any leftover sprites before we add more
+  raycast.sprites.resetSprites();
+  uint8_t spawn = 0;
+  for (uint8_t y = 1; y < gs.map.height - 1; y++) {
+    for (uint8_t x = 1; x < gs.map.width - 1; x++) {
+      if (spawn >= NUMSPRITES)
+        goto NOMOREGENERATESPRITES;
+      if (RANDOF(4)) {
+        if (has_2x2_box_around(gs.map, x, y)) {
+          MAPT(gs.map, x, y) = TILERESERVED;
+          RcSprite<NUMINTERNALBYTES> *sp = raycast.sprites.addSprite(
+              MHALF + x, MHALF + y, ITEMSPRITE, 1, 0, NULL);
+          spawn++;
+          // raycast.sprites
+        }
+      }
+    }
+  }
+NOMOREGENERATESPRITES:
+  remove_reserved_map(gs.map);
+}
+
 void goto_next_floor() {
+  // Restore state from last floor (so generation always the same per seed)
+  prng_restore(gen_state);
   gen_region(gs.region);
+  // Also generate some items...
+  generate_sprites();
+  gen_state = prng_snapshot();
   gs.next_player = gs.player;
   // gs.total_floor++;
   gs.region_floor++;
@@ -369,21 +404,14 @@ void goto_next_floor() {
 // ASSUMING THE TEXT AREA DECORATION IS KNOWN, this will very VERY quickly clear
 // JUST the text area fully. It's very fast and very little code...
 void clear_textarea() {
-  // arduboy.fillRect(0, HEIGHT - 7, WIDTH, 7, BLACK);
   memset(arduboy.sBuffer + (WIDTH * ((HEIGHT >> 3) - 1)), 1, WIDTH);
 }
 
 // Draw a standard 2x16 bar at given x, y chosen by default
 void draw_std_bar(uint8_t x, uint8_t filled, uint8_t max) {
   uint8_t fh = round(BARHEIGHT * (float)filled / (float)max);
-  // uint8_t fh = round(ffilled); //BARHEIGHT - round(ffilled);
   arduboy.fillRect(x, BARTOP, 2, BARHEIGHT, BLACK);
   arduboy.fillRect(x, BARTOP + BARHEIGHT - fh, 2, fh, WHITE);
-  // for (uint8_t y = 0; y < BARHEIGHT; y++) {
-  //   uint8_t col = y < fh ? BLACK : WHITE;
-  //   arduboy.drawPixel(x, BARTOP + y, col);
-  //   arduboy.drawPixel(x + 1, BARTOP + y, col);
-  // }
 }
 
 void draw_runtime_data() {
