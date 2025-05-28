@@ -55,6 +55,18 @@ bool has_2x2_box_around(Map m, uint8_t x, uint8_t y) {
   return false;
 }
 
+bool has_3x3_box_around(Map m, uint8_t x, uint8_t y) {
+  if (x < 1 || y < 1 || x >= m.width - 1 || y >= m.height - 1)
+    return false;
+  for (int8_t yi = -1; yi <= 1; yi++) {
+    for (int8_t xi = -1; xi <= 1; xi++) {
+      if (MAPT(m, x + xi, y + yi) != TILEEMPTY)
+        return false;
+    }
+  }
+  return true;
+}
+
 static bool map_area_overlaps_buffer(Map m, MRect r) { //, bool filled) {
   for (uint8_t y = 0; y < r.h + 2; y++) {
     for (uint8_t x = 0; x < r.w + 2; x++) {
@@ -104,17 +116,17 @@ static bool any_corner_exposed(Map m, uint8_t x, uint8_t y) {
   return false;
 }
 
-static bool block_empty(Map m, uint8_t x, uint8_t y) {
-  if (x < 1 || y < 1 || x >= m.width - 1 || y >= m.height - 1)
-    return false;
-  for (int8_t yi = -1; yi <= 1; yi++) {
-    for (int8_t xi = -1; xi <= 1; xi++) {
-      if (MAPT(m, x + xi, y + yi) != TILEEMPTY)
-        return false;
-    }
-  }
-  return true;
-}
+// static bool block_empty(Map m, uint8_t x, uint8_t y) {
+//   if (x < 1 || y < 1 || x >= m.width - 1 || y >= m.height - 1)
+//     return false;
+//   for (int8_t yi = -1; yi <= 1; yi++) {
+//     for (int8_t xi = -1; xi <= 1; xi++) {
+//       if (MAPT(m, x + xi, y + yi) != TILEEMPTY)
+//         return false;
+//     }
+//   }
+//   return true;
+// }
 
 // #define RANDS(x) (prng16(config->state) % (x))
 
@@ -229,7 +241,7 @@ ENDTYPE2EXITFIND:;
             }
             break;
           case TILEEXTRATYPE_PILLAR:
-            if (block_empty(m, x, y)) {
+            if (has_3x3_box_around(m, x, y)) {
               MAPT(m, x, y) = config->tiles.extras[i].tile;
             }
           }

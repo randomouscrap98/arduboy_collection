@@ -1,9 +1,9 @@
-#include "Arduboy2Core.h"
-#include "WString.h"
+// This saves 1000 bytes but doesn't help the overdraw glitch
+// #define RCSMALLLOOPS
+
 #include <Arduboy2.h>
 #include <ArduboyTones.h>
 #include <Tinyfont.h>
-#include <avr/pgmspace.h>
 
 // This saves ~2700 pgm and 110 ram, will need exitToBootloader in menu
 // ARDUBOY_NO_USB
@@ -15,13 +15,13 @@
 
 // #define FULLMAP
 // #define INSTANTFLOORUP
+// #define INSTANTREFRESH
 // #define PRINTSTAMHEALTH
 // #define PRINTSEED
+// #define PRINTDIRXY
+// #define RCNOBACKGROUND
 
-#include <ArduboyFX.h>
-#include <ArduboyRaycastFX.h>
-
-#include "ArduboyRaycast_Map.h"
+#include "LocalRaycast/ArduboyRaycastFX.h"
 #include "game.hpp"
 #include "graphics.hpp"
 #include "map.hpp"
@@ -58,13 +58,15 @@ constexpr uint8_t FRAMERATE = 30;
 constexpr float MOVESPEED = 4.25f / FRAMERATE;
 constexpr float ROTSPEED = 3.0f / FRAMERATE;
 
-constexpr uint8_t DEFAULTANIMFRAMES = ((float)FRAMERATE) * 0.34;
-constexpr uint8_t DEFAULTANIMEXITFRAMES = ((float)FRAMERATE) * 0.6;
+constexpr uint8_t DEFAULTANIMFRAMES = ((float)FRAMERATE) * 0.34f;
+constexpr uint8_t DEFAULTANIMEXITFRAMES = ((float)FRAMERATE) * 0.6f;
 constexpr uint8_t DEFAULTANIMGAMEOVERFRAMES = ((float)FRAMERATE);
 
 // Once again we pick 16 sprites just in case we need them. 16 is a decent
 // number to not take up all the memory but still have enough to work with.
 RcContainer<NUMSPRITES, NUMINTERNALBYTES, WIDTH - SIDESIZE, HEIGHT - BOTTOMSIZE>
+    // 128, 64>
+    //  48> // WIDTH - SIDESIZE, HEIGHT - BOTTOMSIZE>
     raycast(tilesheet, spritesheet, spritesheetMask);
 // spritesheet, spritesheetMask);
 
@@ -314,6 +316,9 @@ void gen_region(uint8_t region) {
     c.room_unlikely = 3;
     c.room_min = 2;
     c.room_max = 4;
+    // c.room_unlikely = 1; // For big rooms (debugging?)
+    // c.room_min = 3;
+    // c.room_max = 4;
     c.turn_unlikely = 255;
     c.tiles.main = 1;
     c.tiles.perimeter = 7;
@@ -346,6 +351,11 @@ void refresh_screen_full() {
 }
 
 constexpr uint8_t ITEMSPRITE = 1;
+constexpr uint8_t ITEMSIZE = 2;
+
+void item_hover(RcSprite<NUMINTERNALBYTES> *sp) {
+  sp->setHeight(4 + 2 * sin(arduboy.frameCount / 6.0f));
+}
 
 // TODO: this will need to be a very complex function maybe...
 void generate_sprites() {
@@ -354,13 +364,13 @@ void generate_sprites() {
   uint8_t spawn = 0;
   for (uint8_t y = 1; y < gs.map.height - 1; y++) {
     for (uint8_t x = 1; x < gs.map.width - 1; x++) {
-      if (spawn >= NUMSPRITES)
+      if (spawn >= NUMSPRITES) // NUMSPRITES)
         goto NOMOREGENERATESPRITES;
-      if (RANDOF(4)) {
+      if (RANDOF(16)) {
         if (has_2x2_box_around(gs.map, x, y)) {
           MAPT(gs.map, x, y) = TILERESERVED;
           RcSprite<NUMINTERNALBYTES> *sp = raycast.sprites.addSprite(
-              MHALF + x, MHALF + y, ITEMSPRITE, 1, 0, NULL);
+              MHALF + x, MHALF + y, ITEMSPRITE, ITEMSIZE, 0, item_hover);
           spawn++;
           // raycast.sprites
         }
@@ -417,6 +427,13 @@ void draw_std_bar(uint8_t x, uint8_t filled, uint8_t max) {
 void draw_runtime_data() {
   draw_std_bar(HEALTHBARX, gs.health, BASESTAMHEALTH);
   draw_std_bar(STAMINABARX, gs.stamina, BASESTAMHEALTH);
+#ifdef PRINTDIRXY
+  clear_textarea();
+  tinyfont.setCursor(0, HEIGHT - 6);
+  tinyfont.print(raycast.player.dirX);
+  tinyfont.setCursor(30, HEIGHT - 6);
+  tinyfont.print(raycast.player.dirY);
+#endif
 #ifdef PRINTSTAMHEALTH
   clear_textarea();
   print_tinynumber(arduboy.sBuffer, gs.health, 3, 0, HEIGHT - 5);
@@ -457,7 +474,8 @@ void setup() {
   arduboy.flashlight(); // or safeMode(); for an extra 24 bytes wooo
   arduboy.setFrameRate(FRAMERATE);
   FX::begin(FX_DATA_PAGE, FX_SAVE_PAGE);
-  raycast.render.spritescaling[2] = 0.75;
+  raycast.render.spritescaling[2] = 0.75f;
+  raycast.render.spritescaling[3] = 0.5f;
   gs.map.width = RCMAXMAPDIMENSION;
   gs.map.height = RCMAXMAPDIMENSION;
   gs.map.map = raycast.worldMap.map;
@@ -480,6 +498,11 @@ RESTARTSTATE:;
 
   switch (gs.state) {
   case GS_STATEMAIN:
+#ifdef INSTANTREFRESH
+    if (arduboy.justPressed(A_BUTTON)) {
+      refresh_screen_full();
+    }
+#endif
 #ifdef INSTANTFLOORUP
     if (arduboy.justPressed(A_BUTTON)) {
       initiate_floor_transition();
@@ -552,10 +575,14 @@ RESTARTSTATE:;
   }
 
   // Draw the correct background for the area.
+#ifdef RCNOBACKGROUND
+  raycast.render.clearRaycast(&arduboy);
+#else
   if (raycast_bg) {
     render_fximage(raycast_bg, arduboy.sBuffer, raycast.render.VIEWWIDTH,
                    raycast.render.VIEWHEIGHT);
   }
+#endif
   raycast.runIteration(&arduboy);
 
 SKIPRCRENDER:;
