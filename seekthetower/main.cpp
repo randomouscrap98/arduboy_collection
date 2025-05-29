@@ -4,6 +4,7 @@
 #include <Arduboy2.h>
 #include <ArduboyTones.h>
 #include <Tinyfont.h>
+#include <avr/pgmspace.h>
 
 // This saves ~2700 pgm and 110 ram, will need exitToBootloader in menu
 // ARDUBOY_NO_USB
@@ -271,10 +272,12 @@ void clear_items_menu() {
 // Draw ONLY the items in the menu right now
 void draw_items_menu() {
   for (uint8_t i = 0; i < ITEMSPAGE; i++) {
-    uint8_t item = gs.inventory[gs.item_top + i].item;
-    FX::drawBitmap(ITEMSTARTX + ITEMCURSORMOVEX * (i % ITEMSACROSS),
-                   ITEMSTARTY + ITEMCURSORMOVEY * (i / ITEMSDOWN), itemsheet,
-                   item, dbmOverwrite);
+    if (gs.inventory[gs.item_top + i].count) {
+      uint8_t item = gs.inventory[gs.item_top + i].item;
+      FX::drawBitmap(ITEMSTARTX + ITEMCURSORMOVEX * (i % ITEMSACROSS),
+                     ITEMSTARTY + ITEMCURSORMOVEY * (i / ITEMSDOWN), itemsheet,
+                     item, dbmOverwrite);
+    }
   }
   // Don't forget to draw the scrollbar
   uint8_t range = gs.max_items - ITEMSPAGE;
@@ -361,11 +364,53 @@ void refresh_screen_full() {
   draw_items_menu();
 }
 
-constexpr uint8_t ITEMSPRITE = 1;
-constexpr uint8_t ITEMSIZE = 2;
+// constexpr uint8_t ITEMSPRITE = 1;
+// constexpr uint8_t ITEMSIZE = 2;
 
 void item_hover(RcSprite<NUMINTERNALBYTES> *sp) {
   sp->setHeight(4 + 2 * sin(arduboy.frameCount / 6.0f));
+}
+
+struct SpriteDefinition {
+  uint8_t sprite;
+  uint8_t size;
+  uint8_t offset;
+  void (*func)(RcSprite<NUMINTERNALBYTES> *);
+};
+
+constexpr SpriteDefinition sprite_definitions[] PROGMEM = {
+    {
+        1, // Item bag
+        2,
+        0,
+        item_hover,
+    },
+    {
+        2, // rocks
+        3,
+        4,
+        NULL,
+    },
+};
+
+uint8_t try_place_2x2(uint8_t item, uint8_t retries, uint8_t count) {
+  uint8_t placed = 0;
+  for (uint8_t i = 0; i < retries; i++) {
+    uint8_t x = 1 + RANDB(14);
+    uint8_t y = 1 + RANDB(14);
+    if (has_2x2_box_around(gs.map, x, y)) {
+      MAPT(gs.map, x, y) = TILERESERVED;
+      SpriteDefinition sp;
+      memcpy_P(&sp, sprite_definitions + item, sizeof(SpriteDefinition));
+      // RcSprite<NUMINTERNALBYTES> *sp =
+      raycast.sprites.addSprite(MHALF + x, MHALF + y, sp.sprite, sp.size,
+                                sp.offset, sp.func);
+      placed++;
+      if (placed >= count)
+        break;
+    }
+  }
+  return placed;
 }
 
 // TODO: this will need to be a very complex function maybe...
@@ -373,21 +418,29 @@ void generate_sprites() {
   // Remove any leftover sprites before we add more
   raycast.sprites.resetSprites();
   uint8_t spawn = 0;
-  for (uint8_t y = 1; y < gs.map.height - 1; y++) {
-    for (uint8_t x = 1; x < gs.map.width - 1; x++) {
-      if (spawn >= NUMSPRITES) // NUMSPRITES)
-        goto NOMOREGENERATESPRITES;
-      if (RANDOF(16)) {
-        if (has_2x2_box_around(gs.map, x, y)) {
-          MAPT(gs.map, x, y) = TILERESERVED;
-          RcSprite<NUMINTERNALBYTES> *sp = raycast.sprites.addSprite(
-              MHALF + x, MHALF + y, ITEMSPRITE, ITEMSIZE, 0, item_hover);
-          spawn++;
-          // raycast.sprites
-        }
-      }
-    }
-  }
+  // These retries and numbers can be tweaked. May store in FX later
+  spawn += try_place_2x2(0, 10, 1);
+  if (spawn >= NUMSPRITES)
+    goto NOMOREGENERATESPRITES;
+  spawn += try_place_2x2(1, 10, 2);
+  if (spawn >= NUMSPRITES)
+    goto NOMOREGENERATESPRITES;
+
+  // for (uint8_t y = 1; y < gs.map.height - 1; y++) {
+  //   for (uint8_t x = 1; x < gs.map.width - 1; x++) {
+  //     if (spawn >= NUMSPRITES) // NUMSPRITES)
+  //       goto NOMOREGENERATESPRITES;
+  //     if (RANDOF(16)) {
+  //       if (has_2x2_box_around(gs.map, x, y)) {
+  //         MAPT(gs.map, x, y) = TILERESERVED;
+  //         RcSprite<NUMINTERNALBYTES> *sp = raycast.sprites.addSprite(
+  //             MHALF + x, MHALF + y, ITEMSPRITE, ITEMSIZE, 0, item_hover);
+  //         spawn++;
+  //         // raycast.sprites
+  //       }
+  //     }
+  //   }
+  // }
 NOMOREGENERATESPRITES:
   remove_reserved_map(gs.map);
 }
@@ -487,7 +540,7 @@ void setup() {
   FX_INIT();
   // FX::begin(FX_DATA_PAGE, FX_SAVE_PAGE);
   raycast.render.spritescaling[2] = 0.75f;
-  raycast.render.spritescaling[3] = 0.5f;
+  raycast.render.spritescaling[3] = 0.6f;
   gs.map.width = RCMAXMAPDIMENSION;
   gs.map.height = RCMAXMAPDIMENSION;
   gs.map.map = raycast.worldMap.map;

@@ -3,7 +3,7 @@
 #include <Arduboy2.h>
 using uint24_t = __uint24;
 
-// Generated with ardugotools on 2025-05-28T23:24:00-04:00
+// Generated with ardugotools on 2025-05-29T03:16:03-04:00
 
 // Image info for "tilesheet"
 // Raycast frame bytes: 172, mipmap widths: 32,16,8,4
@@ -49,10 +49,14 @@ constexpr uint24_t itemsheet       = 0x0212E0;
 constexpr uint8_t  itemsheetFrames = 256;
 constexpr uint16_t itemsheetWidth  = 8;
 constexpr uint16_t itemsheetHeight = 8;
+constexpr uint24_t itemstacks = 0x021AE4;
+constexpr uint24_t itemprices = 0x021AF2;
+constexpr uint24_t itemnames = 0x021B00;
+constexpr uint24_t itemnameoffsets = 0x021B82;
 
 // FX addresses (only really used for initialization)
-constexpr uint16_t FX_DATA_PAGE = 0xFDD5;
-constexpr uint24_t FX_DATA_BYTES = 137956;
+constexpr uint16_t FX_DATA_PAGE = 0xFDD4;
+constexpr uint24_t FX_DATA_BYTES = 138142;
 
 constexpr uint16_t FX_SAVE_PAGE = 0xFFF0;
 constexpr uint24_t FX_SAVE_BYTES = 0;

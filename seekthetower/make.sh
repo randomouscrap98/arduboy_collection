@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 ardugotools fxdata generate
 
 DEVICE="${1:-fx}"

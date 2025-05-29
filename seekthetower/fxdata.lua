@@ -43,6 +43,39 @@ image_helper(
 	})
 )
 
+-- We have some file with item definitions in it
+local masterlist = toml(file("items.toml"))
+-- print(masterlist)
+-- print(#masterlist)
+
+local maxstacks = {}
+local prices = {}
+local names = {}
+local names_ptr = 0
+local names_offsets = {}
+for _, item in ipairs(masterlist.items) do
+	table.insert(maxstacks, item.maxstack)
+	table.insert(prices, item.buy)
+	local name = item.name .. "\0"
+	table.insert(names, name)
+	table.insert(names_offsets, names_ptr)
+	names_ptr = names_ptr + #name
+end
+
+field("itemstacks")
+write(bytes(maxstacks))
+
+field("itemprices")
+write(bytes(prices))
+
+field("itemnames")
+for _, name in ipairs(names) do
+	write(name)
+end
+
+field("itemnameoffsets")
+write(bytes(names_offsets, "uint16"))
+
 -- Sprites (use manual mipmapping) --
 -- function loadss(swidth)
 -- 	sprites = image({

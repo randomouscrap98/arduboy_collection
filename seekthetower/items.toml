@@ -10,79 +10,149 @@
 [[items]] # 0
 name="NOITEM"
 maxstack=0
-type=0
-value=0
-sell=0
+buy=0
 
 [[items]] # 1
 name="POTION"
 maxstack=1
-type=1
-value=1
 buy=3
 
 [[items]] # 2
 name="HI POTION"
 maxstack=1
-type=1
-value=2
 buy=8
 
 [[items]] # 3
-name="MAX POTION"
-maxstack=1
-type=1
-value=3
-buy=16
-
-[[items]] # 4
 name="FOOD"
 maxstack=1
-type=2
-value=1
 buy=2
 
-[[items]] # 5
-name="GOOD FOOD"
+[[items]] # 4
+name="HI FOOD"
 maxstack=1
-type=2
-value=2
 buy=5
 
+[[items]] # 5
+name="ROCK"
+maxstack=10
+buy=1
+
 [[items]] # 6
-name="BEST FOOD"
-maxstack=1
-type=2
-value=3
-buy=10
+name="SHARP ROCK?"
+maxstack=10
+buy=3
 
 [[items]] # 7
 name="REVIVE SPIRIT"
 maxstack=1
-type=3
-value=1
 buy=20
 
 [[items]] # 8
 name="REVIVE SOUL"
 maxstack=1
-type=3
-value=2
 buy=40
 
 [[items]] # 9
-name="ROCK"
-maxstack=20
-type=4
-value=1
-buy=1
+name="ATTACK UP"
+maxstack=1
+buy=20
 
 [[items]] # 10
-name="SPIKE"
-maxstack=20
-type=4
-value=2
-buy=2
+name="DEFENSE UP"
+maxstack=1
+buy=20
+
+[[items]] # 11
+name="RUSTY SWORD"
+maxstack=1
+buy=5
+
+[[items]] # 12
+name="SWORD"
+maxstack=1
+buy=10
+
+[[items]] # 13
+name="GREATSWORD"
+maxstack=1
+buy=20
+
+# [[items]] # 0
+# name="NOITEM"
+# maxstack=0
+# type=0
+# value=0
+# sell=0
+# 
+# [[items]] # 1
+# name="POTION"
+# maxstack=1
+# type=1
+# value=1
+# buy=3
+# 
+# [[items]] # 2
+# name="HI POTION"
+# maxstack=1
+# type=1
+# value=2
+# buy=8
+# 
+# [[items]] # 3
+# name="MAX POTION"
+# maxstack=1
+# type=1
+# value=3
+# buy=16
+# 
+# [[items]] # 4
+# name="FOOD"
+# maxstack=1
+# type=2
+# value=1
+# buy=2
+# 
+# [[items]] # 5
+# name="GOOD FOOD"
+# maxstack=1
+# type=2
+# value=2
+# buy=5
+# 
+# [[items]] # 6
+# name="BEST FOOD"
+# maxstack=1
+# type=2
+# value=3
+# buy=10
+# 
+# [[items]] # 7
+# name="REVIVE SPIRIT"
+# maxstack=1
+# type=3
+# value=1
+# buy=20
+# 
+# [[items]] # 8
+# name="REVIVE SOUL"
+# maxstack=1
+# type=3
+# value=2
+# buy=40
+# 
+# [[items]] # 9
+# name="ROCK"
+# maxstack=20
+# type=4
+# value=1
+# buy=1
+# 
+# [[items]] # 10
+# name="SPIKE"
+# maxstack=20
+# type=4
+# value=2
+# buy=2
 
 # [[items]] # 11
 # name="SPIKE"
@@ -90,3 +160,4 @@ buy=2
 # type=4
 # value=2
 # sell=0
+
