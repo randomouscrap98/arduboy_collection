@@ -40,6 +40,8 @@ constexpr uint8_t NUMINTERNALBYTES = 8;
 constexpr uint8_t NUMSPRITES = 16;
 constexpr uint8_t BOTTOMSIZE = 8;
 constexpr uint8_t SIDESIZE = 32;
+constexpr uint8_t BMESSAGEX = 1;
+constexpr uint8_t BMESSAGEY = HEIGHT - BOTTOMSIZE + 2;
 constexpr uint8_t MAPX = WIDTH - 18;
 constexpr uint8_t MAPY = 2;
 constexpr uint8_t MAPRANGE = 1;
@@ -500,8 +502,9 @@ void goto_next_floor() {
 
 // ASSUMING THE TEXT AREA DECORATION IS KNOWN, this will very VERY quickly clear
 // JUST the text area fully. It's very fast and very little code...
-void clear_textarea() {
+void prep_textarea() {
   memset(arduboy.sBuffer + (WIDTH * ((HEIGHT >> 3) - 1)), 1, WIDTH);
+  tinyfont.setCursor(BMESSAGEX, BMESSAGEY);
 }
 
 // Draw a standard 2x16 bar at given x, y chosen by default
@@ -515,19 +518,19 @@ void draw_runtime_data() {
   draw_std_bar(HEALTHBARX, gs.health, BASESTAMHEALTH);
   draw_std_bar(STAMINABARX, gs.stamina, BASESTAMHEALTH);
 #ifdef PRINTDIRXY
-  clear_textarea();
+  prep_textarea();
   tinyfont.setCursor(0, HEIGHT - 6);
   tinyfont.print(raycast.player.dirX);
   tinyfont.setCursor(30, HEIGHT - 6);
   tinyfont.print(raycast.player.dirY);
 #endif
 #ifdef PRINTSTAMHEALTH
-  clear_textarea();
+  prep_textarea();
   print_tinynumber(arduboy.sBuffer, gs.health, 3, 0, HEIGHT - 5);
   print_tinynumber(arduboy.sBuffer, gs.stamina, 3, 16, HEIGHT - 5);
 #endif
 #ifdef PRINTSEED
-  clear_textarea();
+  prep_textarea();
   print_tinynumber(arduboy.sBuffer, sg.player_seed, 5, 0, HEIGHT - 5);
   print_tinynumber(arduboy.sBuffer, sg.total_runs, 5, 24, HEIGHT - 5);
 #endif
@@ -623,6 +626,14 @@ RESTARTSTATE:;
       goto_next_floor();
       initiate_gamemain();
       refresh_screen_full();
+      prep_textarea();
+      if (gs.region == 1 && gs.region_floor == 1) {
+        tinyfont.print(F("PRISONER, SEEK THE TOWER"));
+      } else {
+        tinyfont.print(F("ENTERED FLOOR"));
+        tinyfont.setCursor(BMESSAGEX + 70, BMESSAGEY);
+        tinyfont.print(gs.region_floor);
+      }
     }
     goto SKIPRCRENDER;
     break;
