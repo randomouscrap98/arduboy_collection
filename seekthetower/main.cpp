@@ -74,11 +74,21 @@ GameState gs;
 SaveGame sg;
 prng_state gen_state;
 
+// Play the beep when moving through menus
+void menu_move_beep() { sound.tone(4000, 10); }
+void menu_select_beep() { sound.tone(2000, 15); }
+void confirm_beep() { sound.tone(2000, 30, 3000, 30, 4000, 40); }
+void descend_beep() { sound.tone(60, 50, 57, 50, 54, 130); }
+void item_open_beep() { sound.tone(1000, 30, 1500, 30); }
+void item_close_beep() { sound.tone(1500, 30, 1000, 30); }
+void step_beep() { sound.tone(40 + RANDB(10), 30); }
+
 void initiate_floor_transition() {
   sg.total_rooms++;
   gs.animframes = 0; // begin animation at 0 (?)
   gs.state = GS_FLOORTRANSITION;
   gs.animend = DEFAULTANIMEXITFRAMES;
+  descend_beep();
 }
 
 void initiate_animation() {
@@ -107,6 +117,7 @@ void initiate_about() { gs.state = GS_STATEABOUT; }
 void initiate_itemmenu() {
   gs.tempstate1 = 1;
   gs.state = GS_STATEITEMMENU;
+  item_open_beep();
 }
 void initiate_gamemain() { gs.state = GS_STATEMAIN; }
 
@@ -185,10 +196,14 @@ void run_menu() {
   tinyfont.print(F("ABOUT"));
   tinyfont.setCursor(12, 30);
   tinyfont.print(F("QUIT"));
+  uint8_t opos = gs.menu_pos;
   gs.menu_pos =
       (gs.menu_pos + MENUOPTIONS + (arduboy.justPressed(DOWN_BUTTON) ? 1 : 0) -
        (arduboy.justPressed(UP_BUTTON) ? 1 : 0)) %
       MENUOPTIONS;
+  if (opos != gs.menu_pos) {
+    menu_move_beep();
+  }
   tinyfont.setCursor(7, 12 + 6 * gs.menu_pos);
   tinyfont.print(F("#"));
   if (arduboy.justPressed(A_BUTTON)) {
@@ -200,10 +215,11 @@ void run_menu() {
     case 1:
       // Don't save it (for now)
       arduboy.audio.toggle();
+      menu_select_beep();
       break;
     case 2:
-      // Don't save it (for now)
       initiate_about();
+      menu_select_beep();
       break;
     case 3:
       // Can exit immediately
@@ -245,6 +261,7 @@ void run_about() {
   print_stat(10, F("MTIME"), sg.total_seconds / 60);
   print_stat(11, F("SEED"), sg.player_seed);
   if (arduboy.justPressed(A_BUTTON)) {
+    confirm_beep();
     initiate_mainmenu();
   }
 }
@@ -294,16 +311,22 @@ void run_itemmenu() {
   clear_items_menu();
   if (arduboy.justReleased(B_BUTTON)) {
     if (gs.tempstate1) {
+      // menu_select_beep();
       gs.tempstate1 = 0;
     } else {
       // Draw items WITHOUT cursor, then jump to main
       draw_items_menu();
       initiate_gamemain();
+      item_close_beep();
       return;
     }
   }
   // NOTE: this keeps the item position from before...
+  uint8_t opos = gs.item_pos;
   uint8_t vpos = gs_item_cursor(&gs, &arduboy, &gs.tempstate1);
+  if (opos != gs.item_pos) {
+    menu_move_beep();
+  }
   // Must draw cursor first, then items. Ah well, could fix it maybe
   FX::drawBitmap(ITEMCURSORSTARTX + ITEMCURSORMOVEX * (vpos % ITEMSACROSS),
                  ITEMCURSORSTARTY + ITEMCURSORMOVEY * (vpos / ITEMSDOWN),
@@ -456,7 +479,7 @@ void goto_next_floor() {
   // gs.total_floor++;
   gs.region_floor++;
   update_visual_position(0);
-  sound.tone(300, 30);
+  // sound.tone(300, 30);
 }
 
 // void gen_mymap() {
@@ -518,6 +541,7 @@ bool run_movement(uint8_t movement) {
   if (movement & (GS_MOVEBACKWARD | GS_MOVEFORWARD)) {
     // Run sim here? Some kind of "action"?
     gs_tickstamina(&gs);
+    step_beep();
     if (gs_dead(&gs)) {
       initiate_gameover();
       setstate = true;
