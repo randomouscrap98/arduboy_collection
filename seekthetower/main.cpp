@@ -83,7 +83,25 @@ void confirm_beep() { sound.tone(2000, 30, 3000, 30, 4000, 40); }
 void descend_beep() { sound.tone(60, 50, 57, 50, 54, 130); }
 void item_open_beep() { sound.tone(1000, 30, 1500, 30); }
 void item_close_beep() { sound.tone(1500, 30, 1000, 30); }
+void item_pickup_beep() { sound.tone(500, 30, 1000, 30); }
 void step_beep() { sound.tone(40 + RANDB(10), 30); }
+
+// ASSUMING THE TEXT AREA DECORATION IS KNOWN, this will very VERY quickly clear
+// JUST the text area fully. It's very fast and very little code...
+void prep_textarea() {
+  memset(arduboy.sBuffer + (WIDTH * ((HEIGHT >> 3) - 1)), 1, WIDTH);
+  tinyfont.setCursor(BMESSAGEX, BMESSAGEY);
+}
+
+uint8_t print_item_name(uint8_t item) {
+  char name[16]; // Careful not to go over this!
+  uint16_t offset = 0;
+  FX::readDataObject<uint16_t>(itemnameoffsets + sizeof(uint16_t) * item,
+                               offset);
+  FX::readDataBytes(itemnames + offset, (uint8_t *)name, 16);
+  tinyfont.print(name);
+  return strlen(name);
+}
 
 void initiate_floor_transition() {
   sg.total_rooms++;
@@ -320,6 +338,7 @@ void run_itemmenu() {
       draw_items_menu();
       initiate_gamemain();
       item_close_beep();
+      prep_textarea(); // clear it
       return;
     }
   }
@@ -328,6 +347,16 @@ void run_itemmenu() {
   uint8_t vpos = gs_item_cursor(&gs, &arduboy, &gs.tempstate1);
   if (opos != gs.item_pos) {
     menu_move_beep();
+  }
+  // is this too laggy? IDK...
+  prep_textarea();
+  uint8_t icount = gs.inventory[gs.item_pos].count;
+  if (icount) {
+    uint8_t len = print_item_name(gs.inventory[gs.item_pos].item);
+    if (icount > 1) {
+      tinyfont.setCursor(BMESSAGEX + (len + 1) * 5, BMESSAGEY);
+      tinyfont.print(icount);
+    }
   }
   // Must draw cursor first, then items. Ah well, could fix it maybe
   FX::drawBitmap(ITEMCURSORSTARTX + ITEMCURSORMOVEX * (vpos % ITEMSACROSS),
@@ -470,6 +499,66 @@ NOMOREGENERATESPRITES:
   remove_reserved_map(gs.map);
 }
 
+bool add_item(uint8_t item) {
+  // First, check stackable. If stackable, look for place to put it
+  uint8_t maxstack;
+  FX::readDataObject<uint8_t>(itemstacks + item, maxstack);
+  if (maxstack > 1) {
+    for (uint8_t i = 0; i < gs.max_items; i++) {
+      if (gs.inventory[i].count < maxstack && gs.inventory[i].item == item) {
+        gs.inventory[i].count++;
+        return true;
+      }
+    }
+  }
+  // OK, just look for any empty slot
+  for (uint8_t i = 0; i < gs.max_items; i++) {
+    if (gs.inventory[i].count == 0) {
+      gs.inventory[i].item = item;
+      gs.inventory[i].count = 1;
+      return true;
+    }
+  }
+  return false;
+}
+
+void check_pickup() {
+  // Check for any item sprites overlapping the player and initiate a pickup
+  for (uint8_t i = 0; i < NUMSPRITES; i++) {
+    RcSprite<NUMINTERNALBYTES> *sprite = &raycast.sprites.sprites[i];
+    if (!ISSPRITEACTIVE((*sprite)))
+      continue;
+    if (sprite->x.getInteger() == gs.player.posX &&
+        sprite->y.getInteger() == gs.player.posY) {
+      uint8_t new_item = 0;
+      switch (sprite->frame) {
+      case 1:
+        new_item = (prng() & 1) ? 1 : 3; // potion or food (change later)
+        break;
+      case 2:
+        new_item = 5; // rock
+        break;
+      }
+      if (new_item) {
+        if (add_item(new_item)) {
+          raycast.sprites.deleteSprite(sprite);
+          draw_items_menu();
+          prep_textarea();
+          sg.total_items++;
+          tinyfont.print(F("PICKUP: "));
+          tinyfont.setCursor(BMESSAGEX + 40, BMESSAGEY);
+          print_item_name(new_item);
+          item_pickup_beep();
+          break;
+        } else {
+          prep_textarea();
+          tinyfont.print(F("INVENTORY FULL"));
+        }
+      }
+    }
+  }
+}
+
 void goto_next_floor() {
   // Restore state from last floor (so generation always the same per seed)
   prng_restore(gen_state);
@@ -499,13 +588,6 @@ void goto_next_floor() {
 //   // c.stops = 15;
 //   // c.room_unlikely = 3;
 // }
-
-// ASSUMING THE TEXT AREA DECORATION IS KNOWN, this will very VERY quickly clear
-// JUST the text area fully. It's very fast and very little code...
-void prep_textarea() {
-  memset(arduboy.sBuffer + (WIDTH * ((HEIGHT >> 3) - 1)), 1, WIDTH);
-  tinyfont.setCursor(BMESSAGEX, BMESSAGEY);
-}
 
 // Draw a standard 2x16 bar at given x, y chosen by default
 void draw_std_bar(uint8_t x, uint8_t filled, uint8_t max) {
@@ -604,6 +686,7 @@ RESTARTSTATE:;
     // Check for menu button first
     if (arduboy.justPressed(B_BUTTON)) {
       initiate_itemmenu();
+      break;
     }
     movement = gs_move(&gs, &arduboy);
     if (movement) {
@@ -617,6 +700,7 @@ RESTARTSTATE:;
     if (gs.animframes >= gs.animend) {
       gs.player = gs.next_player;
       initiate_gamemain();
+      check_pickup();
     }
     break;
   case GS_FLOORTRANSITION:
@@ -628,7 +712,7 @@ RESTARTSTATE:;
       refresh_screen_full();
       prep_textarea();
       if (gs.region == 1 && gs.region_floor == 1) {
-        tinyfont.print(F("PRISONER, SEEK THE TOWER"));
+        tinyfont.print(F("** SEEK THE TOWER **"));
       } else {
         tinyfont.print(F("ENTERED FLOOR"));
         tinyfont.setCursor(BMESSAGEX + 70, BMESSAGEY);

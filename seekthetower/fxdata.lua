@@ -62,19 +62,20 @@ for _, item in ipairs(masterlist.items) do
 	names_ptr = names_ptr + #name
 end
 
-field("itemstacks")
-write(bytes(maxstacks))
-
-field("itemprices")
-write(bytes(prices))
-
 field("itemnames")
-for _, name in ipairs(names) do
+for i, name in ipairs(names) do
+	-- print("Writing name: " .. name .. " | offset: " .. names_offsets[i])
 	write(name)
 end
 
 field("itemnameoffsets")
 write(bytes(names_offsets, "uint16"))
+
+field("itemstacks")
+write(bytes(maxstacks))
+
+field("itemprices")
+write(bytes(prices))
 
 -- Sprites (use manual mipmapping) --
 -- function loadss(swidth)
