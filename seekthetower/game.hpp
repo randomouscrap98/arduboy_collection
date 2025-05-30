@@ -18,6 +18,21 @@ constexpr uint8_t STARTITEMS = ITEMSPAGE;
 // constexpr uint8_t ITEMS_SWAPBTN = A_BUTTON | B_BUTTON;
 constexpr uint8_t ITEMS_SWAPBTN = B_BUTTON;
 
+// ITEM DEFINITIONS
+constexpr uint8_t ITEM_POTION = 1;
+constexpr uint8_t ITEM_HIPOTION = 2;
+constexpr uint8_t ITEM_FOOD = 3;
+constexpr uint8_t ITEM_HIFOOD = 4;
+constexpr uint8_t ITEM_ROCK = 5;
+constexpr uint8_t ITEM_SHARPROCK = 6;
+constexpr uint8_t ITEM_REVIVE = 7;
+constexpr uint8_t ITEM_HIREVIVE = 8;
+constexpr uint8_t ITEM_ATTACK = 9;
+constexpr uint8_t ITEM_DEFENSE = 10;
+constexpr uint8_t ITEM_BADSWORD = 11;
+constexpr uint8_t ITEM_SWORD = 12;
+constexpr uint8_t ITEM_GREATSWORD = 13;
+
 struct Map {
   uint8_t *map;
   uint8_t width;
@@ -109,6 +124,11 @@ uint8_t gs_item_cursor(GameState *gs, Arduboy2Base *arduboy, uint8_t *swapped);
 bool gs_add_item(GameState *gs, uint8_t item);
 bool gs_has_item(GameState *gs, uint8_t pos);
 void gs_remove_item(GameState *gs, uint8_t pos);
+bool gs_consume_item(GameState *gs, uint8_t pos);
+uint8_t gs_add_health(GameState *gs, int16_t amount);
+uint8_t gs_add_stamina(GameState *gs, int16_t amount);
+bool gs_add_health_changed(GameState *gs, int16_t amount);
+bool gs_add_stamina_changed(GameState *gs, int16_t amount);
 
 // Draw very simple 1:1 map at given location. Does not check if out of bounds
 // void gs_draw_map(GameState *gs, Arduboy2Base *arduboy, uint8_t x, uint8_t y);

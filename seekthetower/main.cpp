@@ -105,7 +105,10 @@ void initiate_itemmenu() {
   gs.tempstate1 = 1;
   gs.state = GS_STATEITEMMENU;
 }
-void initiate_gamemain() { gs.state = GS_STATEMAIN; }
+void initiate_gamemain() {
+  draw_items_menu(&gs);
+  gs.state = GS_STATEMAIN;
+}
 void initiate_itemselect() { gs.state = GS_STATEITEMSELECT; }
 
 void begin_game() {
@@ -203,8 +206,6 @@ void run_itemmenu() {
       // menu_select_beep();
       gs.tempstate1 = 0;
     } else {
-      // Draw items WITHOUT cursor, then jump to main
-      draw_items_menu(&gs);
       initiate_gamemain();
       item_close_beep();
       prep_textarea(); // clear it
@@ -231,12 +232,44 @@ void run_itemselect() {
   }
   if (arduboy.justPressed(A_BUTTON)) {
     // confirm_beep();
-    if (gs.menu_pos == 1) {
+    if (gs.menu_pos == 1) { // Toss, it's easier
       toss_beep();
       gs_remove_item(&gs, gs.item_pos);
       initiate_itemmenu();
       gs.tempstate1 = 0; // Don't want to enter temp state (hack!!)
+    } else {
+      bool used = true;
+      switch (gs.inventory[gs.item_pos].item) {
+      case ITEM_POTION:
+        used = gs_add_health_changed(&gs, 128);
+        break;
+      case ITEM_HIPOTION:
+        used = gs_add_health_changed(&gs, 255);
+        break;
+      case ITEM_FOOD:
+        used = gs_add_stamina_changed(&gs, 128);
+        break;
+      case ITEM_HIFOOD:
+        used = gs_add_stamina_changed(&gs, 255);
+        break;
+      default:
+        used = false;
+        break;
+      }
+      print_current_item();
+      // It just HAPPENS to be the same...
+      tinyfont.setCursor(BMESSAGEX + 82, BMESSAGEY);
+      if (used) {
+        confirm_beep();
+        gs_consume_item(&gs, gs.item_pos);
+        tinyfont.print(F("USED 1"));
+      } else {
+        cancel_beep();
+        tinyfont.print(F("NO EFFECT"));
+      }
+      initiate_gamemain(); // kinda sucks but exit to game...
     }
+    return;
   }
   if (arduboy.justPressed(RIGHT_BUTTON)) {
     gs.menu_pos = 1;
@@ -394,13 +427,14 @@ void check_pickup() {
       switch (sprite->frame) {
       case 1:
         if (RANDOF(12)) {
-          new_item = 7; // Revive spirit
+          new_item = ITEM_REVIVE; // Revive spirit
         } else {
-          new_item = RANDOF(3) ? 1 : 3; // one in three chance for potion
+          new_item = RANDOF(3) ? ITEM_POTION
+                               : ITEM_FOOD; // one in three chance for potion
         }
         break;
       case 2:
-        new_item = 5; // rock
+        new_item = ITEM_ROCK; // rock
         break;
       }
       if (new_item) {

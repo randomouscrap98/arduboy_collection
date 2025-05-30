@@ -197,3 +197,42 @@ void gs_remove_item(GameState *gs, uint8_t pos) {
   gs->inventory[pos].count = 0;
   gs->inventory[pos].item = 0;
 }
+
+bool gs_consume_item(GameState *gs, uint8_t pos) {
+  if (gs->inventory[pos].count > 0) {
+    gs->inventory[pos].count--;
+    if (gs->inventory[pos].count == 0)
+      gs->inventory[pos].item = 0;
+    return true;
+  }
+  return false;
+}
+
+uint8_t gs_add_health(GameState *gs, int16_t amount) {
+  int16_t result = gs->health + amount;
+  if (result < 0)
+    result = 0;
+  if (result > BASESTAMHEALTH)
+    result = BASESTAMHEALTH;
+  gs->health = result;
+  return gs->health;
+}
+
+uint8_t gs_add_stamina(GameState *gs, int16_t amount) {
+  int16_t result = gs->stamina + amount;
+  if (result < 0)
+    result = 0;
+  if (result > BASESTAMHEALTH)
+    result = BASESTAMHEALTH;
+  gs->health = result;
+  return gs->health;
+}
+
+bool gs_add_health_changed(GameState *gs, int16_t amount) {
+  uint8_t ohealth = gs->health;
+  return gs_add_health(gs, amount) != ohealth;
+}
+bool gs_add_stamina_changed(GameState *gs, int16_t amount) {
+  uint8_t ostam = gs->stamina;
+  return gs_add_stamina(gs, amount) != ostam;
+}

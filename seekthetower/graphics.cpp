@@ -114,7 +114,9 @@ static void print_stat(uint8_t pos, const __FlashStringHelper *name,
 
 void display_about(SaveGame *sg) {
   render_fximage(blankimg, arduboy.sBuffer, WIDTH, HEIGHT);
-  tinyfont.setCursor(48, 54);
+  tinyfont.setCursor(7, 53);
+  tinyfont.print(F("v104") );
+  tinyfont.setCursor(47, 53);
   tinyfont.print(F("haloopdy - 2025"));
   print_stat(0, F("RUNS"), sg->total_runs);
   print_stat(1, F("WINS"), sg->total_wins);
