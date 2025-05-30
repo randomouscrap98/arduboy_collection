@@ -235,6 +235,7 @@ void run_itemselect() {
       toss_beep();
       gs_remove_item(&gs, gs.item_pos);
       initiate_itemmenu();
+      gs.tempstate1 = 0; // Don't want to enter temp state (hack!!)
     }
   }
   if (arduboy.justPressed(RIGHT_BUTTON)) {
@@ -358,7 +359,7 @@ void generate_sprites() {
   spawn += try_place_2x2(0, 4, 1);
   if (spawn >= NUMSPRITES)
     goto NOMOREGENERATESPRITES;
-  spawn += try_place_2x2(1, 8, 3);
+  spawn += try_place_2x2(1, 10, 3);
   if (spawn >= NUMSPRITES)
     goto NOMOREGENERATESPRITES;
 
