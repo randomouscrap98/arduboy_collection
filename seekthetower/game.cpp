@@ -166,6 +166,10 @@ uint8_t gs_item_cursor(GameState *gs, Arduboy2Base *arduboy, uint8_t *swapped) {
   return gs->item_pos - gs->item_top;
 }
 
+bool gs_has_item(GameState *gs, uint8_t pos) {
+  return gs->inventory[pos].count;
+}
+
 bool gs_add_item(GameState *gs, uint8_t item) {
   // First, check stackable. If stackable, look for place to put it
   uint8_t maxstack;
@@ -187,4 +191,9 @@ bool gs_add_item(GameState *gs, uint8_t item) {
     }
   }
   return false;
+}
+
+void gs_remove_item(GameState *gs, uint8_t pos) {
+  gs->inventory[pos].count = 0;
+  gs->inventory[pos].item = 0;
 }

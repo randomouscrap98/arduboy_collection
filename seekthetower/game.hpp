@@ -107,6 +107,8 @@ bool gs_dead(GameState *gs);
 uint8_t gs_item_cursor(GameState *gs, Arduboy2Base *arduboy, uint8_t *swapped);
 
 bool gs_add_item(GameState *gs, uint8_t item);
+bool gs_has_item(GameState *gs, uint8_t pos);
+void gs_remove_item(GameState *gs, uint8_t pos);
 
 // Draw very simple 1:1 map at given location. Does not check if out of bounds
 // void gs_draw_map(GameState *gs, Arduboy2Base *arduboy, uint8_t x, uint8_t y);

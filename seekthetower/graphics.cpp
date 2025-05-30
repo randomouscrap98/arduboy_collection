@@ -188,7 +188,7 @@ void clear_items_menu() {
 // Draw ONLY the items in the menu right now
 void draw_items_menu(GameState *gs) {
   for (uint8_t i = 0; i < ITEMSPAGE; i++) {
-    if (gs->inventory[gs->item_top + i].count) {
+    if (gs_has_item(gs, gs->item_top + i)) {
       uint8_t item = gs->inventory[gs->item_top + i].item;
       FX::drawBitmap(ITEMSTARTX + ITEMCURSORMOVEX * (i % ITEMSACROSS),
                      ITEMSTARTY + ITEMCURSORMOVEY * (i / ITEMSDOWN), itemsheet,

@@ -60,9 +60,6 @@ constexpr uint8_t DEFAULTANIMGAMEOVERFRAMES = ((float)FRAMERATE);
 // number to not take up all the memory but still have enough to work with.
 RcContainer<NUMSPRITES, NUMINTERNALBYTES, WIDTH - SIDESIZE, HEIGHT - BOTTOMSIZE>
     raycast(tilesheet, spritesheet, spritesheetMask);
-// 128, 64>
-//  48> // WIDTH - SIDESIZE, HEIGHT - BOTTOMSIZE>
-// spritesheet, spritesheetMask);
 
 GameState gs;
 SaveGame sg;
@@ -70,8 +67,7 @@ prng_state gen_state;
 
 void print_current_item() {
   prep_textarea();
-  // InventorySlot item = gs.inventory[gs.item_pos];
-  print_item_info(gs.inventory[gs.item_pos]); // item.item, item.count);
+  print_item_info(gs.inventory[gs.item_pos]);
 }
 
 void initiate_floor_transition() {
@@ -108,7 +104,6 @@ void initiate_about() { gs.state = GS_STATEABOUT; }
 void initiate_itemmenu() {
   gs.tempstate1 = 1;
   gs.state = GS_STATEITEMMENU;
-  item_open_beep();
 }
 void initiate_gamemain() { gs.state = GS_STATEMAIN; }
 void initiate_itemselect() { gs.state = GS_STATEITEMSELECT; }
@@ -197,9 +192,10 @@ void run_about() {
 
 void run_itemmenu() {
   clear_items_menu();
-  if (arduboy.justPressed(A_BUTTON)) {
+  if (arduboy.justPressed(A_BUTTON) && gs_has_item(&gs, gs.item_pos)) {
     menu_select_beep();
     gs.tempstate1 = 1; // Don't let b cancel the whole menu
+    gs.menu_pos = 0;
     initiate_itemselect();
   }
   if (arduboy.justReleased(B_BUTTON)) {
@@ -225,6 +221,37 @@ void run_itemmenu() {
   print_current_item();
   draw_items_menu_w_cursor(
       &gs, vpos, (arduboy.buttonsState() & ITEMS_SWAPBTN) == ITEMS_SWAPBTN);
+}
+
+void run_itemselect() {
+  uint8_t opos = gs.menu_pos;
+  if (arduboy.justPressed(B_BUTTON)) {
+    cancel_beep();
+    initiate_itemmenu();
+  }
+  if (arduboy.justPressed(A_BUTTON)) {
+    // confirm_beep();
+    if (gs.menu_pos == 1) {
+      toss_beep();
+      gs_remove_item(&gs, gs.item_pos);
+      initiate_itemmenu();
+    }
+  }
+  if (arduboy.justPressed(RIGHT_BUTTON)) {
+    gs.menu_pos = 1;
+  }
+  if (arduboy.justPressed(LEFT_BUTTON)) {
+    gs.menu_pos = 0;
+  }
+  if (opos != gs.menu_pos) {
+    menu_move_beep();
+  }
+  print_current_item();
+  tinyfont.setCursor(BMESSAGEX + 82, BMESSAGEY);
+  tinyfont.print(F("USE  TOSS"));
+  // uint8_t cpos = BMESSAGEX + 76 * gs.menu_pos;
+  tinyfont.setCursor(BMESSAGEX + 77 + 25 * gs.menu_pos, BMESSAGEY);
+  tinyfont.print(F("#"));
 }
 
 void gen_region(uint8_t region) {
@@ -266,7 +293,7 @@ void gen_region(uint8_t region) {
 
 // Refresh the full menu background, the region digits, and the local map
 // around the player.
-void refresh_screen_full() {
+void draw_menu_init() {
   render_fximage(menu, arduboy.sBuffer, WIDTH, HEIGHT);
   print_tinydigit(arduboy.sBuffer, gs.region, 113, 20);
   print_tinynumber(arduboy.sBuffer, gs.region_floor, 2, 120, 20);
@@ -328,10 +355,10 @@ void generate_sprites() {
   raycast.sprites.resetSprites();
   uint8_t spawn = 0;
   // These retries and numbers can be tweaked. May store in FX later
-  spawn += try_place_2x2(0, 10, 1);
+  spawn += try_place_2x2(0, 4, 1);
   if (spawn >= NUMSPRITES)
     goto NOMOREGENERATESPRITES;
-  spawn += try_place_2x2(1, 10, 2);
+  spawn += try_place_2x2(1, 8, 3);
   if (spawn >= NUMSPRITES)
     goto NOMOREGENERATESPRITES;
 
@@ -427,6 +454,9 @@ void goto_next_floor() {
 void draw_runtime_data() {
   draw_std_bar(HEALTHBARX, gs.health, BASESTAMHEALTH);
   draw_std_bar(STAMINABARX, gs.stamina, BASESTAMHEALTH);
+  draw_map_near(&gs, MAPX, MAPY, MAPRANGE);
+  draw_map_player(&gs, MAPX, MAPY,
+                  arduboy.frameCount & MAPFLASH ? BLACK : WHITE);
 #ifdef PRINTDIRXY
   prep_textarea();
   tinyfont.setCursor(0, HEIGHT - 6);
@@ -444,9 +474,6 @@ void draw_runtime_data() {
   print_tinynumber(arduboy.sBuffer, sg.player_seed, 5, 0, HEIGHT - 5);
   print_tinynumber(arduboy.sBuffer, sg.total_runs, 5, 24, HEIGHT - 5);
 #endif
-  draw_map_near(&gs, MAPX, MAPY, MAPRANGE);
-  draw_map_player(&gs, MAPX, MAPY,
-                  arduboy.frameCount & MAPFLASH ? BLACK : WHITE);
 }
 
 bool run_movement(uint8_t movement) {
@@ -501,7 +528,7 @@ RESTARTSTATE:;
   case GS_STATEMAIN:
 #ifdef INSTANTREFRESH
     if (arduboy.justPressed(A_BUTTON)) {
-      refresh_screen_full();
+      draw_menu_init();
     }
 #endif
 #ifdef INSTANTFLOORUP
@@ -512,6 +539,7 @@ RESTARTSTATE:;
     draw_runtime_data();
     // Check for menu button first
     if (arduboy.justPressed(B_BUTTON)) {
+      item_open_beep();
       initiate_itemmenu();
       break;
     }
@@ -536,7 +564,7 @@ RESTARTSTATE:;
     if (gs.animframes >= gs.animend) {
       goto_next_floor();
       initiate_gamemain();
-      refresh_screen_full();
+      draw_menu_init();
       prep_textarea();
       if (gs.region == 1 && gs.region_floor == 1) {
         tinyfont.print(F("** SEEK THE TOWER **"));
@@ -584,6 +612,7 @@ RESTARTSTATE:;
     run_itemmenu();
     break;
   case GS_STATEITEMSELECT:
+    run_itemselect();
     break;
   }
 
