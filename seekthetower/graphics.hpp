@@ -22,6 +22,13 @@ constexpr uint8_t BMESSAGEY = HEIGHT - BOTTOMSIZE + 2;
 constexpr uint8_t BARWIDTH = 2;
 constexpr uint8_t BARHEIGHT = 16;
 constexpr uint8_t BARTOP = 2;
+constexpr uint8_t HEALTHBARX = 99;
+constexpr uint8_t STAMINABARX = 104;
+
+constexpr uint8_t MAPX = WIDTH - 18;
+constexpr uint8_t MAPY = 2;
+constexpr uint8_t MAPRANGE = 1;
+constexpr uint8_t MAPFLASH = 8;
 
 void print_tinydigit(uint8_t *buffer, uint8_t v, uint8_t x, uint8_t y);
 void print_tinynumber(uint8_t *buffer, uint16_t v, uint8_t w, uint8_t x,
@@ -43,7 +50,8 @@ void draw_full_map(GameState *gs, uint8_t xs, uint8_t ys);
 void draw_map_near(GameState *gs, uint8_t xs, uint8_t ys, uint8_t range);
 void draw_map_player(GameState *gs, uint8_t xs, uint8_t ys, uint8_t col);
 
-void clear_items_menu();
-void draw_items_menu(GameState *gs);
+// void clear_items_menu();
 void draw_items_menu_w_cursor(GameState *gs, uint8_t vpos, bool selected);
+void draw_items_menu(GameState *gs);
 void draw_std_bar(uint8_t x, uint8_t filled, uint8_t max);
+void draw_runtime_data(GameState *gs);

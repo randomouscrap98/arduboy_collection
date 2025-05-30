@@ -1,6 +1,11 @@
 #include "graphics.hpp"
 #include "fxdata/fxdata.h"
+#include "game.hpp"
 #include "mymath.hpp"
+
+// #define PRINTSTAMHEALTH
+// #define PRINTSEED
+// #define PRINTDIRXY
 
 constexpr uint16_t TINYDIGITS[] PROGMEM = {
     0xF9F, 0xAF8, 0xDDA, 0x9DF, 0x74F, 0xBDD, 0xFDC, 0x11F, 0xFDF, 0x75F,
@@ -115,7 +120,7 @@ static void print_stat(uint8_t pos, const __FlashStringHelper *name,
 void display_about(SaveGame *sg) {
   render_fximage(blankimg, arduboy.sBuffer, WIDTH, HEIGHT);
   tinyfont.setCursor(7, 53);
-  tinyfont.print(F("v104") );
+  tinyfont.print(F("v107") );
   tinyfont.setCursor(47, 53);
   tinyfont.print(F("haloopdy - 2025"));
   print_stat(0, F("RUNS"), sg->total_runs);
@@ -182,13 +187,20 @@ constexpr uint8_t ITEMSCROLLTOP = ITEMMENUTOP + 1;
 constexpr uint8_t ITEMSCROLLHEIGHT = ITEMMENUHEIGHT - 2;
 
 // Clear ONLY the items menu quickly
-void clear_items_menu() {
+void static clear_items_menu() {
   arduboy.fillRect(ITEMMENUEDGE, ITEMMENUTOP, WIDTH - ITEMMENUEDGE,
                    ITEMMENUHEIGHT, BLACK);
 }
 
-// Draw ONLY the items in the menu right now
-void draw_items_menu(GameState *gs) {
+// Fully redraw the items menu, including cursor at given position. If cursor
+// position is off screen, will not draw cursor
+void draw_items_menu_w_cursor(GameState *gs, uint8_t vpos, bool selected) {
+  clear_items_menu();
+  if (vpos < ITEMSPAGE) {
+    FX::drawBitmap(ITEMCURSORSTARTX + ITEMCURSORMOVEX * (vpos % ITEMSACROSS),
+                   ITEMCURSORSTARTY + ITEMCURSORMOVEY * (vpos / ITEMSDOWN),
+                   selected ? cursorselectimg : cursorimg, 0, dbmOverwrite);
+  }
   for (uint8_t i = 0; i < ITEMSPAGE; i++) {
     if (gs_has_item(gs, gs->item_top + i)) {
       uint8_t item = gs->inventory[gs->item_top + i].item;
@@ -208,19 +220,46 @@ void draw_items_menu(GameState *gs) {
   }
 }
 
-void draw_items_menu_w_cursor(GameState *gs, uint8_t vpos, bool selected) {
-  // Must draw cursor first, then items. Ah well, could fix it maybe
-  FX::drawBitmap(ITEMCURSORSTARTX + ITEMCURSORMOVEX * (vpos % ITEMSACROSS),
-                 ITEMCURSORSTARTY + ITEMCURSORMOVEY * (vpos / ITEMSDOWN),
-                 selected ? cursorselectimg : cursorimg, 0, dbmOverwrite);
-  //((arduboy.buttonsState() & ITEMS_SWAPBTN) == ITEMS_SWAPBTN)
-  //((arduboy.buttonsState() & ITEMS_SWAPBTN) == ITEMS_SWAPBTN)
-  draw_items_menu(gs);
+void draw_items_menu(GameState *gs) {
+  draw_items_menu_w_cursor(gs, 255, false);
 }
+
+// void draw_items_menu_w_cursor(GameState *gs, uint8_t vpos, bool selected) {
+//   clear_items_menu();
+//   // Must draw cursor first, then items. Ah well, could fix it maybe
+//   //((arduboy.buttonsState() & ITEMS_SWAPBTN) == ITEMS_SWAPBTN)
+//   //((arduboy.buttonsState() & ITEMS_SWAPBTN) == ITEMS_SWAPBTN)
+//   draw_items_menu(gs);
+// }
 
 // Draw a standard 2x16 bar at given x, y chosen by default
 void draw_std_bar(uint8_t x, uint8_t filled, uint8_t max) {
   uint8_t fh = round(BARHEIGHT * (float)filled / (float)max);
   arduboy.fillRect(x, BARTOP, 2, BARHEIGHT, BLACK);
   arduboy.fillRect(x, BARTOP + BARHEIGHT - fh, 2, fh, WHITE);
+}
+
+void draw_runtime_data(GameState *gs) {
+  draw_std_bar(HEALTHBARX, gs->health, BASESTAMHEALTH);
+  draw_std_bar(STAMINABARX, gs->stamina, BASESTAMHEALTH);
+  draw_map_near(gs, MAPX, MAPY, MAPRANGE);
+  draw_map_player(gs, MAPX, MAPY,
+                  arduboy.frameCount & MAPFLASH ? BLACK : WHITE);
+#ifdef PRINTDIRXY
+  prep_textarea();
+  tinyfont.setCursor(0, HEIGHT - 6);
+  tinyfont.print(raycast.player.dirX);
+  tinyfont.setCursor(30, HEIGHT - 6);
+  tinyfont.print(raycast.player.dirY);
+#endif
+#ifdef PRINTSTAMHEALTH
+  prep_textarea();
+  print_tinynumber(arduboy.sBuffer, gs.health, 3, 0, HEIGHT - 5);
+  print_tinynumber(arduboy.sBuffer, gs.stamina, 3, 16, HEIGHT - 5);
+#endif
+#ifdef PRINTSEED
+  prep_textarea();
+  print_tinynumber(arduboy.sBuffer, sg.player_seed, 5, 0, HEIGHT - 5);
+  print_tinynumber(arduboy.sBuffer, sg.total_runs, 5, 24, HEIGHT - 5);
+#endif
 }

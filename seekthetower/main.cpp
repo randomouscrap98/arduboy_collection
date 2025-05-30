@@ -16,9 +16,6 @@
 // #define FULLMAP
 // #define INSTANTFLOORUP
 // #define INSTANTREFRESH
-// #define PRINTSTAMHEALTH
-// #define PRINTSEED
-// #define PRINTDIRXY
 // #define RCNOBACKGROUND
 
 #include "LocalRaycast/ArduboyRaycastFX.h"
@@ -37,12 +34,7 @@ Tinyfont tinyfont =
 
 constexpr uint8_t NUMINTERNALBYTES = 8;
 constexpr uint8_t NUMSPRITES = 16;
-constexpr uint8_t MAPX = WIDTH - 18;
-constexpr uint8_t MAPY = 2;
-constexpr uint8_t MAPRANGE = 1;
-constexpr uint8_t MAPFLASH = 8;
-constexpr uint8_t HEALTHBARX = 99;
-constexpr uint8_t STAMINABARX = 104;
+constexpr uint8_t NUMOWSPRITES = 14;
 
 constexpr uflot HALF = 0.5f;   // IDK
 constexpr muflot MHALF = 0.5f; // IDK
@@ -106,6 +98,7 @@ void initiate_itemmenu() {
   gs.state = GS_STATEITEMMENU;
 }
 void initiate_gamemain() {
+  draw_runtime_data(&gs); // not STRICTLY necessary but just in case...
   draw_items_menu(&gs);
   gs.state = GS_STATEMAIN;
 }
@@ -194,7 +187,6 @@ void run_about() {
 }
 
 void run_itemmenu() {
-  clear_items_menu();
   if (arduboy.justPressed(A_BUTTON) && gs_has_item(&gs, gs.item_pos)) {
     menu_select_beep();
     gs.tempstate1 = 1; // Don't let b cancel the whole menu
@@ -203,7 +195,6 @@ void run_itemmenu() {
   }
   if (arduboy.justReleased(B_BUTTON)) {
     if (gs.tempstate1) {
-      // menu_select_beep();
       gs.tempstate1 = 0;
     } else {
       initiate_gamemain();
@@ -350,6 +341,9 @@ struct SpriteDefinition {
 
 constexpr SpriteDefinition sprite_definitions[] PROGMEM = {
     {
+        0, // Don't care about this one
+    },
+    {
         1, // Item bag
         2,
         0,
@@ -363,24 +357,42 @@ constexpr SpriteDefinition sprite_definitions[] PROGMEM = {
     },
 };
 
-uint8_t try_place_2x2(uint8_t item, uint8_t retries, uint8_t count) {
-  uint8_t placed = 0;
+// Pick a random item to fill the given graphic. We reuse graphics for various
+// items, because our sprite pool is only 256, same as the item pool, and we
+// want enemies and stuff obviously
+uint8_t pick_random_item(uint8_t graphic) {
+  switch (graphic) {
+  case 1:
+    if (RANDOF(16)) {
+      return ITEM_REVIVE; // Revive spirit
+    } else {
+      return RANDOF(3) ? ITEM_POTION
+                       : ITEM_FOOD; // one in three chance for potion
+    }
+  case 2:
+    return ITEM_ROCK; // rock
+  }
+}
+
+uint8_t try_place_2x2(uint8_t graphic, uint8_t retries, uint8_t count,
+                      uint8_t *gcount, uint8_t limit) {
+  uint8_t ogcount = *gcount;
   for (uint8_t i = 0; i < retries; i++) {
+    if ((*gcount) >= limit || (*gcount) >= ogcount + count)
+      break;
     uint8_t x = 1 + RANDB(14);
     uint8_t y = 1 + RANDB(14);
     if (has_2x2_box_around(gs.map, x, y)) {
       MAPT(gs.map, x, y) = TILERESERVED;
       SpriteDefinition sp;
-      memcpy_P(&sp, sprite_definitions + item, sizeof(SpriteDefinition));
-      // RcSprite<NUMINTERNALBYTES> *sp =
-      raycast.sprites.addSprite(MHALF + x, MHALF + y, sp.sprite, sp.size,
-                                sp.offset, sp.func);
-      placed++;
-      if (placed >= count)
-        break;
+      memcpy_P(&sp, sprite_definitions + graphic, sizeof(SpriteDefinition));
+      RcSprite<NUMINTERNALBYTES> *sprite = raycast.sprites.addSprite(
+          MHALF + x, MHALF + y, sp.sprite, sp.size, sp.offset, sp.func);
+      sprite->intstate[0] = pick_random_item(graphic);
+      (*gcount)++;
     }
   }
-  return placed;
+  return (*gcount) - ogcount;
 }
 
 // TODO: this will need to be a very complex function maybe...
@@ -389,12 +401,8 @@ void generate_sprites() {
   raycast.sprites.resetSprites();
   uint8_t spawn = 0;
   // These retries and numbers can be tweaked. May store in FX later
-  spawn += try_place_2x2(0, 4, 1);
-  if (spawn >= NUMSPRITES)
-    goto NOMOREGENERATESPRITES;
-  spawn += try_place_2x2(1, 10, 3);
-  if (spawn >= NUMSPRITES)
-    goto NOMOREGENERATESPRITES;
+  try_place_2x2(1, 4, 1, &spawn, NUMOWSPRITES);
+  try_place_2x2(2, 10, 3, &spawn, NUMOWSPRITES);
 
   // for (uint8_t y = 1; y < gs.map.height - 1; y++) {
   //   for (uint8_t x = 1; x < gs.map.width - 1; x++) {
@@ -411,7 +419,7 @@ void generate_sprites() {
   //     }
   //   }
   // }
-NOMOREGENERATESPRITES:
+  // NOMOREGENERATESPRITES:
   remove_reserved_map(gs.map);
 }
 
@@ -423,20 +431,7 @@ void check_pickup() {
       continue;
     if (sprite->x.getInteger() == gs.player.posX &&
         sprite->y.getInteger() == gs.player.posY) {
-      uint8_t new_item = 0;
-      switch (sprite->frame) {
-      case 1:
-        if (RANDOF(12)) {
-          new_item = ITEM_REVIVE; // Revive spirit
-        } else {
-          new_item = RANDOF(3) ? ITEM_POTION
-                               : ITEM_FOOD; // one in three chance for potion
-        }
-        break;
-      case 2:
-        new_item = ITEM_ROCK; // rock
-        break;
-      }
+      uint8_t new_item = sprite->intstate[0];
       if (new_item) {
         if (gs_add_item(&gs, new_item)) {
           raycast.sprites.deleteSprite(sprite);
@@ -485,31 +480,6 @@ void goto_next_floor() {
 //   // c.stops = 15;
 //   // c.room_unlikely = 3;
 // }
-
-void draw_runtime_data() {
-  draw_std_bar(HEALTHBARX, gs.health, BASESTAMHEALTH);
-  draw_std_bar(STAMINABARX, gs.stamina, BASESTAMHEALTH);
-  draw_map_near(&gs, MAPX, MAPY, MAPRANGE);
-  draw_map_player(&gs, MAPX, MAPY,
-                  arduboy.frameCount & MAPFLASH ? BLACK : WHITE);
-#ifdef PRINTDIRXY
-  prep_textarea();
-  tinyfont.setCursor(0, HEIGHT - 6);
-  tinyfont.print(raycast.player.dirX);
-  tinyfont.setCursor(30, HEIGHT - 6);
-  tinyfont.print(raycast.player.dirY);
-#endif
-#ifdef PRINTSTAMHEALTH
-  prep_textarea();
-  print_tinynumber(arduboy.sBuffer, gs.health, 3, 0, HEIGHT - 5);
-  print_tinynumber(arduboy.sBuffer, gs.stamina, 3, 16, HEIGHT - 5);
-#endif
-#ifdef PRINTSEED
-  prep_textarea();
-  print_tinynumber(arduboy.sBuffer, sg.player_seed, 5, 0, HEIGHT - 5);
-  print_tinynumber(arduboy.sBuffer, sg.total_runs, 5, 24, HEIGHT - 5);
-#endif
-}
 
 bool run_movement(uint8_t movement) {
   bool setstate = false;
@@ -571,7 +541,7 @@ RESTARTSTATE:;
       initiate_floor_transition();
     }
 #endif
-    draw_runtime_data();
+    draw_runtime_data(&gs);
     // Check for menu button first
     if (arduboy.justPressed(B_BUTTON)) {
       item_open_beep();
@@ -643,7 +613,7 @@ RESTARTSTATE:;
     goto SKIPRCRENDER;
     break;
   case GS_STATEITEMMENU:
-    draw_runtime_data();
+    draw_runtime_data(&gs);
     run_itemmenu();
     break;
   case GS_STATEITEMSELECT:

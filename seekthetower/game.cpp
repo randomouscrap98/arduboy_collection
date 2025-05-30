@@ -224,8 +224,8 @@ uint8_t gs_add_stamina(GameState *gs, int16_t amount) {
     result = 0;
   if (result > BASESTAMHEALTH)
     result = BASESTAMHEALTH;
-  gs->health = result;
-  return gs->health;
+  gs->stamina = result;
+  return gs->stamina;
 }
 
 bool gs_add_health_changed(GameState *gs, int16_t amount) {
