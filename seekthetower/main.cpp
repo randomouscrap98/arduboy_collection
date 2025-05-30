@@ -2,7 +2,6 @@
 // #define RCSMALLLOOPS
 
 #include <Arduboy2.h>
-#include <ArduboyTones.h>
 #include <Tinyfont.h>
 #include <avr/pgmspace.h>
 
@@ -27,28 +26,21 @@
 #include "graphics.hpp"
 #include "map.hpp"
 #include "mymath.hpp"
+#include "sound.hpp"
 
 // Resources
 #include "fxdata/fxdata.h"
 
 Arduboy2Base arduboy;
-ArduboyTones sound(arduboy.audio.enabled);
 Tinyfont tinyfont =
     Tinyfont(arduboy.sBuffer, Arduboy2::width(), Arduboy2::height());
 
 constexpr uint8_t NUMINTERNALBYTES = 8;
 constexpr uint8_t NUMSPRITES = 16;
-constexpr uint8_t BOTTOMSIZE = 8;
-constexpr uint8_t SIDESIZE = 32;
-constexpr uint8_t BMESSAGEX = 1;
-constexpr uint8_t BMESSAGEY = HEIGHT - BOTTOMSIZE + 2;
 constexpr uint8_t MAPX = WIDTH - 18;
 constexpr uint8_t MAPY = 2;
 constexpr uint8_t MAPRANGE = 1;
 constexpr uint8_t MAPFLASH = 8;
-constexpr uint8_t BARWIDTH = 2;
-constexpr uint8_t BARHEIGHT = 16;
-constexpr uint8_t BARTOP = 2;
 constexpr uint8_t HEALTHBARX = 99;
 constexpr uint8_t STAMINABARX = 104;
 
@@ -76,31 +68,10 @@ GameState gs;
 SaveGame sg;
 prng_state gen_state;
 
-// Play the beep when moving through menus
-void menu_move_beep() { sound.tone(4000, 10); }
-void menu_select_beep() { sound.tone(2000, 15); }
-void confirm_beep() { sound.tone(2000, 30, 3000, 30, 4000, 40); }
-void descend_beep() { sound.tone(60, 50, 57, 50, 54, 130); }
-void item_open_beep() { sound.tone(1000, 30, 1500, 30); }
-void item_close_beep() { sound.tone(1500, 30, 1000, 30); }
-void item_pickup_beep() { sound.tone(500, 30, 1000, 30); }
-void step_beep() { sound.tone(40 + RANDB(10), 30); }
-
-// ASSUMING THE TEXT AREA DECORATION IS KNOWN, this will very VERY quickly clear
-// JUST the text area fully. It's very fast and very little code...
-void prep_textarea() {
-  memset(arduboy.sBuffer + (WIDTH * ((HEIGHT >> 3) - 1)), 1, WIDTH);
-  tinyfont.setCursor(BMESSAGEX, BMESSAGEY);
-}
-
-uint8_t print_item_name(uint8_t item) {
-  char name[16]; // Careful not to go over this!
-  uint16_t offset = 0;
-  FX::readDataObject<uint16_t>(itemnameoffsets + sizeof(uint16_t) * item,
-                               offset);
-  FX::readDataBytes(itemnames + offset, (uint8_t *)name, 16);
-  tinyfont.print(name);
-  return strlen(name);
+void print_current_item() {
+  prep_textarea();
+  // InventorySlot item = gs.inventory[gs.item_pos];
+  print_item_info(gs.inventory[gs.item_pos]); // item.item, item.count);
 }
 
 void initiate_floor_transition() {
@@ -140,6 +111,7 @@ void initiate_itemmenu() {
   item_open_beep();
 }
 void initiate_gamemain() { gs.state = GS_STATEMAIN; }
+void initiate_itemselect() { gs.state = GS_STATEITEMSELECT; }
 
 void begin_game() {
   // void __attribute__((noinline)) begin_game() {
@@ -166,12 +138,8 @@ void update_visual_position(uflot delta) {
   uflot baseY = HALF + gs.player.posY * (indelt);
   raycast.player.posX = baseX + delta * gs.next_player.posX;
   raycast.player.posY = baseY + delta * gs.next_player.posY;
-  // 0.5f + ((float)gs.player.posX * (1 - delta) +
-  //(float)gs.next_player.posX * delta);
-  // raycast.player.posY = 0.5f + ((float)gs.player.posY * (1 - delta) +
-  //(float)gs.next_player.posY * delta);
-  float c1 = cardinal_to_rad(gs.player.cardinal);      //+ 2 * PI;
-  float c2 = cardinal_to_rad(gs.next_player.cardinal); // + 2 * PI;
+  float c1 = cardinal_to_rad(gs.player.cardinal);
+  float c2 = cardinal_to_rad(gs.next_player.cardinal);
   // There are certain turns which go the long way. Fix that.
   if (fabs(c2 - c1) > 2) {
     if (c2 > c1) {
@@ -184,38 +152,8 @@ void update_visual_position(uflot delta) {
                                      FOV);
 }
 
-// very optimized render image at specific address byte chunks only
-void render_fximage(uint24_t addr, uint8_t *at, uint8_t width, uint8_t height) {
-  height = height >> 3; // it's actually per byte ofc
-  for (uint8_t i = 0; i < height; i++) {
-    FX::readDataBytes(addr + 4 + i * width, at + i * WIDTH, width);
-  }
-}
-
-uint16_t menu_animation() {
-  uint16_t pending = 0;
-  uint8_t b;
-  for (uint16_t i = 0; i < 1024; i++) {
-    FX::readDataBytes(titleimg + 4 + i, &b, 1);
-    if (arduboy.sBuffer[i] == b)
-      continue;
-    arduboy.sBuffer[i] = b << (prng() & 7);
-    pending++;
-  }
-  return pending;
-}
-
 void run_menu() {
   constexpr uint8_t MENUOPTIONS = 4;
-  render_fximage(titleimg, arduboy.sBuffer, WIDTH, HEIGHT);
-  tinyfont.setCursor(12, 12);
-  tinyfont.print(F("NEW GAME"));
-  tinyfont.setCursor(12, 18);
-  tinyfont.print(arduboy.audio.enabled() ? F("SOUND:ON") : F("SOUND:OFF"));
-  tinyfont.setCursor(12, 24);
-  tinyfont.print(F("ABOUT"));
-  tinyfont.setCursor(12, 30);
-  tinyfont.print(F("QUIT"));
   uint8_t opos = gs.menu_pos;
   gs.menu_pos =
       (gs.menu_pos + MENUOPTIONS + (arduboy.justPressed(DOWN_BUTTON) ? 1 : 0) -
@@ -224,8 +162,7 @@ void run_menu() {
   if (opos != gs.menu_pos) {
     menu_move_beep();
   }
-  tinyfont.setCursor(7, 12 + 6 * gs.menu_pos);
-  tinyfont.print(F("#"));
+  display_menu(gs.menu_pos);
   if (arduboy.justPressed(A_BUTTON)) {
     switch (gs.menu_pos) {
     case 0:
@@ -250,92 +187,28 @@ void run_menu() {
   }
 }
 
-void print_stat(uint8_t pos, const __FlashStringHelper *name, uint16_t val) {
-  uint8_t xs = 8 + (pos & 1) * 57;
-  uint8_t ys = 8 + (pos >> 1) * 6;
-  tinyfont.setCursor(xs, ys);
-  tinyfont.print(name);
-  tinyfont.setCursor(xs + 30, ys);
-  tinyfont.print(val);
-}
-
 void run_about() {
-  render_fximage(blankimg, arduboy.sBuffer, WIDTH, HEIGHT);
-  tinyfont.setCursor(48, 54);
-  tinyfont.print(F("haloopdy - 2025"));
-  print_stat(0, F("RUNS"), sg.total_runs);
-  print_stat(1, F("WINS"), sg.total_wins);
-  print_stat(2, F("ROOMS"), sg.total_rooms);
-  print_stat(3, F("ENMY"), sg.total_kills);
-  print_stat(4, F("ITEMS"), sg.total_items);
-  print_stat(5, F("USED"), sg.total_used);
-  const __FlashStringHelper *rgns[] = {
-      F("RGN0"),
-      F("RGN1"),
-      F("RGN2"),
-      F("RGN3"),
-  };
-  for (uint8_t i = 0; i < 4; i++) {
-    print_stat(6 + i, rgns[i], sg.completed_region[i]);
-  }
-  print_stat(10, F("MTIME"), sg.total_seconds / 60);
-  print_stat(11, F("SEED"), sg.player_seed);
+  display_about(&sg);
   if (arduboy.justPressed(A_BUTTON)) {
     confirm_beep();
     initiate_mainmenu();
   }
 }
 
-// Visual only?
-constexpr uint8_t ITEMMENUEDGE = 97;
-constexpr uint8_t ITEMMENUTOP = 26;
-constexpr uint8_t ITEMMENUHEIGHT = 30;
-constexpr uint8_t ITEMCURSORSTARTX = 98;
-constexpr uint8_t ITEMCURSORSTARTY = 27;
-constexpr uint8_t ITEMCURSORMOVEX = 9;
-constexpr uint8_t ITEMCURSORMOVEY = 9;
-constexpr uint8_t ITEMSTARTX = 99;
-constexpr uint8_t ITEMSTARTY = 28;
-constexpr uint8_t ITEMSCROLLBARHEIGHT = 8;
-constexpr uint8_t ITEMSCROLLTOP = ITEMMENUTOP + 1;
-constexpr uint8_t ITEMSCROLLHEIGHT = ITEMMENUHEIGHT - 2;
-
-// Clear ONLY the items menu quickly
-void clear_items_menu() {
-  arduboy.fillRect(ITEMMENUEDGE, ITEMMENUTOP, WIDTH - ITEMMENUEDGE,
-                   ITEMMENUHEIGHT, BLACK);
-}
-
-// Draw ONLY the items in the menu right now
-void draw_items_menu() {
-  for (uint8_t i = 0; i < ITEMSPAGE; i++) {
-    if (gs.inventory[gs.item_top + i].count) {
-      uint8_t item = gs.inventory[gs.item_top + i].item;
-      FX::drawBitmap(ITEMSTARTX + ITEMCURSORMOVEX * (i % ITEMSACROSS),
-                     ITEMSTARTY + ITEMCURSORMOVEY * (i / ITEMSDOWN), itemsheet,
-                     item, dbmOverwrite);
-    }
-  }
-  // Don't forget to draw the scrollbar
-  uint8_t range = gs.max_items - ITEMSPAGE;
-  if (range != 0) {
-    float fscrollpos = (float)gs.item_top / range;
-    arduboy.fillRect(WIDTH - 1,
-                     ITEMSCROLLTOP +
-                         (ITEMSCROLLHEIGHT - ITEMSCROLLBARHEIGHT) * fscrollpos,
-                     1, ITEMSCROLLBARHEIGHT);
-  }
-}
-
 void run_itemmenu() {
   clear_items_menu();
+  if (arduboy.justPressed(A_BUTTON)) {
+    menu_select_beep();
+    gs.tempstate1 = 1; // Don't let b cancel the whole menu
+    initiate_itemselect();
+  }
   if (arduboy.justReleased(B_BUTTON)) {
     if (gs.tempstate1) {
       // menu_select_beep();
       gs.tempstate1 = 0;
     } else {
       // Draw items WITHOUT cursor, then jump to main
-      draw_items_menu();
+      draw_items_menu(&gs);
       initiate_gamemain();
       item_close_beep();
       prep_textarea(); // clear it
@@ -349,24 +222,9 @@ void run_itemmenu() {
     menu_move_beep();
   }
   // is this too laggy? IDK...
-  prep_textarea();
-  uint8_t icount = gs.inventory[gs.item_pos].count;
-  if (icount) {
-    uint8_t len = print_item_name(gs.inventory[gs.item_pos].item);
-    if (icount > 1) {
-      tinyfont.setCursor(BMESSAGEX + (len + 1) * 5, BMESSAGEY);
-      tinyfont.print(icount);
-    }
-  }
-  // Must draw cursor first, then items. Ah well, could fix it maybe
-  FX::drawBitmap(ITEMCURSORSTARTX + ITEMCURSORMOVEX * (vpos % ITEMSACROSS),
-                 ITEMCURSORSTARTY + ITEMCURSORMOVEY * (vpos / ITEMSDOWN),
-                 ((arduboy.buttonsState() & ITEMS_SWAPBTN) == ITEMS_SWAPBTN)
-                     ? cursorselectimg
-                     : cursorimg,
-                 0, dbmOverwrite);
-  //((arduboy.buttonsState() & ITEMS_SWAPBTN) == ITEMS_SWAPBTN)
-  draw_items_menu();
+  print_current_item();
+  draw_items_menu_w_cursor(
+      &gs, vpos, (arduboy.buttonsState() & ITEMS_SWAPBTN) == ITEMS_SWAPBTN);
 }
 
 void gen_region(uint8_t region) {
@@ -413,13 +271,10 @@ void refresh_screen_full() {
   print_tinydigit(arduboy.sBuffer, gs.region, 113, 20);
   print_tinynumber(arduboy.sBuffer, gs.region_floor, 2, 120, 20);
 #ifdef FULLMAP
-  gs_draw_map(&gs, &arduboy, MAPX, MAPY);
+  draw_full_map(&gs, MAPX, MAPY);
 #endif
-  draw_items_menu();
+  draw_items_menu(&gs);
 }
-
-// constexpr uint8_t ITEMSPRITE = 1;
-// constexpr uint8_t ITEMSIZE = 2;
 
 void item_hover(RcSprite<NUMINTERNALBYTES> *sp) {
   sp->setHeight(4 + 2 * sin(arduboy.frameCount / 6.0f));
@@ -499,29 +354,6 @@ NOMOREGENERATESPRITES:
   remove_reserved_map(gs.map);
 }
 
-bool add_item(uint8_t item) {
-  // First, check stackable. If stackable, look for place to put it
-  uint8_t maxstack;
-  FX::readDataObject<uint8_t>(itemstacks + item, maxstack);
-  if (maxstack > 1) {
-    for (uint8_t i = 0; i < gs.max_items; i++) {
-      if (gs.inventory[i].count < maxstack && gs.inventory[i].item == item) {
-        gs.inventory[i].count++;
-        return true;
-      }
-    }
-  }
-  // OK, just look for any empty slot
-  for (uint8_t i = 0; i < gs.max_items; i++) {
-    if (gs.inventory[i].count == 0) {
-      gs.inventory[i].item = item;
-      gs.inventory[i].count = 1;
-      return true;
-    }
-  }
-  return false;
-}
-
 void check_pickup() {
   // Check for any item sprites overlapping the player and initiate a pickup
   for (uint8_t i = 0; i < NUMSPRITES; i++) {
@@ -533,16 +365,20 @@ void check_pickup() {
       uint8_t new_item = 0;
       switch (sprite->frame) {
       case 1:
-        new_item = (prng() & 1) ? 1 : 3; // potion or food (change later)
+        if (RANDOF(12)) {
+          new_item = 7; // Revive spirit
+        } else {
+          new_item = RANDOF(3) ? 1 : 3; // one in three chance for potion
+        }
         break;
       case 2:
         new_item = 5; // rock
         break;
       }
       if (new_item) {
-        if (add_item(new_item)) {
+        if (gs_add_item(&gs, new_item)) {
           raycast.sprites.deleteSprite(sprite);
-          draw_items_menu();
+          draw_items_menu(&gs);
           prep_textarea();
           sg.total_items++;
           tinyfont.print(F("PICKUP: "));
@@ -570,7 +406,6 @@ void goto_next_floor() {
   // gs.total_floor++;
   gs.region_floor++;
   update_visual_position(0);
-  // sound.tone(300, 30);
 }
 
 // void gen_mymap() {
@@ -588,13 +423,6 @@ void goto_next_floor() {
 //   // c.stops = 15;
 //   // c.room_unlikely = 3;
 // }
-
-// Draw a standard 2x16 bar at given x, y chosen by default
-void draw_std_bar(uint8_t x, uint8_t filled, uint8_t max) {
-  uint8_t fh = round(BARHEIGHT * (float)filled / (float)max);
-  arduboy.fillRect(x, BARTOP, 2, BARHEIGHT, BLACK);
-  arduboy.fillRect(x, BARTOP + BARHEIGHT - fh, 2, fh, WHITE);
-}
 
 void draw_runtime_data() {
   draw_std_bar(HEALTHBARX, gs.health, BASESTAMHEALTH);
@@ -616,9 +444,9 @@ void draw_runtime_data() {
   print_tinynumber(arduboy.sBuffer, sg.player_seed, 5, 0, HEIGHT - 5);
   print_tinynumber(arduboy.sBuffer, sg.total_runs, 5, 24, HEIGHT - 5);
 #endif
-  gs_draw_map_near(&gs, &arduboy, MAPX, MAPY, MAPRANGE);
-  gs_draw_map_player(&gs, &arduboy, MAPX, MAPY,
-                     arduboy.frameCount & MAPFLASH ? BLACK : WHITE);
+  draw_map_near(&gs, MAPX, MAPY, MAPRANGE);
+  draw_map_player(&gs, MAPX, MAPY,
+                  arduboy.frameCount & MAPFLASH ? BLACK : WHITE);
 }
 
 bool run_movement(uint8_t movement) {
@@ -647,7 +475,6 @@ void setup() {
   arduboy.flashlight(); // or safeMode(); for an extra 24 bytes wooo
   arduboy.setFrameRate(FRAMERATE);
   FX_INIT();
-  // FX::begin(FX_DATA_PAGE, FX_SAVE_PAGE);
   raycast.render.spritescaling[2] = 0.75f;
   raycast.render.spritescaling[3] = 0.6f;
   gs.map.width = RCMAXMAPDIMENSION;
@@ -722,7 +549,7 @@ RESTARTSTATE:;
     goto SKIPRCRENDER;
     break;
   case GS_STATEMENUANIM:
-    if (menu_animation() < 32) {
+    if (fuzzy_in(titleimg) < 32) {
       gs.state = GS_STATEMENU;
     }
     goto SKIPRCRENDER;
@@ -755,6 +582,8 @@ RESTARTSTATE:;
   case GS_STATEITEMMENU:
     draw_runtime_data();
     run_itemmenu();
+    break;
+  case GS_STATEITEMSELECT:
     break;
   }
 

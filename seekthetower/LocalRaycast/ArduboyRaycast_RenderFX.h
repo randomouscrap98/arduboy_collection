@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __clang__
+#define __uint24 uint32_t
+#endif
+
 #include <Arduboy2.h>
 #include <ArduboyFX.h>
 #include <FixedPoints.h>

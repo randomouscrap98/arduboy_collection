@@ -1,5 +1,12 @@
+// JUST TO SHUTUP CLANGD
+#ifdef __clang__
+#define __uint24 uint32_t
+#endif
+
 #include "game.hpp"
+#include "fxdata/fxdata.h"
 #include "mymath.hpp"
+#include <ArduboyFX.h>
 
 uint8_t get_player_bestdir(MapPlayer *p, Map m) {
   uint8_t max_count = 0;
@@ -159,34 +166,25 @@ uint8_t gs_item_cursor(GameState *gs, Arduboy2Base *arduboy, uint8_t *swapped) {
   return gs->item_pos - gs->item_top;
 }
 
-void gs_draw_map(GameState *gs, Arduboy2Base *arduboy, uint8_t xs, uint8_t ys) {
-  arduboy->fillRect(xs, ys, gs->map.width, gs->map.height, BLACK);
-  for (int y = 0; y < gs->map.height; y++) {
-    for (int x = 0; x < gs->map.width; x++) {
-      if (MAPT(gs->map, x, gs->map.height - 1 - y)) {
-        arduboy->drawPixel(xs + x, ys + y, WHITE);
+bool gs_add_item(GameState *gs, uint8_t item) {
+  // First, check stackable. If stackable, look for place to put it
+  uint8_t maxstack;
+  FX::readDataObject<uint8_t>(itemstacks + item, maxstack);
+  if (maxstack > 1) {
+    for (uint8_t i = 0; i < gs->max_items; i++) {
+      if (gs->inventory[i].count < maxstack && gs->inventory[i].item == item) {
+        gs->inventory[i].count++;
+        return true;
       }
     }
   }
-}
-
-void gs_draw_map_near(GameState *gs, Arduboy2Base *arduboy, uint8_t xs,
-                      uint8_t ys, uint8_t range) {
-  for (int8_t y = -range; y <= range; y++) {
-    for (int8_t x = -range; x <= range; x++) {
-      uint8_t px = x + gs->player.posX;
-      uint8_t py = y + gs->player.posY;
-      if (px >= gs->map.width || py >= gs->map.height)
-        continue;
-      uint8_t mt = MAPT(gs->map, px, py);
-      arduboy->drawPixel(xs + px, ys + gs->map.height - 1 - py,
-                         mt ? WHITE : BLACK);
+  // OK, just look for any empty slot
+  for (uint8_t i = 0; i < gs->max_items; i++) {
+    if (gs->inventory[i].count == 0) {
+      gs->inventory[i].item = item;
+      gs->inventory[i].count = 1;
+      return true;
     }
   }
-}
-
-void gs_draw_map_player(GameState *gs, Arduboy2Base *arduboy, uint8_t xs,
-                        uint8_t ys, uint8_t col) {
-  arduboy->drawPixel(xs + gs->player.posX,
-                     ys + gs->map.height - 1 - gs->player.posY, col);
+  return false;
 }

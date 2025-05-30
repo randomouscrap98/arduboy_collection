@@ -88,6 +88,7 @@ constexpr uint8_t GS_STATEMENU = 5;
 constexpr uint8_t GS_STATEGAMEOVER = 6;
 constexpr uint8_t GS_STATEABOUT = 7;
 constexpr uint8_t GS_STATEITEMMENU = 8;
+constexpr uint8_t GS_STATEITEMSELECT = 9;
 
 // Attempt certain movement, returning which action was performed. The changes
 // are applied immediately to the state.
@@ -105,9 +106,11 @@ bool gs_dead(GameState *gs);
 // screen". Top left = 0, bottom right = ITEMSPAGE - 1
 uint8_t gs_item_cursor(GameState *gs, Arduboy2Base *arduboy, uint8_t *swapped);
 
+bool gs_add_item(GameState *gs, uint8_t item);
+
 // Draw very simple 1:1 map at given location. Does not check if out of bounds
-void gs_draw_map(GameState *gs, Arduboy2Base *arduboy, uint8_t x, uint8_t y);
-void gs_draw_map_near(GameState *gs, Arduboy2Base *arduboy, uint8_t xs,
-                      uint8_t ys, uint8_t range);
-void gs_draw_map_player(GameState *gs, Arduboy2Base *arduboy, uint8_t xs,
-                        uint8_t ys, uint8_t col);
+// void gs_draw_map(GameState *gs, Arduboy2Base *arduboy, uint8_t x, uint8_t y);
+// void gs_draw_map_near(GameState *gs, Arduboy2Base *arduboy, uint8_t xs,
+//                       uint8_t ys, uint8_t range);
+// void gs_draw_map_player(GameState *gs, Arduboy2Base *arduboy, uint8_t xs,
+//                         uint8_t ys, uint8_t col);
