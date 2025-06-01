@@ -1,6 +1,7 @@
 // This saves 1000 bytes but doesn't help the overdraw glitch
 // #define RCSMALLLOOPS
 
+#include "LocalRaycast/ArduboyRaycast_Sprite.h"
 #include <Arduboy2.h>
 #include <Tinyfont.h>
 #include <avr/pgmspace.h>
@@ -338,10 +339,21 @@ void item_hover(RcSprite<NUMINTERNALBYTES> *sp) {
 void anim_normal(RcSprite<NUMINTERNALBYTES> *sp) {
   if ((arduboy.frameCount % sp->intstate[ANIMWAITBYTE]) == 0) {
     sp->frame++;
-    if (sp->frame & 3 == 0)
+    if ((sp->frame & 3) == 0)
       sp->frame -= 4;
-    // sp->frame = sp->frame + (sp->frame + 1) & 3;
   }
+}
+
+RcSprite<NUMINTERNALBYTES> *sprite_in_tile(uint8_t x, uint8_t y) {
+  for (uint8_t i = 0; i < NUMSPRITES; i++) {
+    RcSprite<NUMINTERNALBYTES> *sprite = &raycast.sprites.sprites[i];
+    if (!ISSPRITEACTIVE((*sprite)))
+      continue;
+    if (sprite->x.getInteger() == x && sprite->y.getInteger() == y) {
+      return sprite;
+    }
+  }
+  return NULL;
 }
 
 struct SpriteDefinition {
@@ -380,7 +392,7 @@ constexpr SpriteDefinition sprite_definitions[] PROGMEM = {
     {},
     {
         2,
-        0,
+        4,
         4,
         anim_normal,
     },
@@ -487,28 +499,23 @@ void generate_sprites() {
 
 void check_pickup() {
   // Check for any item sprites overlapping the player and initiate a pickup
-  for (uint8_t i = 0; i < NUMSPRITES; i++) {
-    RcSprite<NUMINTERNALBYTES> *sprite = &raycast.sprites.sprites[i];
-    if (!ISSPRITEACTIVE((*sprite)))
-      continue;
-    if (sprite->x.getInteger() == gs.player.posX &&
-        sprite->y.getInteger() == gs.player.posY) {
-      uint8_t new_item = sprite->intstate[0];
-      if (new_item) {
-        if (gs_add_item(&gs, new_item)) {
-          raycast.sprites.deleteSprite(sprite);
-          draw_items_menu(&gs);
-          prep_textarea();
-          sg.total_items++;
-          tinyfont.print(F("PICKUP: "));
-          tinyfont.setCursor(BMESSAGEX + 40, BMESSAGEY);
-          print_item_name(new_item);
-          item_pickup_beep();
-          break;
-        } else {
-          prep_textarea();
-          tinyfont.print(F("INVENTORY FULL"));
-        }
+  RcSprite<NUMINTERNALBYTES> *sprite =
+      sprite_in_tile(gs.player.posX, gs.player.posY);
+  if (sprite) {
+    uint8_t new_item = sprite->intstate[0];
+    if (new_item) {
+      if (gs_add_item(&gs, new_item)) {
+        raycast.sprites.deleteSprite(sprite);
+        draw_items_menu(&gs);
+        prep_textarea();
+        sg.total_items++;
+        tinyfont.print(F("PICKUP: "));
+        tinyfont.setCursor(BMESSAGEX + 40, BMESSAGEY);
+        print_item_name(new_item);
+        item_pickup_beep();
+      } else {
+        prep_textarea();
+        tinyfont.print(F("INVENTORY FULL"));
       }
     }
   }
@@ -542,6 +549,13 @@ void goto_next_floor() {
 //   // c.stops = 15;
 //   // c.room_unlikely = 3;
 // }
+bool is_sprite_solid(RcSprite<NUMINTERNALBYTES> *sprite) {
+  return sprite && sprite->frame >= 16;
+}
+
+bool movement_solid_sprite_check(GameState *gs, uint8_t x, uint8_t y) {
+  return !is_sprite_solid(sprite_in_tile(x, y));
+}
 
 bool run_movement(uint8_t movement) {
   bool setstate = false;
@@ -610,7 +624,7 @@ RESTARTSTATE:;
       initiate_itemmenu();
       break;
     }
-    movement = gs_move(&gs, &arduboy);
+    movement = gs_move(&gs, &arduboy, movement_solid_sprite_check);
     if (movement) {
       run_movement(movement);
       goto RESTARTSTATE; // Eliminate pause: do animation first frame

@@ -107,7 +107,8 @@ constexpr uint8_t GS_STATEITEMSELECT = 9;
 
 // Attempt certain movement, returning which action was performed. The changes
 // are applied immediately to the state.
-uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy);
+uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy,
+                bool (*extra_check)(GameState *, uint8_t, uint8_t));
 
 void gs_restart(GameState *gs);
 

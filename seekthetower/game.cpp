@@ -52,7 +52,8 @@ uint8_t get_player_bestdir(MapPlayer *p, Map m) {
 // }
 
 // Run movement, setting "next player"
-uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy) {
+uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy,
+                bool (*extra_check)(GameState *, uint8_t, uint8_t)) {
 
   uint8_t move = 0; // gs->buffered_input;
   int8_t pmod = 0;
@@ -82,7 +83,9 @@ uint8_t gs_move(GameState *gs, Arduboy2Base *arduboy) {
     gs->next_player.posX += pmod * dx;
     gs->next_player.posY += pmod * dy;
     uint8_t mt = MAPT(gs->map, gs->next_player.posX, gs->next_player.posY);
-    if (!(mt == TILEEMPTY || (mt & TILEEXITBITS) == TILEEXITBITS)) {
+    if ((extra_check &&
+         !extra_check(gs, gs->next_player.posX, gs->next_player.posY)) ||
+        !(mt == TILEEMPTY || (mt & TILEEXITBITS) == TILEEXITBITS)) {
       move &= ~(GS_MOVEBACKWARD | GS_MOVEFORWARD);
       gs->next_player = gs->player; // Undo what we did before
     }
