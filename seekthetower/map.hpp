@@ -13,6 +13,7 @@
 void set_empty_map(Map m);
 bool clear_rect_map(Map m, MRect r);
 void remove_reserved_map(Map m);
+void reserve_around(Map m, uint8_t x, uint8_t y);
 bool has_2x2_box_around(Map m, uint8_t x, uint8_t y);
 bool has_3x3_box_around(Map m, uint8_t x, uint8_t y);
 

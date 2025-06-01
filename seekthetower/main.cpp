@@ -328,81 +328,143 @@ void draw_menu_init() {
   draw_items_menu(&gs);
 }
 
+constexpr uint8_t ITEMBYTE = 0;
+constexpr uint8_t ANIMWAITBYTE = 1;
+
 void item_hover(RcSprite<NUMINTERNALBYTES> *sp) {
   sp->setHeight(4 + 2 * sin(arduboy.frameCount / 6.0f));
 }
 
+void anim_normal(RcSprite<NUMINTERNALBYTES> *sp) {
+  if ((arduboy.frameCount % sp->intstate[ANIMWAITBYTE]) == 0) {
+    sp->frame++;
+    if (sp->frame & 3 == 0)
+      sp->frame -= 4;
+    // sp->frame = sp->frame + (sp->frame + 1) & 3;
+  }
+}
+
 struct SpriteDefinition {
-  uint8_t sprite;
   uint8_t size;
   uint8_t offset;
+  uint8_t animwait;
   void (*func)(RcSprite<NUMINTERNALBYTES> *);
 };
 
 constexpr SpriteDefinition sprite_definitions[] PROGMEM = {
+    {},
     {
-        0, // Don't care about this one
-    },
-    {
-        1, // Item bag
         2,
         0,
+        1,
         item_hover,
     },
     {
-        2, // rocks
         3,
         4,
+        1,
         NULL,
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {
+        2,
+        0,
+        4,
+        anim_normal,
     },
 };
 
 // Pick a random item to fill the given graphic. We reuse graphics for various
 // items, because our sprite pool is only 256, same as the item pool, and we
 // want enemies and stuff obviously
-uint8_t pick_random_item(uint8_t graphic) {
+// uint8_t pick_random_item(uint8_t graphic) {
+//   switch (graphic) {
+//   case 1:
+//     if (RANDOF(16)) {
+//       return ITEM_REVIVE; // Revive spirit
+//     } else {
+//       return RANDOF(3) ? ITEM_POTION
+//                        : ITEM_FOOD; // one in three chance for potion
+//     }
+//   case 2:
+//     return ITEM_ROCK; // rock
+//   }
+// }
+
+void setup_sprite(uint8_t graphic, uint8_t x, uint8_t y) {
+  SpriteDefinition sp;
+  memcpy_P(&sp, sprite_definitions + graphic, sizeof(SpriteDefinition));
+  RcSprite<NUMINTERNALBYTES> *sprite = raycast.sprites.addSprite(
+      MHALF + x, MHALF + y, graphic, sp.size, sp.offset, sp.func);
+  sprite->intstate[ANIMWAITBYTE] = sp.animwait;
+  // sprite->intstate[0] = pick_random_item(graphic);
   switch (graphic) {
   case 1:
     if (RANDOF(16)) {
-      return ITEM_REVIVE; // Revive spirit
+      sprite->intstate[ITEMBYTE] = ITEM_REVIVE; // Revive spirit
     } else {
-      return RANDOF(3) ? ITEM_POTION
-                       : ITEM_FOOD; // one in three chance for potion
+      sprite->intstate[ITEMBYTE] =
+          RANDOF(3) ? ITEM_POTION : ITEM_FOOD; // one in three chance for potion
     }
+    break;
   case 2:
-    return ITEM_ROCK; // rock
+    sprite->intstate[ITEMBYTE] = ITEM_ROCK; // rock
+    break;
+  case 16:
+    break;
   }
 }
 
-uint8_t try_place_2x2(uint8_t graphic, uint8_t retries, uint8_t count,
-                      uint8_t *gcount, uint8_t limit) {
-  uint8_t ogcount = *gcount;
+struct SpriteLimiter {
+  uint8_t current;
+  uint8_t limit;
+};
+
+bool any_empty(Map map, uint8_t x, uint8_t y) {
+  return MAPT(map, x, y) == TILEEMPTY;
+}
+
+uint8_t try_spawn(uint8_t graphic, uint8_t retries, uint8_t count,
+                  SpriteLimiter *limit, bool (*check)(Map, uint8_t, uint8_t)) {
+  uint8_t ogcount = limit->current;
   for (uint8_t i = 0; i < retries; i++) {
-    if ((*gcount) >= limit || (*gcount) >= ogcount + count)
+    if ((limit->current) >= limit->limit || (limit->current) >= ogcount + count)
       break;
     uint8_t x = 1 + RANDB(14);
     uint8_t y = 1 + RANDB(14);
-    if (has_2x2_box_around(gs.map, x, y)) {
+    if (check == NULL || check(gs.map, x, y)) {
       MAPT(gs.map, x, y) = TILERESERVED;
-      SpriteDefinition sp;
-      memcpy_P(&sp, sprite_definitions + graphic, sizeof(SpriteDefinition));
-      RcSprite<NUMINTERNALBYTES> *sprite = raycast.sprites.addSprite(
-          MHALF + x, MHALF + y, sp.sprite, sp.size, sp.offset, sp.func);
-      sprite->intstate[0] = pick_random_item(graphic);
-      (*gcount)++;
+      setup_sprite(graphic, x, y);
+      limit->current++;
     }
   }
-  return (*gcount) - ogcount;
+  return limit->current - ogcount;
 }
 
 // TODO: this will need to be a very complex function maybe...
 void generate_sprites() {
+  reserve_around(gs.map, gs.player.posX, gs.player.posY);
   // Remove any leftover sprites before we add more
   raycast.sprites.resetSprites();
-  uint8_t spawn = 0;
+  SpriteLimiter limit;
+  limit.limit = NUMOWSPRITES;
+  limit.current = 0;
   // These retries and numbers can be tweaked. May store in FX later
-  try_place_2x2(1, 4, 1, &spawn, NUMOWSPRITES);
-  try_place_2x2(2, 10, 3, &spawn, NUMOWSPRITES);
+  try_spawn(1, 4, 1, &limit, has_2x2_box_around);
+  try_spawn(2, 10, 3, &limit, has_2x2_box_around);
+  try_spawn(16, 10, 3, &limit, any_empty);
 
   // for (uint8_t y = 1; y < gs.map.height - 1; y++) {
   //   for (uint8_t x = 1; x < gs.map.width - 1; x++) {

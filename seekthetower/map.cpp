@@ -24,6 +24,16 @@ bool clear_rect_map(Map m, MRect room) {
   return false;
 }
 
+void reserve_around(Map m, uint8_t x, uint8_t y) {
+  for (uint8_t ys = y - 1; ys <= y + 1; ys++) {
+    for (uint8_t xs = x - 1; xs <= x + 1; xs++) {
+      if (MAPT(m, xs, ys) == TILEEMPTY) {
+        MAPT(m, xs, ys) = TILERESERVED;
+      }
+    }
+  }
+}
+
 // Remove any tiles that are "reserved"
 void remove_reserved_map(Map m) {
   for (uint16_t i = 0; i < m.width * m.height; i++) {
