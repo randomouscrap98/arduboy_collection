@@ -6,7 +6,7 @@
 #include <avr/pgmspace.h>
 
 // This saves ~2700 pgm and 110 ram, will need exitToBootloader in menu
-// ARDUBOY_NO_USB
+ARDUBOY_NO_USB
 
 // JUST TO SHUTUP CLANGD
 #ifdef __clang__
@@ -121,14 +121,19 @@ void begin_game() {
 }
 
 constexpr uint8_t IDENTITYBYTE = 0; // The base identifier for all things
-constexpr uint8_t ANIMWAITBYTE = 1;
-constexpr uint8_t DIRBYTE = 2; // Facing direction for enemies (if they use it)
-constexpr uint8_t QUEUEBYTE = 3;  // Queued up action (usually attack)
-constexpr uint8_t NEWPOSBYTE = 4; // Next position for animation (movement)
+constexpr uint8_t POSBYTE =
+    1; // Realistically need an actual tile position within the map
+constexpr uint8_t ANIMWAITBYTE = 2;
+constexpr uint8_t DIRBYTE = 3; // Facing direction for enemies (if they use it)
+constexpr uint8_t QUEUEBYTE = 4;  // Queued up action (usually attack)
+constexpr uint8_t NEWPOSBYTE = 5; // Next position for animation (movement)
 
-#define ENCODENEWPOS(s, x, y) (s)->intstate[NEWPOSBYTE] = (((y << 4)) | (x))
-#define DECODENEWPOSX(s) ((s)->intstate[NEWPOSBYTE] & 15)
-#define DECODENEWPOSY(s) (((s)->intstate[NEWPOSBYTE] >> 4) & 15)
+// #define ENCODENEWPOS(s, x, y) (s)->intstate[NEWPOSBYTE] = (((y << 4)) | (x))
+// #define DECODENEWPOSX(s) ((s)->intstate[NEWPOSBYTE] & 15)
+// #define DECODENEWPOSY(s) (((s)->intstate[NEWPOSBYTE] >> 4) & 15)
+#define ENCODEBPOS(x, y) (((y << 4)) | (x))
+#define DECODEBPOSX(p) (p & 15)
+#define DECODEBPOSY(p) ((p >> 4) & 15)
 
 constexpr uint8_t G_ITEMBAG = 1;
 constexpr uint8_t G_ROCK = 2;
@@ -139,10 +144,12 @@ constexpr uint8_t G_MOUSE = 16;
 // they don't have rotation and their position is different
 void update_visual_position(float delta) {
   float indelt = 1 - delta;
-  float baseX = 0.5f + gs.player.posX * (indelt);
-  float baseY = 0.5f + gs.player.posY * (indelt);
-  raycast.player.posX = baseX + delta * gs.next_player.posX;
-  raycast.player.posY = baseY + delta * gs.next_player.posY;
+  // float baseX = 0.5f + gs.player.posX * (indelt);
+  // float baseY = 0.5f + gs.player.posY * (indelt);
+  raycast.player.posX =
+      0.5f + gs.player.posX * (indelt) + delta * gs.next_player.posX;
+  raycast.player.posY =
+      0.5f + gs.player.posY * (indelt) + delta * gs.next_player.posY;
   float c1 = cardinal_to_rad(gs.player.cardinal);
   float c2 = cardinal_to_rad(gs.next_player.cardinal);
   // There are certain turns which go the long way. Fix that.
@@ -160,18 +167,33 @@ void update_visual_position(float delta) {
     RcSprite<NUMINTERNALBYTES> *sprite = &raycast.sprites.sprites[i];
     if (!ISSPRITEACTIVE((*sprite)))
       continue;
+    uint8_t sx = DECODEBPOSX(sprite->intstate[POSBYTE]);
+    uint8_t sy = DECODEBPOSY(sprite->intstate[POSBYTE]);
+    uint8_t nx = DECODEBPOSX(sprite->intstate[NEWPOSBYTE]);
+    uint8_t ny = DECODEBPOSY(sprite->intstate[NEWPOSBYTE]);
     // Assume anything over the mouse sprite can move
     if (sprite->intstate[IDENTITYBYTE] >= G_MOUSE) {
-      muflot baseX = 0.5f + sprite->x * (indelt);
-      muflot baseY = 0.5f + sprite->y * (indelt);
-      muflot nextX = 0.5f + DECODENEWPOSX(sprite);
-      muflot nextY = 0.5f + DECODENEWPOSY(sprite);
-      sprite->x = baseX + delta * nextX;
-      sprite->y = baseY + delta * nextY;
+      // muflot baseX = 0.5f + sx * (indelt);
+      // muflot baseY = 0.5f + sy * (indelt);
+      // muflot nextX = 0.5f + nx muflot nextY = 0.5f + DECODENEWPOSY(sprite);
+      sprite->x = 0.5f + sx * indelt + nx * delta;
+      sprite->y = 0.5f + sy * indelt + ny * delta;
+      // baseX + delta * nextX;
+      // sprite->y = baseY + delta * nextY;
     }
     // if (sprite->x.getInteger() == x && sprite->y.getInteger() == y) {
     //   return sprite;
     // }
+  }
+}
+
+// Move sprites to their next position
+void sprites_next_position() {
+  for (uint8_t i = 0; i < NUMSPRITES; i++) {
+    RcSprite<NUMINTERNALBYTES> *sprite = &raycast.sprites.sprites[i];
+    if (!ISSPRITEACTIVE((*sprite)))
+      continue;
+    sprite->intstate[POSBYTE] = sprite->intstate[NEWPOSBYTE];
   }
 }
 
@@ -374,7 +396,8 @@ RcSprite<NUMINTERNALBYTES> *sprite_in_tile(uint8_t x, uint8_t y) {
     RcSprite<NUMINTERNALBYTES> *sprite = &raycast.sprites.sprites[i];
     if (!ISSPRITEACTIVE((*sprite)))
       continue;
-    if (sprite->x.getInteger() == x && sprite->y.getInteger() == y) {
+    if (DECODEBPOSX(sprite->intstate[POSBYTE]) == x &&
+        DECODEBPOSY(sprite->intstate[POSBYTE]) == y) {
       return sprite;
     }
   }
@@ -384,8 +407,10 @@ RcSprite<NUMINTERNALBYTES> *sprite_in_tile(uint8_t x, uint8_t y) {
 // Line of sight with range. Returns the direction to face
 int8_t line_of_sight(RcSprite<NUMINTERNALBYTES> *sprite, uint8_t x, uint8_t y,
                      uint8_t range) { //, int8_t *dist) {
-  uint8_t sx = sprite->x.getInteger();
-  uint8_t sy = sprite->y.getInteger();
+  uint8_t sx =
+      DECODEBPOSX(sprite->intstate[POSBYTE]); // sprite->x.getInteger();
+  uint8_t sy =
+      DECODEBPOSY(sprite->intstate[POSBYTE]); // sprite->y.getInteger();
   int8_t result = -1;
   if (sx == x) {
     //*dist = sy - y;
@@ -425,7 +450,8 @@ void mouse_ai(RcSprite<NUMINTERNALBYTES> *sprite) {
   int8_t dx, dy; //, dist;
   // Mice can only attack in plus sign. Reuse the line of sight func
   // to see if the NEW position is somewhere we can immediately attack
-  int8_t pdir = line_of_sight(sprite, gs.next_player.posX, gs.player.posY, 1);
+  int8_t pdir =
+      line_of_sight(sprite, gs.next_player.posX, gs.next_player.posY, 1);
   if (pdir >= 0) {
     // Queue attack, no movement
     sprite->intstate[QUEUEBYTE] = 1;
@@ -439,18 +465,18 @@ void mouse_ai(RcSprite<NUMINTERNALBYTES> *sprite) {
     sprite->intstate[DIRBYTE] = pdir;
   }
   cardinal_to_dir(sprite->intstate[DIRBYTE], &dx, &dy);
-  uint8_t nx = sprite->x.getInteger() + dx;
-  uint8_t ny = sprite->y.getInteger() + dy;
-  // If the AI is about to run into a wall or literally going to bump INTO the
-  // player's new position somehow, pick a new direction and run the AI again.
-  // At most it should call itself 3 times, so the stack isn't bad
+  uint8_t nx = DECODEBPOSX(sprite->intstate[POSBYTE]) + dx;
+  uint8_t ny = DECODEBPOSY(sprite->intstate[POSBYTE]) + dy;
+  //  If the AI is about to run into a wall or literally going to bump INTO the
+  //  player's new position somehow, pick a new direction and run the AI again.
+  //  At most it should call itself 3 times, so the stack isn't bad
   if (MAPT(gs.map, nx, ny) != TILEEMPTY ||
       (nx == gs.next_player.posX && ny == gs.next_player.posY)) {
     sprite->intstate[DIRBYTE] = (sprite->intstate[DIRBYTE] + 1) & 3;
-    // mouse_ai(sprite);
+    mouse_ai(sprite);
   }
   // Now, encode the new position, since it's good
-  ENCODENEWPOS(sprite, nx, ny);
+  sprite->intstate[NEWPOSBYTE] = ENCODEBPOS(nx, ny);
 }
 
 // Do a tick of the entire world. Enemies, items, etc. Use NEW player
@@ -517,6 +543,8 @@ void setup_sprite(uint8_t graphic, uint8_t x, uint8_t y) {
       MHALF + x, MHALF + y, graphic, sp.size, sp.offset, sp.func);
   // Most things will use this (other than items)
   sprite->intstate[IDENTITYBYTE] = graphic;
+  sprite->intstate[POSBYTE] = ENCODEBPOS(x, y);
+  sprite->intstate[NEWPOSBYTE] = sprite->intstate[POSBYTE];
   sprite->intstate[ANIMWAITBYTE] = sp.animwait;
   sprite->intstate[DIRBYTE] = prng() & 3; // IDK, random direction
   // Pick a random item to fill the given graphic. We reuse graphics for various
@@ -736,6 +764,7 @@ RESTARTSTATE:;
     update_visual_position((float)gs.animframes / gs.animend);
     if (gs.animframes >= gs.animend) {
       gs.player = gs.next_player;
+      sprites_next_position();
       initiate_gamemain();
       check_pickup();
     }
