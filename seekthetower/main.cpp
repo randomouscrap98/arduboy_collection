@@ -1,7 +1,6 @@
 // This saves 1000 bytes but doesn't help the overdraw glitch
 // #define RCSMALLLOOPS
 
-#include "LocalRaycast/ArduboyRaycast_Sprite.h"
 #include <Arduboy2.h>
 #include <Tinyfont.h>
 #include <avr/pgmspace.h>
@@ -121,13 +120,27 @@ void begin_game() {
   initiate_floor_transition();
 }
 
+constexpr uint8_t IDENTITYBYTE = 0; // The base identifier for all things
+constexpr uint8_t ANIMWAITBYTE = 1;
+constexpr uint8_t DIRBYTE = 2; // Facing direction for enemies (if they use it)
+constexpr uint8_t QUEUEBYTE = 3;  // Queued up action (usually attack)
+constexpr uint8_t NEWPOSBYTE = 4; // Next position for animation (movement)
+
+#define ENCODENEWPOS(s, x, y) (s)->intstate[NEWPOSBYTE] = (((y << 4)) | (x))
+#define DECODENEWPOSX(s) ((s)->intstate[NEWPOSBYTE] & 15)
+#define DECODENEWPOSY(s) (((s)->intstate[NEWPOSBYTE] >> 4) & 15)
+
+constexpr uint8_t G_ITEMBAG = 1;
+constexpr uint8_t G_ROCK = 2;
+constexpr uint8_t G_MOUSE = 16;
+
 // Update animation rotation/position based on given delta between current
 // position and new player position. Will NOT be extended to enemies, since
 // they don't have rotation and their position is different
-void update_visual_position(uflot delta) {
-  uflot indelt = 1 - delta;
-  uflot baseX = HALF + gs.player.posX * (indelt);
-  uflot baseY = HALF + gs.player.posY * (indelt);
+void update_visual_position(float delta) {
+  float indelt = 1 - delta;
+  float baseX = 0.5f + gs.player.posX * (indelt);
+  float baseY = 0.5f + gs.player.posY * (indelt);
   raycast.player.posX = baseX + delta * gs.next_player.posX;
   raycast.player.posY = baseY + delta * gs.next_player.posY;
   float c1 = cardinal_to_rad(gs.player.cardinal);
@@ -142,6 +155,24 @@ void update_visual_position(uflot delta) {
   }
   raycast.player.initPlayerDirection((float)indelt * c1 + (float)delta * c2,
                                      FOV);
+  // Might as well also do enemies movement
+  for (uint8_t i = 0; i < NUMSPRITES; i++) {
+    RcSprite<NUMINTERNALBYTES> *sprite = &raycast.sprites.sprites[i];
+    if (!ISSPRITEACTIVE((*sprite)))
+      continue;
+    // Assume anything over the mouse sprite can move
+    if (sprite->intstate[IDENTITYBYTE] >= G_MOUSE) {
+      muflot baseX = 0.5f + sprite->x * (indelt);
+      muflot baseY = 0.5f + sprite->y * (indelt);
+      muflot nextX = 0.5f + DECODENEWPOSX(sprite);
+      muflot nextY = 0.5f + DECODENEWPOSY(sprite);
+      sprite->x = baseX + delta * nextX;
+      sprite->y = baseY + delta * nextY;
+    }
+    // if (sprite->x.getInteger() == x && sprite->y.getInteger() == y) {
+    //   return sprite;
+    // }
+  }
 }
 
 void run_menu() {
@@ -329,19 +360,13 @@ void draw_menu_init() {
   draw_items_menu(&gs);
 }
 
-constexpr uint8_t ITEMBYTE = 0;
-constexpr uint8_t ANIMWAITBYTE = 1;
-
 void item_hover(RcSprite<NUMINTERNALBYTES> *sp) {
   sp->setHeight(4 + 2 * sin(arduboy.frameCount / 6.0f));
 }
 
 void anim_normal(RcSprite<NUMINTERNALBYTES> *sp) {
-  if ((arduboy.frameCount % sp->intstate[ANIMWAITBYTE]) == 0) {
-    sp->frame++;
-    if ((sp->frame & 3) == 0)
-      sp->frame -= 4;
-  }
+  sp->frame = sp->intstate[IDENTITYBYTE] +
+              ((arduboy.frameCount >> sp->intstate[ANIMWAITBYTE]) & 3);
 }
 
 RcSprite<NUMINTERNALBYTES> *sprite_in_tile(uint8_t x, uint8_t y) {
@@ -354,6 +379,93 @@ RcSprite<NUMINTERNALBYTES> *sprite_in_tile(uint8_t x, uint8_t y) {
     }
   }
   return NULL;
+}
+
+// Line of sight with range. Returns the direction to face
+int8_t line_of_sight(RcSprite<NUMINTERNALBYTES> *sprite, uint8_t x, uint8_t y,
+                     uint8_t range) { //, int8_t *dist) {
+  uint8_t sx = sprite->x.getInteger();
+  uint8_t sy = sprite->y.getInteger();
+  int8_t result = -1;
+  if (sx == x) {
+    //*dist = sy - y;
+    if (sy > y) {
+      uint8_t t = sy;
+      sy = y;
+      y = t;
+      result = DIRNORTH; // Sprite is below player
+    } else {
+      result = DIRSOUTH;
+    }
+    for (; sy <= y; sy++) {
+      if (MAPT(gs.map, x, sy) != TILEEMPTY) {
+        return -1;
+      }
+    }
+  } else if (sy == y) {
+    //*dist = sx - x;
+    if (sx > x) {
+      uint8_t t = sx;
+      sx = x;
+      x = t;
+      result = DIRWEST; // Sprite is to the right of player
+    } else {
+      result = DIREAST;
+    }
+    for (; sx <= x; sx++) {
+      if (MAPT(gs.map, sx, y) != TILEEMPTY) {
+        return -1;
+      }
+    }
+  }
+  return result;
+}
+
+void mouse_ai(RcSprite<NUMINTERNALBYTES> *sprite) {
+  int8_t dx, dy; //, dist;
+  // Mice can only attack in plus sign. Reuse the line of sight func
+  // to see if the NEW position is somewhere we can immediately attack
+  int8_t pdir = line_of_sight(sprite, gs.next_player.posX, gs.player.posY, 1);
+  if (pdir >= 0) {
+    // Queue attack, no movement
+    sprite->intstate[QUEUEBYTE] = 1;
+    return;
+  }
+  // If it sees the player, immediately face the player first
+  // before moving. Use the OLD player position (it might make more sense,
+  // consider corners, etc)
+  pdir = line_of_sight(sprite, gs.player.posX, gs.player.posY, 4);
+  if (pdir >= 0) {
+    sprite->intstate[DIRBYTE] = pdir;
+  }
+  cardinal_to_dir(sprite->intstate[DIRBYTE], &dx, &dy);
+  uint8_t nx = sprite->x.getInteger() + dx;
+  uint8_t ny = sprite->y.getInteger() + dy;
+  // If the AI is about to run into a wall or literally going to bump INTO the
+  // player's new position somehow, pick a new direction and run the AI again.
+  // At most it should call itself 3 times, so the stack isn't bad
+  if (MAPT(gs.map, nx, ny) != TILEEMPTY ||
+      (nx == gs.next_player.posX && ny == gs.next_player.posY)) {
+    sprite->intstate[DIRBYTE] = (sprite->intstate[DIRBYTE] + 1) & 3;
+    // mouse_ai(sprite);
+  }
+  // Now, encode the new position, since it's good
+  ENCODENEWPOS(sprite, nx, ny);
+}
+
+// Do a tick of the entire world. Enemies, items, etc. Use NEW player
+// position when checking
+void world_tick() {
+  for (uint8_t i = 0; i < NUMSPRITES; i++) {
+    RcSprite<NUMINTERNALBYTES> *sprite = &raycast.sprites.sprites[i];
+    if (!ISSPRITEACTIVE((*sprite)))
+      continue;
+    switch (sprite->intstate[IDENTITYBYTE]) {
+    case G_MOUSE:
+      mouse_ai(sprite);
+      break;
+    }
+  }
 }
 
 struct SpriteDefinition {
@@ -393,48 +505,36 @@ constexpr SpriteDefinition sprite_definitions[] PROGMEM = {
     {
         2,
         4,
-        4,
+        2,
         anim_normal,
     },
 };
-
-// Pick a random item to fill the given graphic. We reuse graphics for various
-// items, because our sprite pool is only 256, same as the item pool, and we
-// want enemies and stuff obviously
-// uint8_t pick_random_item(uint8_t graphic) {
-//   switch (graphic) {
-//   case 1:
-//     if (RANDOF(16)) {
-//       return ITEM_REVIVE; // Revive spirit
-//     } else {
-//       return RANDOF(3) ? ITEM_POTION
-//                        : ITEM_FOOD; // one in three chance for potion
-//     }
-//   case 2:
-//     return ITEM_ROCK; // rock
-//   }
-// }
 
 void setup_sprite(uint8_t graphic, uint8_t x, uint8_t y) {
   SpriteDefinition sp;
   memcpy_P(&sp, sprite_definitions + graphic, sizeof(SpriteDefinition));
   RcSprite<NUMINTERNALBYTES> *sprite = raycast.sprites.addSprite(
       MHALF + x, MHALF + y, graphic, sp.size, sp.offset, sp.func);
+  // Most things will use this (other than items)
+  sprite->intstate[IDENTITYBYTE] = graphic;
   sprite->intstate[ANIMWAITBYTE] = sp.animwait;
-  // sprite->intstate[0] = pick_random_item(graphic);
+  sprite->intstate[DIRBYTE] = prng() & 3; // IDK, random direction
+  // Pick a random item to fill the given graphic. We reuse graphics for various
+  // items, because our sprite pool is only 256, same as the item pool, and we
+  // want enemies and stuff obviously
   switch (graphic) {
-  case 1:
+  case G_ITEMBAG:
     if (RANDOF(16)) {
-      sprite->intstate[ITEMBYTE] = ITEM_REVIVE; // Revive spirit
+      sprite->intstate[IDENTITYBYTE] = ITEM_REVIVE; // Revive spirit
     } else {
-      sprite->intstate[ITEMBYTE] =
+      sprite->intstate[IDENTITYBYTE] =
           RANDOF(3) ? ITEM_POTION : ITEM_FOOD; // one in three chance for potion
     }
     break;
-  case 2:
-    sprite->intstate[ITEMBYTE] = ITEM_ROCK; // rock
+  case G_ROCK:
+    sprite->intstate[IDENTITYBYTE] = ITEM_ROCK; // rock
     break;
-  case 16:
+  case G_MOUSE:
     break;
   }
 }
@@ -474,9 +574,9 @@ void generate_sprites() {
   limit.limit = NUMOWSPRITES;
   limit.current = 0;
   // These retries and numbers can be tweaked. May store in FX later
-  try_spawn(1, 4, 1, &limit, has_2x2_box_around);
-  try_spawn(2, 10, 3, &limit, has_2x2_box_around);
-  try_spawn(16, 10, 3, &limit, any_empty);
+  try_spawn(G_ITEMBAG, 4, 1, &limit, has_2x2_box_around);
+  try_spawn(G_ROCK, 10, 3, &limit, has_2x2_box_around);
+  try_spawn(G_MOUSE, 10, 3, &limit, any_empty);
 
   // for (uint8_t y = 1; y < gs.map.height - 1; y++) {
   //   for (uint8_t x = 1; x < gs.map.width - 1; x++) {
@@ -562,6 +662,7 @@ bool run_movement(uint8_t movement) {
   if (movement & (GS_MOVEBACKWARD | GS_MOVEFORWARD)) {
     // Run sim here? Some kind of "action"?
     gs_tickstamina(&gs);
+    world_tick();
     step_beep();
     if (gs_dead(&gs)) {
       initiate_gameover();
@@ -632,7 +733,7 @@ RESTARTSTATE:;
     break;
   case GS_STATEANIMATE:
     gs.animframes++;
-    update_visual_position((uflot)gs.animframes / gs.animend);
+    update_visual_position((float)gs.animframes / gs.animend);
     if (gs.animframes >= gs.animend) {
       gs.player = gs.next_player;
       initiate_gamemain();
