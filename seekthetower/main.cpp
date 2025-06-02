@@ -142,10 +142,8 @@ constexpr uint8_t G_MOUSE = 16;
 // Update animation rotation/position based on given delta between current
 // position and new player position. Will NOT be extended to enemies, since
 // they don't have rotation and their position is different
-void update_visual_position(float delta) {
+void update_visual_positions(float delta) {
   float indelt = 1 - delta;
-  // float baseX = 0.5f + gs.player.posX * (indelt);
-  // float baseY = 0.5f + gs.player.posY * (indelt);
   raycast.player.posX =
       0.5f + gs.player.posX * (indelt) + delta * gs.next_player.posX;
   raycast.player.posY =
@@ -171,24 +169,13 @@ void update_visual_position(float delta) {
     uint8_t sy = DECODEBPOSY(sprite->intstate[POSBYTE]);
     uint8_t nx = DECODEBPOSX(sprite->intstate[NEWPOSBYTE]);
     uint8_t ny = DECODEBPOSY(sprite->intstate[NEWPOSBYTE]);
-    // Assume anything over the mouse sprite can move
-    if (sprite->intstate[IDENTITYBYTE] >= G_MOUSE) {
-      // muflot baseX = 0.5f + sx * (indelt);
-      // muflot baseY = 0.5f + sy * (indelt);
-      // muflot nextX = 0.5f + nx muflot nextY = 0.5f + DECODENEWPOSY(sprite);
-      sprite->x = 0.5f + sx * indelt + nx * delta;
-      sprite->y = 0.5f + sy * indelt + ny * delta;
-      // baseX + delta * nextX;
-      // sprite->y = baseY + delta * nextY;
-    }
-    // if (sprite->x.getInteger() == x && sprite->y.getInteger() == y) {
-    //   return sprite;
-    // }
+    sprite->x = 0.5f + sx * indelt + nx * delta;
+    sprite->y = 0.5f + sy * indelt + ny * delta;
   }
 }
 
 // Move sprites to their next position
-void sprites_next_position() {
+void sprites_to_next_position() {
   for (uint8_t i = 0; i < NUMSPRITES; i++) {
     RcSprite<NUMINTERNALBYTES> *sprite = &raycast.sprites.sprites[i];
     if (!ISSPRITEACTIVE((*sprite)))
@@ -406,21 +393,21 @@ RcSprite<NUMINTERNALBYTES> *sprite_in_tile(uint8_t x, uint8_t y) {
 
 // Line of sight with range. Returns the direction to face
 int8_t line_of_sight(RcSprite<NUMINTERNALBYTES> *sprite, uint8_t x, uint8_t y,
-                     uint8_t range) { //, int8_t *dist) {
-  uint8_t sx =
-      DECODEBPOSX(sprite->intstate[POSBYTE]); // sprite->x.getInteger();
-  uint8_t sy =
-      DECODEBPOSY(sprite->intstate[POSBYTE]); // sprite->y.getInteger();
+                     uint8_t range) {
+  uint8_t sx = DECODEBPOSX(sprite->intstate[POSBYTE]);
+  uint8_t sy = DECODEBPOSY(sprite->intstate[POSBYTE]);
   int8_t result = -1;
   if (sx == x) {
-    //*dist = sy - y;
     if (sy > y) {
       uint8_t t = sy;
       sy = y;
       y = t;
-      result = DIRNORTH; // Sprite is below player
-    } else {
       result = DIRSOUTH;
+    } else {
+      result = DIRNORTH;
+    }
+    if (y - sy > range) {
+      return -1;
     }
     for (; sy <= y; sy++) {
       if (MAPT(gs.map, x, sy) != TILEEMPTY) {
@@ -428,7 +415,6 @@ int8_t line_of_sight(RcSprite<NUMINTERNALBYTES> *sprite, uint8_t x, uint8_t y,
       }
     }
   } else if (sy == y) {
-    //*dist = sx - x;
     if (sx > x) {
       uint8_t t = sx;
       sx = x;
@@ -436,6 +422,9 @@ int8_t line_of_sight(RcSprite<NUMINTERNALBYTES> *sprite, uint8_t x, uint8_t y,
       result = DIRWEST; // Sprite is to the right of player
     } else {
       result = DIREAST;
+    }
+    if (x - sx > range) {
+      return -1;
     }
     for (; sx <= x; sx++) {
       if (MAPT(gs.map, sx, y) != TILEEMPTY) {
@@ -447,13 +436,13 @@ int8_t line_of_sight(RcSprite<NUMINTERNALBYTES> *sprite, uint8_t x, uint8_t y,
 }
 
 void mouse_ai(RcSprite<NUMINTERNALBYTES> *sprite) {
-  int8_t dx, dy; //, dist;
+  int8_t dx, dy, pdir;
   // Mice can only attack in plus sign. Reuse the line of sight func
   // to see if the NEW position is somewhere we can immediately attack
-  int8_t pdir =
-      line_of_sight(sprite, gs.next_player.posX, gs.next_player.posY, 1);
+  pdir = line_of_sight(sprite, gs.next_player.posX, gs.next_player.posY, 1);
   if (pdir >= 0) {
     // Queue attack, no movement
+    sprite->intstate[DIRBYTE] = pdir;
     sprite->intstate[QUEUEBYTE] = 1;
     return;
   }
@@ -467,11 +456,11 @@ void mouse_ai(RcSprite<NUMINTERNALBYTES> *sprite) {
   cardinal_to_dir(sprite->intstate[DIRBYTE], &dx, &dy);
   uint8_t nx = DECODEBPOSX(sprite->intstate[POSBYTE]) + dx;
   uint8_t ny = DECODEBPOSY(sprite->intstate[POSBYTE]) + dy;
-  //  If the AI is about to run into a wall or literally going to bump INTO the
-  //  player's new position somehow, pick a new direction and run the AI again.
+  //  If the AI is about to run into a wall or literally going to bump INTO
+  //  another enemy, pick a new direction and run the AI again.
   //  At most it should call itself 3 times, so the stack isn't bad
-  if (MAPT(gs.map, nx, ny) != TILEEMPTY ||
-      (nx == gs.next_player.posX && ny == gs.next_player.posY)) {
+  if (MAPT(gs.map, nx, ny) != TILEEMPTY || sprite_in_tile(nx, ny)) {
+    //(nx == gs.next_player.posX && ny == gs.next_player.posY)) {
     sprite->intstate[DIRBYTE] = (sprite->intstate[DIRBYTE] + 1) & 3;
     mouse_ai(sprite);
   }
@@ -539,8 +528,8 @@ constexpr SpriteDefinition sprite_definitions[] PROGMEM = {
 void setup_sprite(uint8_t graphic, uint8_t x, uint8_t y) {
   SpriteDefinition sp;
   memcpy_P(&sp, sprite_definitions + graphic, sizeof(SpriteDefinition));
-  RcSprite<NUMINTERNALBYTES> *sprite = raycast.sprites.addSprite(
-      MHALF + x, MHALF + y, graphic, sp.size, sp.offset, sp.func);
+  RcSprite<NUMINTERNALBYTES> *sprite =
+      raycast.sprites.addSprite(0, 0, graphic, sp.size, sp.offset, sp.func);
   // Most things will use this (other than items)
   sprite->intstate[IDENTITYBYTE] = graphic;
   sprite->intstate[POSBYTE] = ENCODEBPOS(x, y);
@@ -659,7 +648,7 @@ void goto_next_floor() {
   gs.next_player = gs.player;
   // gs.total_floor++;
   gs.region_floor++;
-  update_visual_position(0);
+  update_visual_positions(0);
 }
 
 // void gen_mymap() {
@@ -761,10 +750,10 @@ RESTARTSTATE:;
     break;
   case GS_STATEANIMATE:
     gs.animframes++;
-    update_visual_position((float)gs.animframes / gs.animend);
+    update_visual_positions((float)gs.animframes / gs.animend);
     if (gs.animframes >= gs.animend) {
       gs.player = gs.next_player;
-      sprites_next_position();
+      sprites_to_next_position();
       initiate_gamemain();
       check_pickup();
     }
